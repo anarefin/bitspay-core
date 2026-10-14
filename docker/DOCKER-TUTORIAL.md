@@ -156,9 +156,36 @@ First start also **downloads** the infra images (Postgres, Kafka, ...), so allow
 ### Step 3 — `make welcome`
 Calls `GET /welcome` on every service.
 
+*Expected output:* every service prints `OK`.
+
 ```
-  OK   ledger-service   http://localhost:8000/ledger/welcome
+  OK   ledger-service           http://localhost:8000/ledger/welcome
+  OK   transaction-service      http://localhost:8000/transaction/welcome
+  OK   wallet-service           http://localhost:8000/wallet/welcome
+  OK   limits-risk-service      http://localhost:8000/limits-risk/welcome
+  OK   pricing-service          http://localhost:8000/pricing/welcome
+  OK   treasury-service         http://localhost:8000/treasury/welcome
+  OK   admin-service            http://localhost:8000/admin/welcome
+  OK   general-ledger-service   http://localhost:8000/general-ledger/welcome
 ```
+
+#### Test with `curl` yourself
+`make welcome` is just `curl` in a loop. Test one service through the edge proxy (port 8000):
+
+```bash
+curl -i http://localhost:8000/ledger/welcome
+```
+
+Or test all eight in one go (prints the HTTP status; `200` = healthy):
+
+```bash
+for p in ledger transaction wallet limits-risk pricing treasury admin general-ledger; do
+  printf '%-16s' "$p"
+  curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:8000/$p/welcome"
+done
+```
+
+Expected: `200` on every line. Anything else (or `000`) means the service or proxy is not up — see [section 10](#10-troubleshooting).
 
 > See [section 11](#11-known-gaps-read-this-before-you-file-a-bug).
 
