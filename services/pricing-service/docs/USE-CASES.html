@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing Service Use Cases</title>
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1f2933;
+  --muted: #5b6876;
+  --border: #e3e7ec;
+  --accent: #0b6e4f;
+  --accent-soft: #e6f4ee;
+  --code-bg: #f3f5f8;
+  --code-text: #24292f;
+  --quote-bg: #f0f6ff;
+  --quote-border: #3b82f6;
+  --th-bg: #f1f4f7;
+  --row-alt: #fafbfc;
+  --warn-bg: #fff8e6;
+  --warn-border: #d99a00;
+  --story-bg: #f6f3ff;
+  --story-border: #7c5cd6;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15.5px/1.65 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+nav.toc {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 28px 18px 28px 22px; border-right: 1px solid var(--border); background: var(--surface);
+}
+nav.toc .brand { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+nav.toc .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 18px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; }
+nav.toc li a {
+  display: block; padding: 5px 10px; border-radius: 6px; color: var(--muted);
+  text-decoration: none; font-size: 13.5px; line-height: 1.4;
+}
+nav.toc li a:hover, nav.toc li a.active { background: var(--accent-soft); color: var(--accent); }
+nav.toc .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 10px 4px; font-weight: 600; }
+main { padding: 36px 48px 80px; min-width: 0; }
+article { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 40px 48px; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 18px; letter-spacing: -0.01em; }
+h2 { font-size: 23px; margin: 56px 0 14px; padding-top: 18px; border-top: 1px solid var(--border); letter-spacing: -0.01em; }
+h3 { font-size: 18px; margin: 34px 0 10px; }
+h4 { font-size: 16px; margin: 26px 0 8px; color: var(--accent); }
+h1, h2, h3, h4 { position: relative; scroll-margin-top: 16px; }
+.anchor { position: absolute; left: -22px; color: var(--border); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; color: var(--muted); }
+a { color: var(--accent); }
+p, ul, ol { margin: 0 0 14px; }
+li { margin: 3px 0; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 14px 18px; background: var(--quote-bg);
+  border-left: 4px solid var(--quote-border); border-radius: 0 8px 8px 0;
+}
+blockquote p { margin: 4px 0; }
+.callout { margin: 0 0 18px; padding: 12px 16px; background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; }
+.callout p { margin: 3px 0; }
+.warn { margin: 0 0 18px; padding: 12px 16px; background: var(--warn-bg); border-left: 4px solid var(--warn-border); border-radius: 0 8px 8px 0; }
+.warn p { margin: 3px 0; }
+.story { margin: 0 0 18px; padding: 12px 16px; background: var(--story-bg); border-left: 4px solid var(--story-border); border-radius: 0 8px 8px 0; }
+.story p { margin: 3px 0; }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
+.tag.r1 { background: var(--accent-soft); color: var(--accent); }
+.tag.r2 { background: #eef0ff; color: #4651c7; }
+code { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; border: 1px solid var(--border); overflow-wrap: anywhere; }
+pre.code {
+  background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.5; margin: 0 0 18px;
+}
+pre.code code { font-size: 12.8px; }
+.label { font-size: 12.5px; color: var(--muted); font-weight: 600; margin: 0 0 4px; }
+.table-wrap { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--border); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+th { background: var(--th-bg); font-weight: 600; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+tbody tr:last-child td { border-bottom: 0; }
+tr.total td { font-weight: 700; background: var(--accent-soft); }
+.diagram {
+  margin: 4px 0 22px; padding: 18px; background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; overflow-x: auto; text-align: center;
+}
+pre.mermaid { margin: 0; background: transparent; font-size: 13px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0 0 20px; }
+.card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: var(--surface); }
+.card h5 { margin: 0 0 6px; font-size: 14.5px; }
+.card p { margin: 0; font-size: 14px; color: var(--muted); }
+.specref { font-size: 13px; color: var(--muted); }
+.top { position: fixed; right: 20px; bottom: 20px; background: var(--accent); color: #fff; border-radius: 999px;
+  padding: 8px 14px; font-size: 13px; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 18px 16px; }
+  main { padding: 16px; }
+  article { padding: 22px 16px; border-radius: 10px; }
+  h1 { font-size: 24px; } h2 { font-size: 20px; }
+  .anchor { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <div class="brand">pricing-service</div>
+    <div class="sub">Use cases, features &amp; workflows</div>
+    <ol>
+<li class="grp">Start here</li>
+<li><a href="#s1">1. The service in one minute</a></li>
+<li><a href="#s2">2. Glossary &amp; money math</a></li>
+<li><a href="#s3">3. The cast (who is who)</a></li>
+<li class="grp">Fees (module pricing)</li>
+<li><a href="#uc1">4. UC1 — Configure a fee plan</a></li>
+<li><a href="#uc2">5. UC2 — Quote a fee</a></li>
+<li><a href="#uc3">6. UC3 — Plans reach transaction-service</a></li>
+<li class="grp">Commission (module pricing)</li>
+<li><a href="#uc4">7. UC4 — In-line agent commission</a></li>
+<li><a href="#uc5">8. UC5 — Hierarchical sharing</a></li>
+<li><a href="#uc6">9. UC6 — Monthly incentive bonus</a></li>
+<li><a href="#uc7">10. UC7 — Reversal &amp; clawback</a></li>
+<li><a href="#uc8">11. UC8 — Commission settlement</a></li>
+<li><a href="#uc9">12. UC9 — Adjustments &amp; disputes</a></li>
+<li><a href="#uc10">13. UC10 — Maker-checker approvals</a></li>
+<li class="grp">Campaigns (module campaign)</li>
+<li><a href="#uc11">14. UC11 — Run a cashback campaign</a></li>
+<li><a href="#uc12">15. UC12 — Referrals, draws, points, education</a></li>
+<li><a href="#uc13">16. UC13 — Reward failures &amp; clawback</a></li>
+<li class="grp">Reference</li>
+<li><a href="#s17">17. Events in and out</a></li>
+<li><a href="#s18">18. API map</a></li>
+<li><a href="#s19">19. Jobs &amp; caching</a></li>
+<li><a href="#s20">20. Where it will live in code</a></li>
+<li><a href="#s21">21. Open decisions</a></li>
+    </ol>
+  </nav>
+  <main>
+    <article>
+<h1 id="top">pricing-service — Use Cases, Features and Workflows</h1>
+<blockquote>
+<p><strong>Who this is for:</strong> developers, QA and business analysts new to Bits Pay who need to understand what pricing-service does. No prior knowledge of MFS pricing is assumed.</p>
+<p><strong>Based on:</strong> <a href="SPEC.md"><code>SPEC.md</code></a> (SVC-06 v6), <a href="contracts/provided/data/pricing-algorithm.v1.md"><code>pricing-algorithm.v1.md</code></a>, <a href="contracts/provided/data/pricing-golden-vectors.v1.json"><code>pricing-golden-vectors.v1.json</code></a> and <a href="contracts/provided/openapi.yaml"><code>openapi.yaml</code></a>. If this guide and those files disagree, <strong>the spec and contracts win</strong>.</p>
+<p><strong>Status:</strong> the code is still the WP-0 skeleton. This guide describes the <em>intended</em> behaviour. Tags: <span class="tag r1">R1</span> = first release, <span class="tag r2">R2</span> = later release. ⚑ marks a provisional value that Finance or Marketing still has to confirm.</p>
+</blockquote>
+
+<!-- ============================================================ -->
+<h2 id="s1"><a class="anchor" href="#s1">#</a>1. The service in one minute</h2>
+<p>Every time money moves in Bits Pay, someone has to decide <strong>"what does this cost, and who earns what from it?"</strong>. pricing-service owns all of those rules. It has two modules in one Spring Boot app:</p>
+<div class="cards">
+  <div class="card"><h5>💸 Fees</h5><p>Fee per transaction (fixed, percent or slab), min/max, VAT, free monthly allowance, and who pays (payer, payee or operator). The merchant fee (MDR) is also a fee.</p></div>
+  <div class="card"><h5>🤝 Commission</h5><p>What the agent earns per transaction, the share passed up to distributors, monthly bonuses, clawbacks, and periodic payout (settlement) with tax (AIT) withheld.</p></div>
+  <div class="card"><h5>🎁 Campaigns <span class="tag r2">R2</span></h5><p>Promotions such as cashback, bonus, referral, lucky draw, points and educational messages, with budgets, abuse checks and clawback.</p></div>
+  <div class="card"><h5>✅ Maker-checker</h5><p>Every rule change is proposed by one person and approved by a <em>different</em> person before it takes effect.</p></div>
+</div>
+
+<h3 id="s1-hot">The most important design idea</h3>
+<p>The payment hot path <strong>never calls pricing-service</strong>. Instead:</p>
+<ol>
+<li>pricing-service publishes every active fee plan on a Kafka topic called <code>fee.rules</code>.</li>
+<li>transaction-service keeps a copy of those plans in memory and computes the fee <em>itself</em>, using the <strong>same algorithm</strong> (<code>pricing-algorithm</code> v1).</li>
+<li>Both services prove they compute identical numbers by passing the same <strong>golden vectors</strong>, a shared file of test cases.</li>
+</ol>
+<p>Later, pricing-service reads the completed transactions from <code>txn.events</code> to record commissions and evaluate campaigns. This happens <em>after</em> the payment has completed.</p>
+
+<div class="diagram"><pre class="mermaid">flowchart LR
+  STAFF["Back-office staff"]
+  HOLDER["Customers / agents (app)"]
+  PS(("pricing-service<br/>pricing + campaign"))
+  TX["transaction-service"]
+  LED["ledger-service"]
+  WAL["wallet-service"]
+  LR["limits-risk-service"]
+  ADM["admin-service"]
+  STAFF -- "plans, rules, campaigns, approvals" --&gt; PS
+  HOLDER -- "offers, rewards, referral code" --&gt; PS
+  PS -. "fee.rules (plans)" .-&gt; TX
+  TX -. "txn.events (completed / reversed)" .-&gt; PS
+  WAL -. "partner / wallet / customer events" .-&gt; PS
+  PS -- "settle commission, pay rewards, clawback" --&gt; LED
+  PS -- "status:batchGet" --&gt; WAL
+  PS -- "evaluate:batch (rewards)" --&gt; LR
+  PS -. "approval, audit, notification events" .-&gt; ADM</pre></div>
+<p class="specref">Solid arrows are HTTP calls and dotted arrows are Kafka topics. Spec ref: SPEC §1.1, §3.1.</p>
+
+<h3 id="s1-never">Things it must NEVER do</h3>
+<ol>
+<li>Use <code>double</code>/<code>float</code> for money, or round with anything other than <strong>HALF_EVEN</strong>.</li>
+<li>Debit a partner (agent/distributor) wallet. Clawbacks are netted against future payouts instead.</li>
+<li>Publish a plan that has not been approved by a checker other than its maker, or publish a future version before its start time.</li>
+<li>Store customer names, clear NID, full phone numbers or device ids. These are stored as HMAC hashes only.</li>
+<li>Call services other than ledger, wallet, limits-risk and admin.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="s2"><a class="anchor" href="#s2">#</a>2. Glossary &amp; money math</h2>
+<div class="table-wrap"><table><thead><tr><th>Term</th><th>Plain meaning</th><th>Example</th></tr></thead><tbody>
+<tr><td><strong>poisha</strong></td><td>The smallest unit of Taka. 100 poisha = 1 Tk. Every amount is stored as a whole number of poisha (<code>long</code>).</td><td>500 Tk = <code>50000</code></td></tr>
+<tr><td><strong>bps</strong> (basis points)</td><td>A rate expressed in hundredths of a percent. 10000 bps = 100 %.</td><td>150 bps = 1.5 %; 1500 bps = 15 %</td></tr>
+<tr><td><strong>Pricing plan</strong></td><td>A rule that says "for this kind of transaction, charge this fee and pay this commission". It has an id such as <code>PLN-CASHOUT-STD</code>.</td><td>Cash-out costs 1.5 %</td></tr>
+<tr><td><strong>Version</strong></td><td>Each change to a plan creates a new version (v1, v2, …). Only one version is ACTIVE at a time.</td><td>v3 ACTIVE, v4 SCHEDULED</td></tr>
+<tr><td><strong>Fee bearer</strong></td><td>Who pays the fee: <code>PAYER</code> (sender), <code>PAYEE</code> (receiver, e.g. a merchant paying MDR) or <code>OPERATOR</code> (Bits Pay absorbs it).</td><td>MDR → PAYEE</td></tr>
+<tr><td><strong>VAT</strong></td><td>Value-added tax charged on the fee.</td><td>15 % of fee</td></tr>
+<tr><td><strong>MDR</strong></td><td>Merchant Discount Rate: the fee a merchant pays on a customer's payment. Modelled as a MERCHANT_PAYMENT plan with bearer PAYEE.</td><td>1.5 % of a QR payment</td></tr>
+<tr><td><strong>Commission</strong></td><td>What a partner (usually the agent) earns from a transaction.</td><td>40 % of the cash-out fee</td></tr>
+<tr><td><strong>AIT</strong></td><td>Advance Income Tax withheld from commission at source. The default is 10 %; 15 % applies to share accruals when the partner has no TIN ⚑.</td><td>commission 300 → AIT 30</td></tr>
+<tr><td><strong>Accrual</strong></td><td>One line in the commission ledger, recording "X earned Y from transaction Z".</td><td>Rupa earned 75</td></tr>
+<tr><td><strong>Settlement</strong></td><td>Periodic payout of accrued commission to a partner's wallet (net of AIT).</td><td>Weekly payout</td></tr>
+<tr><td><strong>Maker / Checker</strong></td><td>The maker proposes a change and the checker (a different person) approves it.</td><td>PRICING_MAKER / PRICING_CHECKER</td></tr>
+<tr><td><strong>Campaign</strong> / <strong>Segment</strong></td><td>A promotion with a budget, and the group of users it targets.</td><td>"10 % cashback on first QR"</td></tr>
+<tr><td><strong>Clawback</strong></td><td>Taking back a commission or reward when the original transaction is reversed.</td><td>Reversed cash-out → negative accrual</td></tr>
+</tbody></table></div>
+
+<h3 id="s2-bps">The one rounding function: <code>bpsOf</code></h3>
+<p>All percentage math in the service goes through one function. It computes <code>base × bps / 10000</code> using integers only, and rounds <strong>half to even</strong> (banker's rounding). An exact <code>.5</code> rounds to the nearest <em>even</em> number. Anything above <code>.5</code> rounds up, and anything below rounds down.</p>
+<pre class="code"><code class="lang-java">static long bpsOf(long base, int bps) {          // base ≥ 0
+  long n = Math.multiplyExact(base, (long) bps);
+  long q = n / 10_000, r = n % 10_000;
+  if (r &gt; 5_000 || (r == 5_000 &amp;&amp; (q &amp; 1) == 1)) q++;
+  return q;
+}</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Call</th><th class="num">Exact</th><th class="num">Result</th><th>Why</th></tr></thead><tbody>
+<tr><td><code>bpsOf(750, 1500)</code></td><td class="num">112.5</td><td class="num"><strong>112</strong></td><td>exactly .5 and 112 is even → stay</td></tr>
+<tr><td><code>bpsOf(75, 1000)</code></td><td class="num">7.5</td><td class="num"><strong>8</strong></td><td>exactly .5 and 7 is odd → go to 8</td></tr>
+<tr><td><code>bpsOf(45, 1000)</code></td><td class="num">4.5</td><td class="num"><strong>4</strong></td><td>exactly .5 and 4 is even → stay</td></tr>
+<tr><td><code>bpsOf(525, 1500)</code></td><td class="num">78.75</td><td class="num"><strong>79</strong></td><td>above .5 → round up</td></tr>
+<tr><td><code>bpsOf(1000, 125)</code></td><td class="num">12.5</td><td class="num"><strong>12</strong></td><td>even → stay</td></tr>
+<tr><td><code>bpsOf(1000, 175)</code></td><td class="num">17.5</td><td class="num"><strong>18</strong></td><td>17 is odd → 18</td></tr>
+</tbody></table></div>
+<p class="specref">Spec ref: BR-PRC-01, BR-PRC-02, pricing-algorithm §3.</p>
+
+<!-- ============================================================ -->
+<h2 id="s3"><a class="anchor" href="#s3">#</a>3. The cast (who is who)</h2>
+<p>The examples follow the same characters that the spec uses:</p>
+<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Wallet type / category</th></tr></thead><tbody>
+<tr><td>Rahim, Karim</td><td>Customers</td><td><code>C</code>, category 0</td></tr>
+<tr><td>Salma's shop</td><td>Retail agent (cash-in / cash-out point)</td><td><code>A</code>, 101 RETAIL</td></tr>
+<tr><td>Rupa Telecom</td><td>Sub-distributor (Salma's parent)</td><td><code>D</code>, 203 SUB</td></tr>
+<tr><td>Dhaka North Distribution</td><td>Distributor</td><td><code>D</code>, 202 DISTRIBUTOR</td></tr>
+<tr><td>Bengal Master Distribution</td><td>Master distributor</td><td><code>D</code>, 201 MASTER</td></tr>
+<tr><td>Nirob Store</td><td>Micro grocery merchant</td><td><code>M</code>, 3101 (3000 + size 1 × 100 + MCC group 1)</td></tr>
+<tr><td>Maker / Checker</td><td>Back-office staff with roles such as PRICING_MAKER, PRICING_CHECKER, FIN_MAKER, FIN_CHECKER, OPS_MAKER, OPS_CHECKER</td><td>—</td></tr>
+</tbody></table></div>
+<p>Wallet types: <code>C</code> customer, <code>A</code> agent, <code>D</code> distributor, <code>M</code> merchant, <code>I</code> institution.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc1"><a class="anchor" href="#uc1">#</a>4. Use case 1 — Configure a fee plan <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> a PRICING_MAKER proposes the plan and a PRICING_CHECKER approves it.</p><p><strong>Why:</strong> fees change through configuration, never through a code deployment (SRS FEE-001, FEE-005, ADM-004).</p></div>
+<div class="story"><p><strong>Story.</strong> Bits Pay decides that from 1 November a cash-out costs <strong>1.5 %</strong> plus 15 % VAT, and the agent earns <strong>40 % of the fee</strong>. The maker types this in as plan <code>PLN-CASHOUT-STD</code>. The checker reviews it and approves it. At midnight on 1 November the plan goes live by itself.</p></div>
+
+<h3 id="uc1-anatomy">Anatomy of a plan</h3>
+<div class="table-wrap"><table><thead><tr><th>Part</th><th>What it says</th><th>Options</th></tr></thead><tbody>
+<tr><td><code>txnType</code></td><td>Which transaction kind the plan prices</td><td>P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL</td></tr>
+<tr><td><code>match</code></td><td>Optional filters. <code>null</code> means "any".</td><td><code>channel</code>, <code>payerWalletType</code>, <code>payeeWalletType</code>, <code>payerKycTier</code>, <code>categoryCode</code></td></tr>
+<tr><td><code>priority</code></td><td>Higher wins when several plans match</td><td>0..100000</td></tr>
+<tr><td><code>effectiveFrom</code> / <code>effectiveTo</code></td><td>When the plan is valid. From is inclusive, To is exclusive, and a null To means open-ended.</td><td>timestamps</td></tr>
+<tr><td><code>fee</code></td><td>How the fee is computed, with a min/max clamp (<code>maxPoisha = 0</code> means no cap)</td><td>FIXED, PERCENT, SLAB, NONE</td></tr>
+<tr><td><code>feeBearer</code></td><td>Who pays</td><td>PAYER, PAYEE, OPERATOR (SHARED reserved)</td></tr>
+<tr><td><code>vatBps</code></td><td>VAT on the fee</td><td>e.g. 1500 = 15 %</td></tr>
+<tr><td><code>freeMonthlyCount</code></td><td>First N transactions per month are free</td><td>e.g. 5</td></tr>
+<tr><td><code>commission</code></td><td>What the agent earns, with its own min/max clamp and AIT</td><td>NONE, FIXED, PERCENT_OF_AMOUNT, PERCENT_OF_FEE</td></tr>
+</tbody></table></div>
+
+<h3 id="uc1-flow">Workflow</h3>
+<ol>
+<li><strong>Create.</strong> The maker calls <code>POST /v1/pricing/plans</code>, which creates the plan and its <strong>DRAFT v1</strong>. Later changes go through <code>POST …/{planId}/versions</code> (new draft) and <code>PUT …/versions/{v}</code> (edit, using <code>If-Match</code>).</li>
+<li><strong>Optional dry run.</strong> <code>POST /v1/pricing/plans:validate</code> checks the plan and returns sample quotes, without saving anything.</li>
+<li><strong>Submit.</strong> <code>POST …/versions/{v}:submit</code> runs the validation rules and the <strong>golden self-check</strong> (every golden vector must still pass). The version becomes <strong>PENDING_APPROVAL</strong> and an approval request is created.</li>
+<li><strong>Approve.</strong> A checker (≠ maker) calls <code>POST /v1/approvals/{id}:approve</code>. The golden self-check runs again.</li>
+<li><strong>Go live.</strong> If <code>effectiveFrom</code> is in the future, the version becomes <strong>SCHEDULED</strong>, and the activation scheduler (every 10 s) switches it to ACTIVE at that moment. If <code>effectiveFrom</code> is now, it becomes ACTIVE immediately. Backdating more than 5 minutes is refused.</li>
+<li><strong>Publish.</strong> In one DB transaction the old version becomes SUPERSEDED, the new one ACTIVE, and an outbox row is written. Debezium then sends <code>PRICING_PLAN_UPSERTED</code> to <code>fee.rules</code>.</li>
+</ol>
+
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant M as PRICING_MAKER
+  participant P as pricing-service
+  participant C as PRICING_CHECKER
+  participant K as fee.rules topic
+  M-&gt;&gt;P: POST /v1/pricing/plans (DRAFT v1)
+  M-&gt;&gt;P: POST .../versions/1:submit
+  P-&gt;&gt;P: validate rules + golden self-check
+  P--&gt;&gt;M: PENDING_APPROVAL, approvalId
+  C-&gt;&gt;P: POST /v1/approvals/{id}:approve
+  P-&gt;&gt;P: checker != maker, golden self-check again
+  alt effectiveFrom in the future
+    P-&gt;&gt;P: SCHEDULED (nothing published yet)
+    Note over P: ActivationScheduler fires at effectiveFrom
+  end
+  P-&gt;&gt;P: old version SUPERSEDED, new version ACTIVE (one DB txn + outbox)
+  P--&gt;&gt;K: PRICING_PLAN_UPSERTED key = planId</pre></div>
+
+<h3 id="uc1-states">Version lifecycle</h3>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; DRAFT : create / new version
+  DRAFT --&gt; PENDING_APPROVAL : submit (validation ok)
+  DRAFT --&gt; WITHDRAWN : withdraw
+  PENDING_APPROVAL --&gt; WITHDRAWN : withdraw by maker
+  PENDING_APPROVAL --&gt; REJECTED : rejected or expired (72h)
+  PENDING_APPROVAL --&gt; SCHEDULED : approved, starts later
+  PENDING_APPROVAL --&gt; ACTIVE : approved, starts now
+  SCHEDULED --&gt; ACTIVE : at effectiveFrom (publish)
+  ACTIVE --&gt; SUPERSEDED : newer version active
+  ACTIVE --&gt; EXPIRED : effectiveTo reached
+  ACTIVE --&gt; RETIRED : retire approved (tombstone)
+  EXPIRED --&gt; RETIRED : retire approved</pre></div>
+
+<h3 id="uc1-rules">Validation rules that catch beginners</h3>
+<ul>
+<li><strong>SLAB</strong>: slabs must start at 1, be contiguous (<code>next.from = prev.to + 1</code>), and only the last slab may have <code>toPoisha = null</code>.</li>
+<li><strong>NONE</strong> fee ⇒ <code>minPoisha = maxPoisha = 0</code>. Also, <code>feeBearer = OPERATOR</code> ⇒ fee type must be NONE.</li>
+<li><code>feeBearer = SHARED</code> and <code>commission.vatBps</code> are rejected with <code>RESERVED_VALUE</code>, because those decisions are still open.</li>
+<li>Commission beneficiary must be the agent side: CASH_IN → PAYER, CASH_OUT → PAYEE.</li>
+<li><strong>Regulatory caps</strong> ⚑: the fee at the sample amounts 100 Tk to 25 lakh Tk must stay within the configured caps (e.g. CASH_OUT ≤ 185 bps, P2P ≤ 25 Tk).</li>
+<li>A retired <code>planId</code> can never be reused.</li>
+</ul>
+
+<h3 id="uc1-api">Sample request</h3>
+<p class="label">POST /v1/pricing/plans (PRICING_MAKER)</p>
+<pre class="code"><code class="lang-json">{
+  "planId": "PLN-CASHOUT-STD",
+  "txnType": "CASH_OUT",
+  "description": "Standard cash-out: 1.5% fee, 40% of fee to agent",
+  "match": { "channel": null, "payerWalletType": null, "payeeWalletType": null,
+             "payerKycTier": null, "categoryCode": null },
+  "priority": 100,
+  "effectiveFrom": "2026-11-01T00:00:00.000Z",
+  "effectiveTo": null,
+  "fee": { "type": "PERCENT", "fixedPoisha": 0, "percentBps": 150, "slabs": [],
+           "minPoisha": 0, "maxPoisha": 0 },
+  "feeBearer": "PAYER",
+  "vatBps": 1500,
+  "freeMonthlyCount": 0,
+  "commission": { "type": "PERCENT_OF_FEE", "valueBps": 4000, "fixedPoisha": 0,
+                  "source": "FEE_INCOME", "beneficiary": "PAYEE", "aitBps": 1000,
+                  "minPoisha": 0, "maxPoisha": 0 }
+}</code></pre>
+<p class="label">POST …/versions/4:submit → 200</p>
+<pre class="code"><code class="lang-json">{ "planId": "PLN-P2P-STD", "version": 4, "status": "PENDING_APPROVAL",
+  "approvalId": "0192f3d0-1b2c-7a00-8e11-4c5d6e7f8a9b",
+  "validation": { "ok": true, "errors": [], "warnings": ["commission.type NONE"],
+                  "goldenSelfCheck": "PASSED" } }</code></pre>
+
+<h3 id="uc1-retire">Retiring a plan</h3>
+<p><code>POST /v1/pricing/plans/{planId}:retire</code> with a <code>reason</code> creates a RETIRE approval. Once it is approved, every version becomes RETIRED or WITHDRAWN, and a <strong>tombstone</strong> (key = planId, value = null) is published on <code>fee.rules</code> so that consumers delete the plan.</p>
+<p class="specref">Spec ref: §3.4 F1/F2, §3.5, §5.1.4, BR-PRC-04..09, BR-PRC-20..27.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc2"><a class="anchor" href="#uc2">#</a>5. Use case 2 — Quote a fee (the pricing algorithm) <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> any service or staff tool, through <code>POST /v1/pricing/quote</code>. transaction-service runs the same algorithm in its own process.</p><p><strong>Why:</strong> to show the fee before confirmation (SRS FEE-004) and to answer back-office "what if" questions. The response takes p99 ≤ 20 ms and is served from memory, without touching the DB.</p></div>
+<div class="story"><p><strong>Story.</strong> Karim wants to cash out <strong>500 Tk</strong> at Salma's shop. The app asks "what will this cost?". The answer is a 7.50 Tk fee plus 1.12 Tk VAT, so Karim pays <strong>508.62 Tk</strong> in total. Salma earns 3.00 Tk commission, of which 0.30 Tk is withheld as tax.</p></div>
+
+<h3 id="uc2-steps">The 8 steps, in plain words</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+  A["Step 0: resolve category<br/>(agent/merchant side)"] --&gt; B["Step 1: find candidate plans<br/>ACTIVE, same txnType, in date range, match fields equal"]
+  B --&gt; C{"any candidate?"}
+  C -- "no" --&gt; Z["Return zero result<br/>(planId null, all amounts 0)"]
+  C -- "yes" --&gt; D["Step 2: pick one<br/>priority, then specificity, then version, then planId"]
+  D --&gt; E{"Step 3: free allowance left?"}
+  E -- "yes" --&gt; F0["fee = 0 (no min clamp)"]
+  E -- "no" --&gt; F["Step 4: fee by type<br/>then clamp to min / max"]
+  F0 --&gt; G["Step 5: VAT = bpsOf(fee, vatBps)"]
+  F --&gt; G
+  G --&gt; H["Step 6: commission gross, clamp, AIT"]
+  H --&gt; I{"Step 7: bearer = OPERATOR?"}
+  I -- "yes" --&gt; J["fee = 0, VAT = 0"]
+  I -- "no" --&gt; K["Step 8: return 9 fields"]
+  J --&gt; K</pre></div>
+<ol>
+<li><strong>Step 0: category.</strong> If the payee is an agent, distributor, merchant or institution (A/D/M/I), use the payee's category; otherwise use the payer's. So CASH_OUT → the agent, MERCHANT_PAYMENT → the merchant, CASH_IN → the agent (who is the payer), and P2P → 0.</li>
+<li><strong>Step 1: candidates.</strong> Keep plans that are ACTIVE, of the same txnType, with <code>effectiveFrom ≤ at &lt; effectiveTo</code>, and whose every non-null <code>match</code> field equals the request.</li>
+<li><strong>Step 2: selection.</strong> Highest <code>priority</code> wins. On a tie, the plan with more non-null match fields (more specific) wins, then the higher version, then the smaller planId.</li>
+<li><strong>Step 3: free allowance.</strong> If the sender has used fewer than <code>freeMonthlyCount</code> transactions of this type this month, the fee is 0.</li>
+<li><strong>Step 4: fee.</strong> FIXED → <code>fixedPoisha</code>. PERCENT → <code>bpsOf(amount, percentBps)</code>. SLAB → find the slab containing the amount, then <code>slab.fixed + bpsOf(amount, slab.percent)</code>. NONE → 0. Then clamp: <code>max(fee, min)</code>, then <code>min(fee, max)</code> if max &gt; 0.</li>
+<li><strong>Step 5: VAT</strong> = <code>bpsOf(fee, vatBps)</code>.</li>
+<li><strong>Step 6: commission.</strong> Compute the gross by type, clamp it to the commission min/max, then compute AIT = <code>bpsOf(gross, aitBps)</code>.</li>
+<li><strong>Step 7: operator-borne.</strong> If the bearer is OPERATOR, the output fee and VAT are forced to 0.</li>
+</ol>
+
+<h3 id="uc2-examples">Worked examples (all are golden vectors)</h3>
+
+<h4>Example A — Percent fee + commission (vector G2)</h4>
+<p>Karim cashes out 500 Tk (<code>50000</code>) at Salma. Plan: PERCENT 150 bps, VAT 1500, commission PERCENT_OF_FEE 4000 bps, AIT 1000.</p>
+<div class="table-wrap"><table><thead><tr><th>Step</th><th>Calculation</th><th class="num">Poisha</th><th class="num">Taka</th></tr></thead><tbody>
+<tr><td>Fee</td><td><code>bpsOf(50000, 150)</code> = 750.0</td><td class="num">750</td><td class="num">7.50</td></tr>
+<tr><td>VAT</td><td><code>bpsOf(750, 1500)</code> = 112.5 → half-even</td><td class="num">112</td><td class="num">1.12</td></tr>
+<tr><td>Commission (gross)</td><td><code>bpsOf(750, 4000)</code> = 300.0</td><td class="num">300</td><td class="num">3.00</td></tr>
+<tr><td>AIT</td><td><code>bpsOf(300, 1000)</code> = 30.0</td><td class="num">30</td><td class="num">0.30</td></tr>
+<tr class="total"><td>Karim pays</td><td>amount + fee + VAT</td><td class="num">50862</td><td class="num">508.62</td></tr>
+</tbody></table></div>
+
+<h4>Example B — Fixed fee P2P (vector G1)</h4>
+<p>Rahim sends Karim 500 Tk. Plan: FIXED 500 poisha, VAT 1500. The result is fee <strong>500</strong> (5 Tk) and VAT <code>bpsOf(500,1500)</code> = <strong>75</strong>.</p>
+
+<h4>Example C — Slab fee with a cap (vectors G5, G6)</h4>
+<p>Plan <code>PLN-P2P-STD</code>: slab 1 covers 1–100000 poisha with fixed 500, and slab 2 covers ≥ 100001 at 50 bps. The max is 2500.</p>
+<div class="table-wrap"><table><thead><tr><th>Amount</th><th>Which slab</th><th>Raw fee</th><th>After clamp</th><th class="num">VAT</th></tr></thead><tbody>
+<tr><td>100000 (1,000 Tk)</td><td>slab 1 (both ends inclusive)</td><td>500</td><td>500</td><td class="num">75</td></tr>
+<tr><td>100001 (1,000.01 Tk)</td><td>slab 2</td><td>0 + <code>bpsOf(100001, 50)</code> = 500.005 → 500</td><td>500</td><td class="num">75</td></tr>
+<tr><td>1000000 (10,000 Tk)</td><td>slab 2</td><td><code>bpsOf(1000000, 50)</code> = 5000</td><td><strong>2500</strong> (capped)</td><td class="num">375</td></tr>
+</tbody></table></div>
+
+<h4>Example D — Minimum fee (vector X4)</h4>
+<p>Plan: PERCENT 50 bps, <code>minPoisha 1000</code>. Amount 10000 → raw fee 50, which is raised to the minimum of <strong>1000</strong>. VAT = <strong>150</strong>.</p>
+
+<h4>Example E — Free monthly allowance (vectors G7, G8)</h4>
+<p>Plan: FIXED 500, <code>freeMonthlyCount 5</code>. <code>usage.senderMonthlyCountForTxnType</code> is the count <em>before</em> this transaction.</p>
+<div class="table-wrap"><table><thead><tr><th>Sender has already done</th><th>This is their</th><th class="num">Fee</th><th class="num">VAT</th></tr></thead><tbody>
+<tr><td>4 this month</td><td>5th → still free</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>5 this month</td><td>6th → paid</td><td class="num">500</td><td class="num">75</td></tr>
+</tbody></table></div>
+<p>The minimum fee is <em>not</em> applied when the allowance makes the fee 0. A PERCENT_OF_FEE commission also becomes 0, because the fee is 0.</p>
+
+<h4>Example F — Merchant MDR with a category-specific plan (vector X2)</h4>
+<p>Rahim pays Nirob Store (category 3101) 350 Tk. Two plans match: the generic MDR plan (150 bps) and a grocery plan with <code>categoryCode 3101</code> (100 bps). They have the same priority, so the more specific grocery plan wins. MDR = <code>bpsOf(35000, 100)</code> = <strong>350</strong>, and VAT = 52.5 → <strong>52</strong>. The generic plan would have charged 525 / 79. The fee bearer is <strong>PAYEE</strong>, so Nirob Store pays it.</p>
+
+<h4>Example G — Plan selection (vectors G11, G12)</h4>
+<ul>
+<li>Two plans with priority 100 (FIXED 500) and priority 200 (FIXED 300) → the priority-200 plan wins, so the fee is <strong>300</strong>.</li>
+<li>Same priority, but one plan matches <code>payerKycTier = 2</code> (FIXED 400) and the other is generic (FIXED 500) → the more specific plan wins, so the fee is <strong>400</strong>.</li>
+</ul>
+
+<h4>Example H — Operator absorbs the fee (vector X7) and no plan (X1)</h4>
+<ul>
+<li>A plan with bearer OPERATOR → output fee 0 and VAT 0, even if the computed fee was 500.</li>
+<li>FLOAT_TRANSFER with no matching plan → <code>planId: null</code> and every amount 0.</li>
+</ul>
+
+<h3 id="uc2-api">Sample request / response</h3>
+<p class="label">POST /v1/pricing/quote</p>
+<pre class="code"><code class="lang-json">{ "txnType": "CASH_OUT", "channel": "USSD", "amountPoisha": 50000,
+  "payer": { "walletType": "C", "kycTier": 1, "categoryCode": 0 },
+  "payee": { "walletType": "A", "kycTier": 2, "categoryCode": 101 },
+  "usage": { "senderMonthlyCountForTxnType": 0 },
+  "at": "2026-10-09T08:03:22.000Z" }</code></pre>
+<p class="label">200 OK, always exactly nine fields</p>
+<pre class="code"><code class="lang-json">{ "planId": "PLN-CASHOUT-STD", "planVersion": 2,
+  "feePoisha": 750, "vatPoisha": 112, "feeBearer": "PAYER",
+  "commissionPoisha": 300, "aitPoisha": 30,
+  "commissionSource": "FEE_INCOME", "commissionBeneficiary": "PAYEE" }</code></pre>
+<p>Errors: <code>400 VALIDATION_FAILED</code> (bad input) · <code>403 ACTOR_NOT_ALLOWED</code> · <code>503 PLAN_SNAPSHOT_STALE</code> (the DB is down and the in-memory snapshot is older than 5 min).</p>
+<p class="specref">Spec ref: pricing-algorithm §4–§7, BR-PRC-10..18, §5.1.1.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc3"><a class="anchor" href="#uc3">#</a>6. Use case 3 — Plans reach transaction-service <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> transaction-service, a consumer of <code>fee.rules</code>.</p><p><strong>Why:</strong> payments compute their fee locally and never wait on pricing-service. This only works if every copy of the plans and of the algorithm is identical.</p></div>
+<h3 id="uc3-flow">How the copy stays in sync</h3>
+<ol>
+<li><strong>Bootstrap</strong>: on start-up, transaction-service pages through <code>GET /v1/pricing/plans?status=ACTIVE</code> (200 per page, following <code>nextCursor</code> until null). The header <code>X-Snapshot-Outbox-Position</code> tells it which point of the outbox the snapshot covers.</li>
+<li><strong>Stream</strong>: it then consumes <code>fee.rules</code>. This is a <em>compacted</em> topic, so Kafka keeps only the latest value per <code>planId</code>. A newer value replaces the plan, and a null value (tombstone) deletes it. Values with <code>status: "EXPIRED"</code> are dropped.</li>
+<li><strong>Prove</strong>: it downloads <code>GET /v1/pricing/golden-vectors</code> (whose <code>ETag</code> is a SHA-256 of the file) and must pass every <code>CATALOGUE</code> vector in its tests.</li>
+<li><strong>Heal</strong>: if the topic is ever damaged, an admin calls <code>POST /v1/internal/pricing/fee-rules:republish</code> (with <code>Idempotency-Key</code>), which re-writes every current value and tombstone.</li>
+</ol>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant P as pricing-service
+  participant O as outbox table
+  participant D as Debezium
+  participant K as fee.rules (compacted)
+  participant T as transaction-service
+  T-&gt;&gt;P: GET /v1/pricing/plans?status=ACTIVE (paged)
+  P--&gt;&gt;T: items[] + X-Snapshot-Outbox-Position
+  T-&gt;&gt;P: GET /v1/pricing/golden-vectors
+  P--&gt;&gt;T: vector file + ETag
+  Note over P: later, a version becomes ACTIVE
+  P-&gt;&gt;O: insert PRICING_PLAN_UPSERTED (same DB txn)
+  O--&gt;&gt;D: change captured
+  D-&gt;&gt;K: key = planId, value = PlanJson
+  K-&gt;&gt;T: replace plan in memory
+  Note over T: next payment uses the new fee</pre></div>
+<div class="warn"><p><strong>Timing note:</strong> a version is published <em>when it becomes ACTIVE</em>, not when it is approved. Publishing it early would overwrite the plan that is still current. The switch may lag by up to 30 s, which is alerted (OPEN D-44).</p></div>
+<p class="specref">Spec ref: §5.1.2, §5.1.3, §5.2.1, ADR-03, ADR-04, BR-PRC-09a/b.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc4"><a class="anchor" href="#uc4">#</a>7. Use case 4 — In-line agent commission <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> agents such as Salma. Commission is defined in the same pricing plan as the fee.</p><p><strong>Why:</strong> agents are paid for each cash-in and cash-out they serve (SRS COM-001, COM-003).</p></div>
+<p>"In-line" means that the agent's commission is paid <strong>inside the payment itself</strong>: transaction-service posts it in the payment's ledger chain. pricing-service only <em>records</em> it afterwards, as a statement line.</p>
+
+<h3 id="uc4-options">Commission options in a plan</h3>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Values</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>type</code></td><td>NONE · FIXED · PERCENT_OF_AMOUNT · PERCENT_OF_FEE</td><td>How the gross commission is computed</td></tr>
+<tr><td><code>source</code></td><td>FEE_INCOME · COMMISSION_PAYABLE</td><td>Which operator account pays it. FEE_INCOME carves it out of the fee; COMMISSION_PAYABLE is an operator expense (e.g. cash-in, where there is no fee).</td></tr>
+<tr><td><code>beneficiary</code></td><td>PAYER · PAYEE</td><td>The agent side: CASH_IN → PAYER, CASH_OUT → PAYEE</td></tr>
+<tr><td><code>minPoisha</code> / <code>maxPoisha</code></td><td>≥ 0 (max 0 = no cap)</td><td>Clamp applied <strong>before</strong> AIT</td></tr>
+<tr><td><code>aitBps</code></td><td>e.g. 1000</td><td>Tax withheld on the gross</td></tr>
+</tbody></table></div>
+
+<h3 id="uc4-examples">Examples</h3>
+<div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Plan</th><th>Amount</th><th class="num">Gross</th><th class="num">AIT</th><th class="num">Salma nets</th></tr></thead><tbody>
+<tr><td>Karim cashes out 500 Tk (G2)</td><td>PERCENT_OF_FEE 4000, FEE_INCOME</td><td>50000</td><td class="num">300</td><td class="num">30</td><td class="num">270</td></tr>
+<tr><td>Salma cashes in 1,000 Tk to Rahim (G3)</td><td>PERCENT_OF_AMOUNT 40, COMMISSION_PAYABLE</td><td>100000</td><td class="num">400</td><td class="num">40</td><td class="num">360</td></tr>
+<tr><td>Big cash-in, commission capped (X8)</td><td>PERCENT_OF_AMOUNT 40, max 2000</td><td>1000000 → raw 4000</td><td class="num">2000</td><td class="num">200</td><td class="num">1800</td></tr>
+<tr><td>Small cash-in, commission floor (X9)</td><td>PERCENT_OF_AMOUNT 40, min 500</td><td>50000 → raw 200</td><td class="num">500</td><td class="num">50</td><td class="num">450</td></tr>
+</tbody></table></div>
+
+<h3 id="uc4-record">How the record is made</h3>
+<ol>
+<li>transaction-service publishes <code>TRANSACTION_COMPLETED</code> on <code>txn.events</code>, carrying <code>commissionPoisha</code>, <code>aitPoisha</code> and the beneficiary wallet.</li>
+<li>The pricing consumer first <strong>filters</strong> out irrelevant events without writing to the DB, which keeps 5k TPS cheap.</li>
+<li>For a relevant event it writes an <strong>INLINE</strong> accrual at level 0 with status <code>INLINE_SETTLED</code>. The money has already moved, so it is never paid again. It also emits <code>COMMISSION_ACCRUED</code>.</li>
+<li>If the beneficiary is missing, it is derived from the txnType (CASH_IN → sender, CASH_OUT → receiver). Otherwise the event is parked.</li>
+</ol>
+<p class="specref">Spec ref: BR-PRC-16, BR-PRC-24/25, BR-PRC-28/29, vectors G2, G3, X8, X9.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc5"><a class="anchor" href="#uc5">#</a>8. Use case 5 — Hierarchical commission sharing <span class="tag r2">R2</span></h2>
+<div class="callout"><p><strong>Who:</strong> the distributors above an agent (sub-distributor, distributor, master).</p><p><strong>Why:</strong> the whole distribution chain is rewarded for each agent transaction (SRS COM-002).</p></div>
+<div class="story"><p><strong>Story.</strong> Salma reports to Rupa Telecom, which reports to Dhaka North, which reports to Bengal Master. When Karim cashes out at Salma's shop, all three distributors earn a small share from a separate pool that the operator funds.</p></div>
+
+<h3 id="uc5-rule">The share rule</h3>
+<pre class="code"><code class="lang-json">{ "ruleId": "CSR-CASHOUT-STD", "txnType": "CASH_OUT", "matchAgentSubType": null,
+  "poolBasis": "FEE", "poolBps": 2000, "unassignedMode": "RETAIN_OPERATOR", "priority": 100,
+  "splits": [ {"ancestorRole": "DISTRIBUTOR:SUB",         "shareBps": 5000, "aitBps": 1000},
+              {"ancestorRole": "DISTRIBUTOR:DISTRIBUTOR", "shareBps": 3000, "aitBps": 1000},
+              {"ancestorRole": "DISTRIBUTOR:MASTER",      "shareBps": 2000, "aitBps": 1000} ],
+  "effectiveFrom": "2026-11-01T00:00:00.000Z", "effectiveTo": null }</code></pre>
+<p>In plain words: <strong>pool = 20 % of the fee</strong>. Half of the pool goes to the sub-distributor, 30 % to the distributor and 20 % to the master. The splits must add up to 10000 bps. Share rules go through the same draft → submit → approve lifecycle as plans (<code>/v1/commissions/share-rules</code>), but they are <em>not</em> published to Kafka.</p>
+
+<h3 id="uc5-calc">Worked example: Karim's 500 Tk cash-out</h3>
+<div class="table-wrap"><table><thead><tr><th>Who</th><th>Level</th><th>Calculation</th><th class="num">Gross</th><th class="num">AIT</th><th class="num">Net</th><th>Status</th></tr></thead><tbody>
+<tr><td>Salma (agent)</td><td>0 INLINE</td><td>from the plan (UC4)</td><td class="num">300</td><td class="num">30</td><td class="num">270</td><td>INLINE_SETTLED</td></tr>
+<tr><td colspan="7"><em>pool = bpsOf(fee 750, 2000) = 150</em></td></tr>
+<tr><td>Rupa Telecom (SUB)</td><td>1 SHARE</td><td>150 × 50 % = 75.0; AIT 7.5 → 8</td><td class="num">75</td><td class="num">8</td><td class="num">67</td><td>ACCRUED</td></tr>
+<tr><td>Dhaka North (DISTRIBUTOR)</td><td>2 SHARE</td><td>150 × 30 % = 45.0; AIT 4.5 → 4</td><td class="num">45</td><td class="num">4</td><td class="num">41</td><td>ACCRUED</td></tr>
+<tr><td>Bengal (MASTER)</td><td>3 SHARE</td><td>150 × 20 % = 30.0; AIT 3</td><td class="num">30</td><td class="num">3</td><td class="num">27</td><td>ACCRUED</td></tr>
+</tbody></table></div>
+<p>The SHARE lines are <code>ACCRUED</code>: they are owed but not yet paid, and they are paid later by settlement (UC8).</p>
+
+<h3 id="uc5-remainder">When the pool doesn't split evenly: largest remainder</h3>
+<p>Shares must always add up <em>exactly</em> to the pool. Take a pool of <strong>101</strong> poisha split 50/30/20:</p>
+<div class="table-wrap"><table><thead><tr><th>Split</th><th class="num">Exact</th><th class="num">Floor</th><th class="num">Remainder</th><th class="num">Final</th></tr></thead><tbody>
+<tr><td>Rupa 50 %</td><td class="num">50.5</td><td class="num">50</td><td class="num">.5 (largest)</td><td class="num"><strong>51</strong></td></tr>
+<tr><td>Dhaka North 30 %</td><td class="num">30.3</td><td class="num">30</td><td class="num">.3</td><td class="num">30</td></tr>
+<tr><td>Bengal 20 %</td><td class="num">20.2</td><td class="num">20</td><td class="num">.2</td><td class="num">20</td></tr>
+<tr class="total"><td>Total</td><td class="num">101</td><td class="num">100</td><td class="num">1 left over</td><td class="num">101 ✓</td></tr>
+</tbody></table></div>
+
+<h3 id="uc5-missing">When a level is missing</h3>
+<p>Suppose Rupa moves directly under Bengal from 1 Nov, so there is no DISTRIBUTOR in the chain:</p>
+<ul>
+<li><code>RETAIN_OPERATOR</code>: the 30 % share (45) is simply not paid, and the operator keeps it.</li>
+<li><code>NEAREST_PRESENT_ANCESTOR</code>: the 30 % is added to the nearest ancestor that is present.</li>
+</ul>
+<p>The hierarchy is <strong>effective-dated</strong>. A cash-out completed on 31 Oct but processed later still uses the old chain.</p>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant K as txn.events
+  participant P as TxnEventsConsumer
+  participant DB as svc_pricing
+  K-&gt;&gt;P: TRANSACTION_COMPLETED CASH_OUT (fee 750, commission 300)
+  P-&gt;&gt;P: relevant? (else skip, no DB write)
+  P-&gt;&gt;DB: processed_event (dedupe)
+  P-&gt;&gt;DB: INLINE accrual Salma 300/30
+  P-&gt;&gt;DB: share rule + hierarchy as of completedAt
+  P-&gt;&gt;DB: SHARE accruals L1..L3 + 4x COMMISSION_ACCRUED (outbox)
+  Note over P,DB: all in one DB transaction</pre></div>
+<p class="specref">Spec ref: §7.6 BR-PRC-30..38 (worked example), ADR-05, ADR-06, §5.1.5.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc6"><a class="anchor" href="#uc6">#</a>9. Use case 6 — Monthly incentive bonus <span class="tag r2">R2</span></h2>
+<div class="callout"><p><strong>Who:</strong> agents and distributors who hit monthly targets.</p><p><strong>Why:</strong> target-based bonuses motivate partners (SRS COM-008).</p></div>
+<p>An incentive rule counts each partner's transactions (<code>TXN_COUNT</code>) or volume (<code>TXN_VOLUME</code>) per month. On the <strong>1st of the month at 03:30</strong> Dhaka time, the previous month is evaluated and the <strong>highest tier reached</strong> pays a bonus.</p>
+<p class="label">Illustrative rule (the values are examples, not seeds)</p>
+<pre class="code"><code class="lang-json">{ "ruleId": "INC-AGENT-MONTHLY", "partnerType": "AGENT", "subType": null,
+  "metric": "TXN_COUNT", "txnTypes": ["CASH_IN", "CASH_OUT"], "period": "MONTHLY",
+  "tiers": [ { "thresholdFrom": 300, "bonusPoisha": 50000 },
+             { "thresholdFrom": 600, "bonusPoisha": 120000 } ],
+  "aitBps": 1000,
+  "effectiveFrom": "2026-11-01T00:00:00.000Z", "effectiveTo": null }</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Salma's November count</th><th>Tier reached</th><th class="num">Bonus</th><th class="num">AIT</th><th class="num">Net</th></tr></thead><tbody>
+<tr><td>250</td><td>none</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>450</td><td>≥ 300</td><td class="num">50000 (500 Tk)</td><td class="num">5000</td><td class="num">45000</td></tr>
+<tr><td>700</td><td>≥ 600 (highest only)</td><td class="num">120000 (1,200 Tk)</td><td class="num">12000</td><td class="num">108000</td></tr>
+</tbody></table></div>
+<p>The bonus becomes a <strong>BONUS</strong> accrual (level 9, ACCRUED) and is paid in the next settlement. A reversed transaction decrements the counter for its original month.</p>
+<p class="specref">Spec ref: BR-PRC-60, BR-PRC-61, §5.1.5 IncentiveRuleDefinition.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc7"><a class="anchor" href="#uc7">#</a>10. Use case 7 — Reversal &amp; commission clawback <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> triggered automatically by <code>TRANSACTION_REVERSED</code> events.</p><p><strong>Why:</strong> if a transaction is undone, the commission earned on it must be undone too (SRS COM-006), but a partner wallet is <strong>never debited</strong>.</p></div>
+<h3 id="uc7-flow">What happens</h3>
+<ol>
+<li>A reversal arrives with <code>reverseCommission = true</code>.</li>
+<li>For every INLINE and SHARE accrual of that transaction, a <strong>negative CLAWBACK</strong> accrual is added, with the same beneficiary and level and minus the gross and AIT.
+  <ul>
+    <li>INLINE clawback → <code>INLINE_SETTLED</code>, because the ledger reversal already returned the in-line money.</li>
+    <li>SHARE clawback → <code>ACCRUED</code>, and it is netted in the next settlement.</li>
+  </ul>
+</li>
+<li>If <code>reverseCommission = false</code> (e.g. a partial or fee-only reversal), nothing is clawed back by default.</li>
+<li>If the reversal arrives <em>before</em> the completion event (out of order), it waits in <code>pending_clawback</code>. When the completion arrives, the commission is accrued and immediately clawed back.</li>
+</ol>
+
+<h3 id="uc7-example">Example: Rupa's share is clawed back after it was paid</h3>
+<div class="table-wrap"><table><thead><tr><th>Event</th><th class="num">Gross</th><th class="num">AIT</th><th>Status</th></tr></thead><tbody>
+<tr><td>Week 1: share from Karim's cash-out</td><td class="num">75</td><td class="num">8</td><td>SETTLED (paid)</td></tr>
+<tr><td>Week 2: Karim's cash-out reversed → CLAWBACK</td><td class="num">−75</td><td class="num">−8</td><td>ACCRUED</td></tr>
+<tr><td>Week 2: new shares earned</td><td class="num">60</td><td class="num">6</td><td>ACCRUED</td></tr>
+<tr class="total"><td>Week 2 settlement net</td><td class="num">−15</td><td class="num">−2</td><td>net = −13 ≤ 0 → <strong>SKIPPED</strong>, carried forward</td></tr>
+</tbody></table></div>
+<p>Finance is alerted (<code>COMMISSION_NEGATIVE_BALANCE</code>) when a carried negative exceeds 1,000 Tk ⚑ or is older than 90 days. Recovery is done by a treasury manual journal, not by this service.</p>
+<p class="specref">Spec ref: §7.7 BR-PRC-40..45, ADR-08. The week-2 numbers are illustrative.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc8"><a class="anchor" href="#uc8">#</a>11. Use case 8 — Commission settlement (payout) <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> the settlement job (daily at <strong>03:10</strong> Dhaka time, after end of day), plus FIN_MAKER and FIN_CHECKER.</p><p><strong>Why:</strong> accrued commission (shares, bonuses, adjustments) is paid to the partner's wallet on a schedule, with AIT withheld (SRS COM-004/005).</p></div>
+<h3 id="uc8-profile">Settlement profiles</h3>
+<div class="table-wrap"><table><thead><tr><th>Partner</th><th>Default frequency ⚑</th><th>Mode</th></tr></thead><tbody>
+<tr><td>Agent</td><td>WEEKLY (period starts Saturday)</td><td>WALLET</td></tr>
+<tr><td>Distributor (all subtypes)</td><td>MONTHLY</td><td>WALLET</td></tr>
+<tr><td>Merchant / institution</td><td>no profile (they earn no commission)</td><td>—</td></tr>
+</tbody></table></div>
+<p>A FIN_MAKER can change a profile (<code>PUT /v1/commissions/settlement-profiles/{walletId}</code>, which needs approval) or <strong>hold</strong> payouts immediately (<code>:hold</code>). Releasing a hold (<code>:unhold</code>) needs approval. <code>mode = BANK</code> is not supported yet and returns 422.</p>
+
+<h3 id="uc8-flow">Workflow</h3>
+<ol>
+<li>For each partner whose period has ended: sum every <code>ACCRUED</code> accrual with business date ≤ period end, including carried-forward ones. Then <strong>net = Σ gross − Σ AIT</strong>.</li>
+<li>Decide the outcome:
+  <ul>
+    <li>net ≤ 0 or below <code>minPayoutPoisha</code> → <strong>SKIPPED</strong> (the accruals carry forward)</li>
+    <li>profile on hold or partner not ACTIVE → <strong>HELD</strong></li>
+    <li>gross ≥ 1 lakh Tk ⚑ → <strong>PENDING_APPROVAL</strong> (FIN_CHECKER; two levels at ≥ 10 lakh Tk)</li>
+    <li>otherwise → <strong>POSTING</strong></li>
+  </ul>
+</li>
+<li>The <code>settlementId</code> (also used as the ledger <code>commandId</code>) and a <code>txnRef</code> such as <code>CMS-20261007-K3M9QX2A</code> are saved <em>before</em> the ledger call.</li>
+<li>Call ledger <code>post-commission-settlement</code>. The gross comes from COMMISSION_PAYABLE, the AIT goes to AIT_PAYABLE and the net goes to the partner's wallet.</li>
+<li>Handle the result:
+  <ul>
+    <li>OK or EXISTS → <strong>SETTLED</strong>, and <code>COMMISSION_SETTLED</code> is emitted.</li>
+    <li>Timeout or 503 → retry later with the <em>same</em> commandId, so the payout is never doubled.</li>
+    <li>REJECTED → <strong>FAILED</strong>, and the profile is put on hold. <code>:retry</code> re-plans the payout with a new id.</li>
+  </ul>
+</li>
+</ol>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; PLANNED : job sums accruals
+  PLANNED --&gt; SKIPPED : net &lt;= 0 or below min payout
+  PLANNED --&gt; HELD : on hold or partner not ACTIVE
+  PLANNED --&gt; PENDING_APPROVAL : gross over threshold
+  PLANNED --&gt; POSTING : below threshold
+  PENDING_APPROVAL --&gt; POSTING : approved
+  PENDING_APPROVAL --&gt; CANCELLED : rejected / expired
+  POSTING --&gt; POSTING : timeout or 503 (same commandId)
+  POSTING --&gt; SETTLED : ledger OK / EXISTS
+  POSTING --&gt; FAILED : ledger REJECTED
+  FAILED --&gt; CANCELLED : retry (re-plan)</pre></div>
+
+<h3 id="uc8-example">Example: one week of payout</h3>
+<pre class="code"><code class="lang-json">{ "settlementId": "0192f400-6c1d-7e22-8a10-5b6c7d8e9f00", "txnRef": "CMS-20261007-K3M9QX2A",
+  "beneficiaryWalletId": "0192f4a1-0d03-7c00-8a00-00000000d003",
+  "period": "2026-10-01/2026-10-07",
+  "grossPoisha": 4520, "aitPoisha": 452, "netPoisha": 4068, "accrualCount": 37,
+  "status": "SETTLED", "ledgerResult": "OK", "attempts": 1,
+  "postedAt": "2026-10-08T21:10:03.120Z" }</code></pre>
+<p>In words: 37 accruals added up to 45.20 Tk. The service withheld 4.52 Tk of AIT and paid <strong>40.68 Tk</strong> to the wallet.</p>
+
+<h3 id="uc8-reports">Statements and reports</h3>
+<ul>
+<li><code>GET /v1/commissions/accruals</code>: every accrual line, filterable.</li>
+<li><code>GET /v1/commissions/statements/{walletId}?fromDate&amp;toDate</code>: opening balance, lines, settlements, totals and closing balance. Partners can see their own statement.</li>
+<li><code>GET /v1/commissions/summary</code>: dashboard totals grouped by txnType, level, partner type or date.</li>
+<li><code>GET /v1/commissions/ait-certificates/{walletId}?fiscalYear=2026-27</code>: AIT per month for the July–June tax year.</li>
+</ul>
+<p class="specref">Spec ref: §7.8 BR-PRC-50..59, §5.1.6, §5.1.7, ADR-09.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc9"><a class="anchor" href="#uc9">#</a>12. Use case 9 — Adjustments &amp; disputes <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> FIN_MAKER (raises), FIN_CHECKER (approves), and partners or OPS_MAKER (open disputes).</p><p><strong>Why:</strong> real life has mistakes, such as missed accruals or wrong rules, and they need a controlled way to fix them (SRS COM-006).</p></div>
+<h3 id="uc9-adj">Manual adjustment</h3>
+<div class="story"><p>Salma reports that she was not credited for a cash-out. Finance confirms it and raises a +120 Tk adjustment.</p></div>
+<p class="label">POST /v1/commissions/adjustments (Idempotency-Key required)</p>
+<pre class="code"><code class="lang-json">{ "beneficiaryWalletId": "0192f4a1-0a01-7c00-8a00-00000000a001",
+  "grossPoisha": 12000, "aitBps": 1000,
+  "reasonCode": "MISSED_ACCRUAL", "reference": "Ticket 0192f9aa",
+  "relatedTxnRef": "CO26100300Q8XK2M1D" }</code></pre>
+<p>AIT = sign × <code>bpsOf(|12000|, 1000)</code> = <strong>1200</strong>. The adjustment needs one approval below 1 lakh Tk ⚑ and two at or above it. Once approved, it becomes an <strong>ADJUSTMENT</strong> accrual (level 8, ACCRUED) that is paid in the next settlement. A negative <code>grossPoisha</code> reduces what the partner is owed.</p>
+<h3 id="uc9-dispute">Dispute</h3>
+<ol>
+<li>The partner (or ops) opens <code>POST /v1/commissions/disputes</code>, listing the accrual ids and a description. Those accruals become <strong>DISPUTED</strong> and are excluded from settlement.</li>
+<li>FIN_MAKER resolves it with <code>POST …/disputes/{id}:resolve</code> and outcome <code>UPHELD</code> or <code>REJECTED</code>. UPHELD with an amount creates an adjustment, which needs approval.</li>
+<li>Either way, the disputed accruals return to <strong>ACCRUED</strong> and are paid normally.</li>
+</ol>
+<p class="specref">Spec ref: BR-PRC-62, BR-PRC-63, §5.1.8.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc10"><a class="anchor" href="#uc10">#</a>13. Use case 10 — Maker-checker approvals <span class="tag r1">R1</span></h2>
+<div class="callout"><p><strong>Who:</strong> every staff role, from both modules, through one approval engine.</p><p><strong>Why:</strong> no single person can change money rules alone (SRS BOM-004/005).</p></div>
+<h3 id="uc10-rules">Engine rules</h3>
+<ul>
+<li>The checker must not be the maker. A second-level checker must differ from the first-level one.</li>
+<li>Approvals expire after <strong>72 h</strong>, and the entity then returns to its previous state (e.g. a plan version becomes REJECTED and a campaign goes back to DRAFT).</li>
+<li>On the final approval the entity is <strong>re-validated</strong> in the same transaction. If that fails, the call returns 409 and the approval stays pending.</li>
+<li>Every transition publishes <code>approval.events</code> and <code>audit.events</code>.</li>
+</ul>
+<div class="table-wrap"><table><thead><tr><th>What needs approval</th><th>Action</th><th>Checker / levels</th></tr></thead><tbody>
+<tr><td>Plan version / plan retire</td><td>ACTIVATE / RETIRE</td><td>PRICING_CHECKER, 1</td></tr>
+<tr><td>Share rule / incentive rule</td><td>ACTIVATE / RETIRE</td><td>PRICING_CHECKER, 1</td></tr>
+<tr><td>Commission adjustment</td><td>APPROVE_ADJUSTMENT</td><td>FIN_CHECKER, 1–2 by amount</td></tr>
+<tr><td>Large settlement</td><td>RELEASE_SETTLEMENT</td><td>FIN_CHECKER, 1 (≥ 1 lakh) / 2 (≥ 10 lakh)</td></tr>
+<tr><td>Settlement profile change / unhold</td><td>UPDATE_PROFILE / UNHOLD</td><td>FIN_CHECKER, 1</td></tr>
+<tr><td>Campaign activation / budget increase</td><td>ACTIVATE / BUDGET_INCREASE</td><td>OPS_CHECKER; + FIN_CHECKER when the budget is ≥ 10 lakh Tk</td></tr>
+<tr><td>Campaign cancel</td><td>CANCEL</td><td>OPS_CHECKER, 1</td></tr>
+<tr><td>Fraud reward clawback</td><td>CLAWBACK</td><td>RISK_CHECKER, 1</td></tr>
+<tr><td>Reward write-off</td><td>WRITE_OFF</td><td>FIN_CHECKER, 1</td></tr>
+<tr><td>Lucky draw</td><td>EXECUTE_DRAW</td><td>OPS_CHECKER (+ FIN_CHECKER for large prizes)</td></tr>
+</tbody></table></div>
+<p class="label">API</p>
+<pre class="code"><code>GET  /v1/approvals?status=PENDING&amp;entityType=PricingPlanVersion   → inbox
+POST /v1/approvals/{id}:approve   { "comment": "Checked against Finance memo" }
+POST /v1/approvals/{id}:reject    { "comment": "Wrong VAT rate", "reasonCode": "WRONG_RATE" }</code></pre>
+<p>Typical errors: <code>422 CHECKER_IS_MAKER</code>, <code>409 APPROVAL_EXPIRED</code>, <code>409 GOLDEN_SELF_CHECK_FAILED</code>, <code>409 BACKDATING_NOT_ALLOWED</code>.</p>
+<p class="specref">Spec ref: §5.1.9, §7.12 approval table.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc11"><a class="anchor" href="#uc11">#</a>14. Use case 11 — Run a cashback campaign <span class="tag r2">R2</span></h2>
+<div class="callout"><p><strong>Who:</strong> OPS_MAKER designs the campaign, OPS_CHECKER (and FIN_CHECKER for big budgets) approves it, and customers receive rewards.</p><p><strong>Why:</strong> to drive adoption, such as a customer's first QR payment (SRS CMP-001..009).</p></div>
+<div class="story"><p><strong>Story (S15 "QR10").</strong> Marketing runs <em>"10 % cashback on your first QR payment, up to 50 Tk"</em> for November. Rahim pays Nirob Store <strong>350 Tk</strong> by QR for the first time. Within seconds, <strong>35 Tk</strong> arrives in his wallet, funded from the <code>CAMPAIGN_FUNDING</code> ledger account.</p></div>
+
+<h3 id="uc11-design">1. Design the campaign</h3>
+<p class="label">POST /v1/campaigns (OPS_MAKER) → DRAFT</p>
+<pre class="code"><code class="lang-json">{ "code": "QR10-NOV26", "name": "First QR payment — 10% cashback",
+  "objective": "MERCHANT_ADOPTION", "campaignType": "CASHBACK", "channels": ["APP"],
+  "startAt": "2026-10-31T18:00:00.000Z", "endAt": "2026-11-30T17:59:59.000Z",
+  "segmentId": "0192f6b0-0001-7c00-8a00-000000005e01",
+  "triggerSpec": { "kind": "TXN", "txnTypes": ["MERCHANT_PAYMENT"], "beneficiary": "PAYER",
+                   "occurrence": "FIRST_EVER", "minAmountPoisha": 10000, "...": "..." },
+  "rewardSpec": { "type": "CASHBACK_PERCENT", "base": "AMOUNT", "percentBps": 1000,
+                  "fixedPoisha": 0, "capPoisha": 5000, "partialIfBudgetShort": false },
+  "budget": { "totalPoisha": 50000000, "perUserMaxPoisha": 5000, "perUserMaxCount": 1,
+              "perDayMaxPoisha": 5000000, "slices": 1 },
+  "abuseSpec": { "onePerNid": true, "onePerDevice": true, "allowedRiskDecisions": ["ALLOW"],
+                 "allowedWalletStatuses": ["A"], "excludedFlagsMask": 1, "minKycTier": 1 },
+  "clawbackSpec": { "onReversal": true, "onFullRefund": true,
+                    "onPartialRefund": "BELOW_MIN_ONLY", "windowDays": 30 },
+  "controlGroupBps": 500 }</code></pre>
+<p>Reading it: the total budget is 5 lakh Tk, each person can earn at most 50 Tk once, and at most 50,000 Tk is paid per day. Payments under 100 Tk do not count. <strong>5 %</strong> of eligible users form a <em>control group</em> that gets no reward, so that the real impact can be measured. The full <code>triggerSpec</code> is in SPEC §5.1.10.</p>
+
+<h3 id="uc11-target">2. Target a segment</h3>
+<p>Segments are either <strong>RULE</strong> segments (attribute rules) or <strong>LIST</strong> segments (an uploaded CSV of phone numbers or wallet ids, hashed on upload). For example:</p>
+<pre class="code"><code class="lang-json">{ "allOf": [ { "field": "kycTier", "op": "GTE", "value": 1 },
+             { "field": "district", "op": "IN", "values": ["3026", "3033"] },
+             { "field": "usedTxnType", "op": "NOT_USED_IN_DAYS",
+               "txnType": "MERCHANT_PAYMENT", "days": 90 } ],
+  "anyOf": [], "noneOf": [] }</code></pre>
+<p>Useful calls: <code>GET /v1/segments/{id}/count</code> (size preview) and <code>POST …/membership:check</code> ("why is this wallet in or out?").</p>
+
+<h3 id="uc11-approve">3. Submit, approve, go live</h3>
+<ol>
+<li><code>POST /v1/campaigns/{id}:submit</code> → PENDING_APPROVAL. A <em>funding check</em> compares the <code>CAMPAIGN_FUNDING</code> balance with the committed budgets (WARN by default).</li>
+<li>OPS_CHECKER approves. Budgets of 10 lakh Tk or more also need FIN_CHECKER ⚑.</li>
+<li>The campaign is SCHEDULED, then becomes ACTIVE at <code>startAt</code>. Later it becomes ENDED at <code>endAt</code>, and CLOSED once the clawback window is over.</li>
+<li>Ops controls: <code>:pause</code>, <code>:resume</code>, <code>:end</code>, <code>:cancel</code>, <code>/budget-increases</code>, and <code>:test-evaluate</code>, which returns a step-by-step decision trace for a sample event.</li>
+</ol>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; DRAFT
+  DRAFT --&gt; PENDING_APPROVAL : submit
+  PENDING_APPROVAL --&gt; SCHEDULED : approved, starts later
+  PENDING_APPROVAL --&gt; ACTIVE : approved, starts now
+  PENDING_APPROVAL --&gt; REJECTED : reject
+  SCHEDULED --&gt; ACTIVE : startAt
+  ACTIVE --&gt; PAUSED : pause / funding exhausted
+  PAUSED --&gt; ACTIVE : resume
+  ACTIVE --&gt; BUDGET_EXHAUSTED : budget used up
+  BUDGET_EXHAUSTED --&gt; ACTIVE : budget increase approved
+  ACTIVE --&gt; ENDED : endAt
+  ENDED --&gt; CLOSED : clawback window over</pre></div>
+
+<h3 id="uc11-eval">4. How a payment earns a reward</h3>
+<p>For each <code>TRANSACTION_COMPLETED</code>, every active campaign for that txnType is checked <strong>in order</strong>. The first failing check stops the evaluation and records the reason.</p>
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Check</th><th>Rahim's payment</th></tr></thead><tbody>
+<tr><td>1</td><td>Time window (between start and end; optional days and hours)</td><td>5 Nov ✓</td></tr>
+<tr><td>2</td><td>Filters: amount range, channel, payee category / MCC / partner</td><td>350 Tk ≥ 100 Tk ✓</td></tr>
+<tr><td>3</td><td>Beneficiary wallet: type C/A/M, status active, no AML flag, KYC tier</td><td>✓</td></tr>
+<tr><td>4</td><td>Segment membership</td><td>✓</td></tr>
+<tr><td>5</td><td>Risk decision was ALLOW</td><td>✓</td></tr>
+<tr><td>6</td><td>Control group? (deterministic hash)</td><td>not in the 5 % ✓</td></tr>
+<tr><td>7</td><td>Occurrence: FIRST_EVER QR payment</td><td>first one ✓</td></tr>
+<tr><td>8</td><td>Abuse: one reward per NID and per device</td><td>no earlier claim ✓</td></tr>
+<tr><td>9</td><td>Compute the reward</td><td>see below</td></tr>
+<tr><td>10</td><td>Reserve budget (per user, per day, total)</td><td>✓ → reward PENDING</td></tr>
+</tbody></table></div>
+
+<h3 id="uc11-math">5. Reward math</h3>
+<p><code>reward = min(capPoisha, bpsOf(base, percentBps))</code>, then limited by what the user has left of the per-user maximum.</p>
+<div class="table-wrap"><table><thead><tr><th>Payment</th><th>Calculation</th><th class="num">Reward</th></tr></thead><tbody>
+<tr><td>350 Tk (35000)</td><td><code>bpsOf(35000, 1000)</code> = 3500, under the cap of 5000</td><td class="num"><strong>3500</strong> (35 Tk)</td></tr>
+<tr><td>600 Tk (60000)</td><td>6000 → capped</td><td class="num"><strong>5000</strong> (50 Tk)</td></tr>
+<tr><td>80 Tk (8000)</td><td>below <code>minAmountPoisha</code> 10000</td><td class="num">not eligible</td></tr>
+</tbody></table></div>
+<p>A "fee discount" campaign uses <code>base: "FEE_AND_VAT"</code>, which gives the fee + VAT back as cashback <em>after</em> the payment (OPEN D-43). Fee waivers at payment time are done with a pricing plan instead.</p>
+
+<h3 id="uc11-pay">6. Paying the reward</h3>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant K as txn.events
+  participant C as TxnBatchConsumer
+  participant DB as svc_pricing
+  participant E as RewardExecutor
+  participant R as limits-risk-service
+  participant L as ledger-service
+  K-&gt;&gt;C: TRANSACTION_COMPLETED (Rahim to Nirob Store, 35000, ALLOW)
+  C-&gt;&gt;DB: one txn - checks pass, budget reserved, reward PENDING (commandId, txnRef CR...)
+  E-&gt;&gt;DB: claim due rewards (FOR UPDATE SKIP LOCKED)
+  E-&gt;&gt;R: evaluate:batch (receive limits, max balance)
+  R--&gt;&gt;E: ALLOW
+  E-&gt;&gt;L: post-campaign-reward (from CAMPAIGN_FUNDING)
+  alt OK or EXISTS
+    E-&gt;&gt;DB: GRANTED + REWARD_GRANTED event
+  else timeout or 503
+    E-&gt;&gt;DB: stay PENDING, retry with the same commandId
+  else REJECTED INSUFFICIENT_FUNDS
+    E-&gt;&gt;DB: PENDING_FUNDING, pause monetary campaigns, alert
+  end</pre></div>
+<p><strong>Exactly-once payment:</strong> the reward row and its deterministic <code>commandId</code> are saved <em>before</em> the ledger is called. A retry sends the same id, and the ledger answers <code>EXISTS</code> instead of paying twice.</p>
+<p class="label">Live budget: GET /v1/campaigns/{id}/budget</p>
+<pre class="code"><code class="lang-json">{ "status": "ACTIVE", "totalPoisha": 50000000, "reservedPoisha": 3500,
+  "grantedPoisha": 12450000, "clawedBackPoisha": 3500, "remainingPoisha": 37546500,
+  "utilisationBps": 2490,
+  "today": { "businessDate": "2026-11-05", "usedPoisha": 830000, "perDayMaxPoisha": 5000000 } }</code></pre>
+<p>Customers see their offers with <code>GET /v1/wallets/{walletId}/offers</code> and their reward history with <code>…/rewards</code>. Results are reported by <code>GET …/analytics</code>, which covers participants, incremental transactions compared with the control group, cost per acquisition (CPA) and ROI.</p>
+<p class="specref">Spec ref: §5.1.10–5.1.12, §7.10, §7.11 BR-CMP-30, §3.4 F5, ADR-12, ADR-18.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc12"><a class="anchor" href="#uc12">#</a>15. Use case 12 — Referrals, lucky draws, points, education <span class="tag r2">R2</span></h2>
+<h3 id="uc12-ref">Referral</h3>
+<div class="story"><p>Karim shares his code <code>KRM7Q2X</code> with Rahim. Rahim signs up and claims the code within 7 days. When Rahim's KYC is approved, <strong>both</strong> of them get a reward.</p></div>
+<ol>
+<li>Karim calls <code>GET /v1/referrals/codes/{walletId}</code>. The code is deterministic (an HMAC of the wallet id), so it is always the same for the same wallet.</li>
+<li>Rahim calls <code>POST /v1/referrals/claims</code> with <code>{ "refereeWalletId": "…", "referralCode": "KRM7Q2X" }</code>. The claim becomes <code>PENDING_QUALIFICATION</code>. A code entered at registration also creates the claim.</li>
+<li>Qualification happens on <code>KYC_APPROVED</code> or on Rahim's first qualifying transaction. Two rewards are created (REFERRER and REFEREE), each with its own budget check.</li>
+<li>Guards: no self-referral, different NIDs, at most 20 rewarded referrals per referrer ⚑, and the claim must be within the claim window.</li>
+</ol>
+<h3 id="uc12-draw">Lucky draw (provably fair)</h3>
+<ol>
+<li>Qualifying transactions earn <em>draw entries</em> (<code>entriesPerTxn</code>).</li>
+<li>The maker requests a draw with a <strong>seed commitment</strong>, i.e. the SHA-256 of a secret seed (<code>POST …/draws</code>). This needs approval.</li>
+<li>After approval the maker reveals the seed (<code>…:reveal</code>). The service verifies it against the commitment and ranks entries by <code>HMAC-SHA256(seed, entryId)</code>. Nobody can pick the winners, and anyone can reproduce the result.</li>
+<li>Each wallet can win at most once. Prizes become WINNER rewards, paid from the campaign budget.</li>
+</ol>
+<h3 id="uc12-points">Points and educational campaigns</h3>
+<ul>
+<li><strong>POINTS</strong>: a non-monetary counter (<code>GET /v1/wallets/{walletId}/points</code>). It is off by default (<code>points.enabled = false</code>) and cannot be redeemed yet.</li>
+<li><strong>EDUCATIONAL</strong>: no money involved. At <code>sendAt</code> the segment is snapshotted and messages are queued on <code>notification.requests</code>, throttled to 200 per second.</li>
+</ul>
+<p class="specref">Spec ref: §3.4 F7, BR-CMP-48/49, BR-CMP-54/55, ADR-19, §5.1.13–5.1.14.</p>
+
+<!-- ============================================================ -->
+<h2 id="uc13"><a class="anchor" href="#uc13">#</a>16. Use case 13 — Reward failures &amp; clawback <span class="tag r2">R2</span></h2>
+<div class="table-wrap"><table><thead><tr><th>Situation</th><th>What happens</th></tr></thead><tbody>
+<tr><td>Payment reversed before the reward was paid</td><td>Reward PENDING → <strong>CANCELLED</strong>. The budget is released and the abuse claims are removed, so the user can qualify again.</td></tr>
+<tr><td>Payment reversed (or fully refunded) after the reward was paid, within <code>windowDays</code></td><td>GRANTED → CLAWBACK_PENDING. Ledger <code>post-reversal</code> takes the money back → <strong>CLAWED_BACK</strong>, and <code>REWARD_CLAWED_BACK</code> is emitted.</td></tr>
+<tr><td>The customer has already spent the reward</td><td>Ledger rejects with INSUFFICIENT_FUNDS → <strong>CLAWBACK_FAILED</strong>. The clawback is retried every 24 h, up to 30 times ⚑, after which Finance can approve a <strong>write-off</strong> (<code>:write-off</code>).</td></tr>
+<tr><td>Fraud confirmed later</td><td>RISK_ANALYST requests <code>:clawback</code> (reason FRAUD_CONFIRMED). After RISK_CHECKER approval this works at any time, even outside the window.</td></tr>
+<tr><td>Campaign funding runs out</td><td>The reward becomes PENDING_FUNDING and <em>all</em> monetary campaigns pause. A job every 15 min checks whether the account has been refilled, and Ops then resumes the campaigns.</td></tr>
+<tr><td>Limits refuse the credit, or the wallet is no longer eligible</td><td>The reward is <strong>FAILED</strong> and its budget is released. OPS_CHECKER can <code>:retry</code> it.</td></tr>
+<tr><td>Partial refund</td><td>Clawed back only if what remains of the payment falls below the minimum amount (<code>BELOW_MIN_ONLY</code>). Rewards are never partially clawed back.</td></tr>
+</tbody></table></div>
+<p>Clawed-back money does <strong>not</strong> return to the campaign budget. Reusing it requires an approved budget increase.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; PENDING : qualified, budget reserved
+  PENDING --&gt; GRANTED : ledger OK
+  PENDING --&gt; PENDING_FUNDING : no campaign funds
+  PENDING_FUNDING --&gt; PENDING : funds restored
+  PENDING --&gt; FAILED : limits / wallet / ledger refusal
+  FAILED --&gt; PENDING : ops retry
+  PENDING --&gt; CANCELLED : trigger reversed
+  GRANTED --&gt; CLAWBACK_PENDING : reversal / refund / fraud
+  CLAWBACK_PENDING --&gt; CLAWED_BACK : ledger OK
+  CLAWBACK_PENDING --&gt; CLAWBACK_FAILED : insufficient funds
+  CLAWBACK_FAILED --&gt; CLAWBACK_PENDING : daily retry
+  CLAWBACK_FAILED --&gt; WRITTEN_OFF : write-off approved</pre></div>
+<p class="specref">Spec ref: BR-CMP-43..53, §3.4 F6, ADR-16. A manual-clawback mode also exists as a fallback (W5).</p>
+
+<!-- ============================================================ -->
+<h2 id="s17"><a class="anchor" href="#s17">#</a>17. Events in and out</h2>
+<h3 id="s17-out">Produced (through the transactional outbox and Debezium)</h3>
+<div class="table-wrap"><table><thead><tr><th>Topic</th><th>Event</th><th>Key</th><th>When</th></tr></thead><tbody>
+<tr><td><code>fee.rules</code> (compacted)</td><td><code>PRICING_PLAN_UPSERTED</code> / tombstone</td><td>planId</td><td>A version becomes ACTIVE or EXPIRED, a plan is retired (null value), or a republish runs</td></tr>
+<tr><td><code>commission.events</code></td><td><code>COMMISSION_ACCRUED</code></td><td>beneficiaryWalletId</td><td>Every accrual (INLINE, SHARE, CLAWBACK, ADJUSTMENT, BONUS)</td></tr>
+<tr><td><code>commission.events</code></td><td><code>COMMISSION_SETTLED</code></td><td>beneficiaryWalletId</td><td>A payout posted by the ledger</td></tr>
+<tr><td><code>campaign.events</code></td><td><code>REWARD_GRANTED</code></td><td>walletId</td><td>A reward is paid</td></tr>
+<tr><td><code>campaign.events</code></td><td><code>REWARD_CLAWED_BACK</code></td><td>walletId</td><td>A reward is recovered</td></tr>
+<tr><td><code>approval.events</code>, <code>audit.events</code>, <code>notification.requests</code></td><td>—</td><td>—</td><td>Approvals, audit trail, and staff or customer messages</td></tr>
+</tbody></table></div>
+<h3 id="s17-in">Consumed</h3>
+<div class="table-wrap"><table><thead><tr><th>Topic</th><th>Used for</th></tr></thead><tbody>
+<tr><td><code>txn.events</code> (COMPLETED, REVERSED, REFUNDED)</td><td>Commission accruals and clawbacks, incentive counters, campaign triggers and reward clawbacks</td></tr>
+<tr><td><code>partner.events</code></td><td>Partner projection and the effective-dated hierarchy (sharing), default settlement profiles</td></tr>
+<tr><td><code>wallet.events</code>, <code>customer.events</code></td><td>Campaign projections (segments, eligibility), KYC_APPROVED / CUSTOMER_REGISTERED triggers, referrals</td></tr>
+<tr><td><code>refdata.events</code></td><td><code>FEATURE.CAMPAIGN</code> switch, <code>CUTOFF.EOD</code> (business date)</td></tr>
+</tbody></table></div>
+<p class="specref">Spec ref: §5.2, §6.4–6.6.</p>
+
+<!-- ============================================================ -->
+<h2 id="s18"><a class="anchor" href="#s18">#</a>18. API map</h2>
+<div class="table-wrap"><table><thead><tr><th>Group</th><th>Base path</th><th>Purpose</th><th>Release</th></tr></thead><tbody>
+<tr><td>P1–P3</td><td><code>/v1/pricing/quote</code>, <code>/plans</code>, <code>/golden-vectors</code></td><td>Quote, bootstrap snapshot, test vectors</td><td>R1</td></tr>
+<tr><td>P4–P12</td><td><code>/v1/pricing/plans/…</code></td><td>Plan lifecycle (create, version, edit, submit, withdraw, retire, validate)</td><td>R1</td></tr>
+<tr><td>P13</td><td><code>/v1/internal/pricing/fee-rules:republish</code></td><td>Heal the topic</td><td>R1</td></tr>
+<tr><td>R1–R14</td><td><code>/v1/commissions/share-rules</code>, <code>/incentive-rules</code></td><td>Sharing and bonus rule lifecycle</td><td>R2</td></tr>
+<tr><td>C1–C4</td><td><code>/v1/commissions/accruals</code>, <code>/statements</code>, <code>/summary</code>, <code>/ait-certificates</code></td><td>Reports and statements</td><td>R1</td></tr>
+<tr><td>S1–S8</td><td><code>/v1/commissions/settlement-profiles</code>, <code>/settlements</code></td><td>Payout profiles and runs</td><td>R1</td></tr>
+<tr><td>A1–A5</td><td><code>/v1/commissions/adjustments</code>, <code>/disputes</code></td><td>Corrections</td><td>R1</td></tr>
+<tr><td>M1–M3</td><td><code>/v1/approvals</code></td><td>Approval inbox, approve, reject</td><td>R1</td></tr>
+<tr><td>K1–K13</td><td><code>/v1/campaigns</code></td><td>Campaign lifecycle, budget, analytics, test-evaluate</td><td>R2</td></tr>
+<tr><td>G1–G7</td><td><code>/v1/segments</code></td><td>Segments, uploads, counts, membership check</td><td>R2</td></tr>
+<tr><td>W1–W6</td><td><code>/v1/rewards</code></td><td>Reward list, clawback, retry, manual clawback, write-off</td><td>R2</td></tr>
+<tr><td>H1–H3</td><td><code>/v1/wallets/{walletId}/offers|rewards|points</code></td><td>Customer views</td><td>R2</td></tr>
+<tr><td>F1–F2</td><td><code>/v1/referrals/codes</code>, <code>/claims</code></td><td>Referrals</td><td>R2</td></tr>
+<tr><td>D1–D4, I1</td><td><code>/v1/campaigns/{id}/draws</code>, <code>/v1/internal/projections/first-txn:import</code></td><td>Lucky draws, first-transaction history import</td><td>R2</td></tr>
+</tbody></table></div>
+<p>Every call needs the standard headers <code>X-Correlation-Id</code>, <code>X-Actor-Type</code>, <code>X-Actor-Id</code> and <code>X-Channel</code> (plus <code>X-Actor-Roles</code> for staff). List endpoints return <code>{items, nextCursor}</code>. The binding definition is <a href="contracts/provided/openapi.yaml"><code>openapi.yaml</code></a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="s19"><a class="anchor" href="#s19">#</a>19. Background jobs &amp; caching</h2>
+<div class="table-wrap"><table><thead><tr><th>Job</th><th>When</th><th>Does</th></tr></thead><tbody>
+<tr><td><code>pricing-activation</code></td><td>every 10 s</td><td>SCHEDULED → ACTIVE, ACTIVE → EXPIRED, deferred retirements</td></tr>
+<tr><td><code>pricing-approval-expiry</code></td><td>every 5 min</td><td>Expires approvals older than 72 h (both modules)</td></tr>
+<tr><td><code>pricing-settlement</code></td><td>daily 03:10 Dhaka</td><td>Commission payouts</td></tr>
+<tr><td><code>pricing-parked-retry</code></td><td>every 1 min</td><td>Retries parked transaction events (unknown agent or hierarchy)</td></tr>
+<tr><td><code>pricing-incentive</code></td><td>1st of month 03:30</td><td>Monthly bonuses</td></tr>
+<tr><td><code>pricing-negative-carry</code></td><td>daily 04:00</td><td>Alerts Finance about negative balances</td></tr>
+<tr><td><code>campaign-scheduler</code></td><td>every 10 s</td><td>Starts, ends and closes campaigns</td></tr>
+<tr><td><code>campaign-executor</code></td><td>poll every 500 ms</td><td>Pays pending rewards and runs clawbacks</td></tr>
+<tr><td><code>campaign-funding-recheck</code></td><td>every 15 min</td><td>Re-queues PENDING_FUNDING rewards</td></tr>
+<tr><td><code>campaign-budget-invariant</code></td><td>nightly 02:00</td><td>Checks that budget counters match the reward rows</td></tr>
+</tbody></table></div>
+<p>All jobs use <strong>ShedLock</strong>, so only one replica runs each job. There is no Redis. The caches are in-memory <strong>Caffeine</strong>:</p>
+<ul>
+<li><code>PlanSnapshot</code>: rebuilt after every plan change and every 60 s. It serves quotes, and a quote returns 503 if the snapshot is older than 5 min while the DB is down.</li>
+<li><code>ActiveCampaignIndex</code>: maps txnType to active campaigns, refreshed on change and every 30 s.</li>
+<li>Refdata cache: <code>FEATURE.CAMPAIGN</code> and <code>CUTOFF.EOD</code>.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s20"><a class="anchor" href="#s20">#</a>20. Where it will live in code</h2>
+<p>A layered Spring Boot app. Port 8106, management port 9106, DB schema <code>svc_pricing</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Package</th><th>Holds</th></tr></thead><tbody>
+<tr><td><code>com.bracits.bitspay.pricing.pricing</code></td><td>Plans, evaluator (<code>PricingEvaluator</code>, <code>Rounding.bpsOf</code>), validator, accruals, sharing, settlement, incentives, adjustments. Tables are unprefixed.</td></tr>
+<tr><td><code>com.bracits.bitspay.pricing.campaign</code></td><td>Campaigns, segments, triggers, rewards, budgets, clawback, referrals, draws. Tables are prefixed <code>campaign_</code>.</td></tr>
+<tr><td><code>com.bracits.bitspay.pricing.common</code></td><td>Maker-checker engine, outbox, idempotency, ShedLock, HMAC hasher, refdata cache</td></tr>
+</tbody></table></div>
+<p>Each module has the layers <code>controller</code>, <code>dto</code>, <code>service</code>, <code>repository</code>, <code>entity</code>, <code>mapper</code>, <code>exception</code>, <code>client</code>, <code>messaging</code> and <code>config</code>. The modules never call each other directly. Only the public facades (<code>PricingFacade</code>, <code>CampaignFacade</code>) may be used, and ArchUnit enforces this. The campaign module can be switched off entirely with <code>bitspay.modules.campaign.enabled=false</code>, which is how R1 goes live.</p>
+
+<!-- ============================================================ -->
+<h2 id="s21"><a class="anchor" href="#s21">#</a>21. Open decisions</h2>
+<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Topic</th><th>What happens for now</th></tr></thead><tbody>
+<tr><td>OPEN D-02</td><td>VAT on commission</td><td>AIT only. <code>commission.vatBps</code> is reserved and rejected.</td></tr>
+<tr><td>OPEN D-03</td><td>SHARED fee bearer</td><td>Reserved and rejected. Only PAYER / PAYEE / OPERATOR are allowed.</td></tr>
+<tr><td>OPEN D-07</td><td>Sharing as a % split of one total</td><td>A separate operator-funded pool is used; <code>AGENT_COMMISSION</code> as the pool basis emulates it.</td></tr>
+<tr><td>OPEN D-09</td><td>Limits on rewards</td><td>On: rewards are checked against receive limits and max balance.</td></tr>
+<tr><td>OPEN D-27</td><td>Commission expressiveness</td><td>Min/max clamp before AIT. Territory and volume-tier criteria are deferred.</td></tr>
+<tr><td>OPEN D-43</td><td>Segment-targeted fee waiver</td><td>Post-hoc <code>FEE_AND_VAT</code> cashback</td></tr>
+<tr><td>OPEN D-44</td><td>Fee switch lag</td><td>Published at <code>effectiveFrom</code>; a lag over 30 s is alerted.</td></tr>
+</tbody></table></div>
+<p><strong>Deferred:</strong> bank settlement, biller pricing, commission simulation (R3), points redemption, physical prize fulfilment.</p>
+<p><strong>Remember:</strong> every fee, commission, AIT, threshold and campaign value in this guide is a <strong>provisional seed</strong> ⚑. They are data and can be changed through maker-checker without a code change. The full list is in <a href="SPEC.md">SPEC.md §13</a>.</p>
+
+    </article>
+  </main>
+</div>
+<a class="top" href="#">↑ Top</a>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'strict', flowchart: { htmlLabels: true } });
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        const a = byId.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '0px 0px -75% 0px' });
+  document.querySelectorAll('h2[id]').forEach(h => obs.observe(h));
+</script>
+</body>
+</html>
