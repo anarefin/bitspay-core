@@ -1,5 +1,5 @@
 # limits-risk-service — owned code lists (CONTRACT-MODEL §4)
-# contractVersion 1.0.0 · kernel 1.0
+# contractVersion 1.1.0 · kernel 1.0
 # Every list here is owned by limits-risk-service. Consumers that switch on a set declare it in their own
 # contract.yaml (codesUsed) and must handle unknown values safely (kernel K1 open enums).
 
@@ -32,7 +32,7 @@ codeSets:
 
   evaluateTxnType:
     description: >-
-      txnType accepted by POST /v1/risk/evaluate (first seven) and additionally by evaluate:batch items
+      txnType accepted by POST /v1/risk/evaluate (first nine) and additionally by evaluate:batch items
       (DISBURSEMENT, CAMPAIGN_REWARD). REVERSAL is a no-counter type, reserved and never sent in R1.
     values:
       - {code: P2P}
@@ -41,13 +41,15 @@ codeSets:
       - {code: MERCHANT_PAYMENT}
       - {code: MERCHANT_REFUND}
       - {code: FLOAT_TRANSFER}
+      - {code: BILL_PAY, description: "customer to biller wallet (B); added 1.1.0 (CR-LIMITSRISK-1, MVP)"}
+      - {code: RECHARGE, description: "customer to MNO biller wallet (B); added 1.1.0 (CR-LIMITSRISK-1, MVP)"}
       - {code: REVERSAL, description: "no-counter type; reserved, never sent in R1"}
       - {code: DISBURSEMENT, description: "evaluate:batch only"}
       - {code: CAMPAIGN_REWARD, description: "evaluate:batch only; from party = system funding account, walletType S"}
 
   partyWalletType:
     description: >-
-      Party.walletType on evaluate requests. Names are accepted too (CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT,
+      Party.walletType on evaluate requests. Names are accepted too (CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, BILLER,
       INSTITUTION). S (system funding account 00000000-0000-0000-0000-000000000240) is valid only as the
       `from` party of an evaluate:batch item with txnType CAMPAIGN_REWARD; anywhere else -> 400.
     values:
@@ -56,6 +58,7 @@ codeSets:
       - {code: D, name: DISTRIBUTOR}
       - {code: M, name: MERCHANT}
       - {code: I, name: INSTITUTION}
+      - {code: B, name: BILLER, description: "biller settlement wallet; the to party of BILL_PAY / RECHARGE; added 1.1.0 (CR-LIMITSRISK-1)"}
       - {code: S, name: SYSTEM_FUNDING, description: "evaluate:batch CAMPAIGN_REWARD from party only"}
 
   limitCode:
@@ -186,6 +189,7 @@ codeSets:
       - {code: MASTER_DISTRIBUTOR}
       - {code: SUB_DISTRIBUTOR}
       - {code: INSTITUTION}
+      - {code: BILLER, description: "walletType B (default map); no limits seeded in the MVP; added 1.1.0 (CR-LIMITSRISK-1)"}
 
   fraudRuleCategory:
     description: "risk.alerts details.matchedRules[].category and fraud_rule.category"

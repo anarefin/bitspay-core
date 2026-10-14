@@ -4,7 +4,7 @@ number: '15'
 modules:
 - governance
 - notification
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 kernel: '1.0'
 owner: Dev-8
 provides:
@@ -112,7 +112,7 @@ consumes:
   - producer: wallet-service
     operation: GET /v1/wallets/{walletId}
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: notification
     purpose: contact fallback when an SMS delivery waits ≥ 60 s for a wallet not yet seen on wallet.events; the copy is overwritten only when version is newer
     fieldsUsed:
@@ -143,7 +143,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_COMPLETED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-txn
     purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
     fieldsUsed:
@@ -154,7 +154,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_FAILED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-txn
     purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
     fieldsUsed:
@@ -165,7 +165,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REVERSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-txn
     purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
     fieldsUsed:
@@ -176,7 +176,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REFUNDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-txn
     purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
     fieldsUsed:
@@ -187,7 +187,7 @@ consumes:
     topic: audit.events
     eventType: AUDIT_RECORDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-audit
     purpose: 'governance: inbound topic owned by this service (O6); store every record hash-chained; staff last-activity; activity monitoring'
     fieldsUsed:
@@ -200,7 +200,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-approvals
     purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
     fieldsUsed:
@@ -232,7 +232,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_DECIDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-approvals
     purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
     fieldsUsed:
@@ -264,7 +264,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_EXPIRED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.governance-approvals
     purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
     fieldsUsed:
@@ -296,7 +296,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_COMPLETED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-txn
     purpose: 'notification: rules R-P2P-*, R-CASHIN-*, R-CASHOUT-*, R-MERCHANT-*, R-REFUND*, R-FLOAT-*, R-REVERSAL-*, R-COMMISSION-INLINE (group A templates)'
     fieldsUsed:
@@ -315,6 +315,10 @@ consumes:
     - reasonCode
     - originalTxnRef
     - completedAt
+    - billerId
+    - billReference
+    - msisdn
+    - providerReceipt
     codesUsed:
     - set: txnType
       values:
@@ -325,12 +329,14 @@ consumes:
       - MERCHANT_REFUND
       - FLOAT_TRANSFER
       - REVERSAL
+      - BILL_PAY
+      - RECHARGE
     module: notification
   - producer: transaction-service
     topic: txn.events
     eventType: TRANSACTION_FAILED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-txn
     purpose: 'notification: rule R-TXN-FAILED (initiator, IN_APP, channel ≠ SYSTEM)'
     fieldsUsed:
@@ -341,6 +347,9 @@ consumes:
     - amountPoisha
     - failureCode
     - createdAt
+    - billerId
+    - billReference
+    - msisdn
     codesUsed:
     - set: txnType
       values: '*'
@@ -351,7 +360,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REVERSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-txn
     purpose: 'notification: subscribed, no rule — a reversal / refund is notified from the REVERSAL / MERCHANT_REFUND transaction''s own TRANSACTION_COMPLETED'
     fieldsUsed: []
@@ -361,7 +370,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REFUNDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-txn
     purpose: 'notification: subscribed, no rule — a reversal / refund is notified from the REVERSAL / MERCHANT_REFUND transaction''s own TRANSACTION_COMPLETED'
     fieldsUsed: []
@@ -371,7 +380,7 @@ consumes:
     topic: wallet.events
     eventType: WALLET_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-wallet
     purpose: 'notification: the only contact source for wallets (msisdn, language, display name, type, status); rules R-WALLET-BLOCKED/UNBLOCKED/DORMANT/CLOSED; compacted-topic replay guard'
     fieldsUsed:
@@ -401,7 +410,7 @@ consumes:
     topic: customer.events
     eventType: KYC_SUBMITTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: rule R-KYC-SUBMITTED'
     fieldsUsed:
@@ -416,7 +425,7 @@ consumes:
     topic: customer.events
     eventType: KYC_APPROVED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: rule R-KYC-APPROVED'
     fieldsUsed:
@@ -431,7 +440,7 @@ consumes:
     topic: customer.events
     eventType: KYC_REJECTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: rule R-KYC-REJECTED'
     fieldsUsed:
@@ -446,7 +455,7 @@ consumes:
     topic: customer.events
     eventType: KYC_TIER_CHANGED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: rule R-KYC-TIER'
     fieldsUsed:
@@ -461,7 +470,7 @@ consumes:
     topic: customer.events
     eventType: CUSTOMER_REGISTERED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: Bangla/English name of the customer''s wallet contacts'
     fieldsUsed:
@@ -475,7 +484,7 @@ consumes:
     topic: customer.events
     eventType: CUSTOMER_PROFILE_UPDATED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-customer
     purpose: 'notification: Bangla/English name of the customer''s wallet contacts'
     fieldsUsed:
@@ -489,7 +498,7 @@ consumes:
     topic: partner.events
     eventType: PARTNER_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-partner
     purpose: 'notification: partner metadata of partner wallets (owner type); never overwrites msisdn/name of a wallet contact; skips walletId = null'
     fieldsUsed:
@@ -504,7 +513,7 @@ consumes:
     topic: commission.events
     eventType: COMMISSION_SETTLED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-commission
     purpose: 'notification: rule R-COMMISSION-SETTLED'
     fieldsUsed:
@@ -615,7 +624,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_GRANTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-campaign
     purpose: 'notification: rules R-CASHBACK, R-REWARD-BONUS'
     fieldsUsed:
@@ -633,7 +642,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_CLAWED_BACK
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-campaign
     purpose: 'notification: rule R-CASHBACK-CLAWBACK'
     fieldsUsed:
@@ -906,7 +915,7 @@ consumes:
     topic: gl.events
     eventType: GL_DAY_CLOSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -916,7 +925,7 @@ consumes:
     topic: gl.events
     eventType: GL_DAY_CERTIFIED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -926,7 +935,7 @@ consumes:
     topic: gl.events
     eventType: GL_PERIOD_STATUS_CHANGED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -936,7 +945,7 @@ consumes:
     topic: gl.events
     eventType: GL_JOURNAL_POSTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -946,7 +955,7 @@ consumes:
     topic: gl.events
     eventType: GL_ACCOUNT_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -956,7 +965,7 @@ consumes:
     topic: gl.events
     eventType: GL_EXCEPTION_RAISED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: admin-service.notification-gl
     purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
     fieldsUsed: []
@@ -966,7 +975,7 @@ consumes:
     topic: notification.requests
     eventType: NOTIFICATION_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-requests
     purpose: 'notification: inbound topic owned by this service (O6); direct sends and reminder registration'
     fieldsUsed:
@@ -979,7 +988,7 @@ consumes:
     topic: notification.requests
     eventType: NOTIFICATION_REMINDER_CANCELLED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-requests
     purpose: 'notification: inbound topic owned by this service (O6); cancel reminder occurrences'
     fieldsUsed:
@@ -992,7 +1001,7 @@ consumes:
     topic: refdata.events
     eventType: REFDATA_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: admin-service.notification-refdata
     purpose: 'notification: localised REASON_CODE names and SYSTEM_PARAM SUPPORT.HELPLINE for templates (own topic, read like every other reader)'
     fieldsUsed:
@@ -1014,7 +1023,7 @@ consumes:
     topic: notification.requests
     eventType: NOTIFICATION_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: governance
     fieldsUsed:
     - '*'
@@ -1027,7 +1036,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     modules:
     - governance
     - notification
@@ -1037,7 +1046,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_DECIDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     modules:
     - governance
     - notification
@@ -1047,7 +1056,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_EXPIRED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     modules:
     - governance
     - notification
@@ -1057,7 +1066,7 @@ consumes:
     topic: audit.events
     eventType: AUDIT_RECORDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     modules:
     - governance
     - notification

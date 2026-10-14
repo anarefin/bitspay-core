@@ -42,7 +42,7 @@
       "additionalProperties": true,
       "required": ["txnType", "channel", "amountPoisha", "deviceId", "counterpartyWalletId", "matchedRules", "blacklistHits", "reasonCodes", "violatedLimit", "configVersion", "evaluatedAt"],
       "properties": {
-        "txnType": {"type": "string", "enum": ["P2P", "CASH_IN", "CASH_OUT", "MERCHANT_PAYMENT", "MERCHANT_REFUND", "FLOAT_TRANSFER", "REVERSAL", "DISBURSEMENT", "CAMPAIGN_REWARD"]},
+        "txnType": {"type": "string", "enum": ["P2P", "CASH_IN", "CASH_OUT", "MERCHANT_PAYMENT", "MERCHANT_REFUND", "FLOAT_TRANSFER", "BILL_PAY", "RECHARGE", "REVERSAL", "DISBURSEMENT", "CAMPAIGN_REWARD"]},
         "channel": {"type": "string", "enum": ["APP", "USSD", "PARTNER_APP", "PORTAL", "BACKOFFICE", "API", "SYSTEM"]},
         "amountPoisha": {"type": "integer", "exclusiveMinimum": 0, "maximum": 10000000000000},
         "deviceId": {"type": ["string", "null"], "maxLength": 128},

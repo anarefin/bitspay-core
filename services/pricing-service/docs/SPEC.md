@@ -4,13 +4,13 @@
 |---|---|
 | Service | `pricing-service` (`spring.application.name`) |
 | Number / owner | SVC-06 · Dev-6 (service lead) — modules: `pricing` → Dev-6 (lead), `campaign` → Dev-4 |
-| Layer / release | Core (pricing: fees, VAT, MDR, quote, in-line commission records, settlement — R1; hierarchical sharing and incentives — R2) · Back office / async consumer (campaign — R2) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Core — **MVP**: module pricing (plans incl. `BILL_PAY` / `RECHARGE`, fees, VAT, MDR, quote, `fee.rules`, in-line commission records, clawback records) · R1: commission settlement · R2: hierarchical sharing and incentives · Back office / async consumer (campaign — R1+, out of MVP; `bitspay.modules.campaign.enabled=false` in the MVP) |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-PRICING-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8106 · management 9106 |
 | Schema / role | `svc_pricing` (one schema for both modules; campaign tables prefixed `campaign_`) |
 | Depends on (pins) | ledger-service@1 (1.0.0) · transaction-service@1 (1.0.0) · wallet-service@1 (1.0.0) · limits-risk-service@1 (1.0.0) · admin-service@1 (1.0.0) |
-| Open decisions | OPEN D-01, D-02, D-03, D-07, D-09, D-10, D-13, D-14, D-25, D-27, D-30, D-31, D-43, D-44 (§13) |
+| Open decisions | OPEN D-01, D-02, D-03, D-07, D-09, D-10, D-13, D-14, D-25, D-27, D-30, D-31, D-43, D-44, D-45; SRS B-26 (§13) |
 
 ## 1. Mission and boundaries
 
@@ -31,6 +31,8 @@ The payment hot path does **not** call this service. transaction-service evaluat
 4. *Campaign.* Rahim pays Nirob Store 350 Tk by QR for the first time. Campaign `QR10-NOV26` ("10 % cashback, max 50 Tk, first QR payment") sees the completed payment, checks that Rahim is in the segment, has not been rewarded under the same NID or device, and that the payment was risk-`ALLOW`ed, reserves 35 Tk of budget, checks Rahim's receive limits and maximum balance with limits-risk, and credits him 35 Tk from `CAMPAIGN_FUNDING` with a deterministic `commandId`. If the payment is reversed, the reward is clawed back with a ledger reversal.
 
 ### 1.2 In scope
+
+**MVP vs R1+ (SRS v1.2, CR-PRICING-1).** The MVP ships module `pricing` only: plan lifecycle with maker-checker, `fee.rules`, quote, golden vectors, fees / VAT / MDR for P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, `BILL_PAY` and `RECHARGE` (seed plans `PLN-BILL-STD`, `PLN-RECHARGE-NONE`, §8.3), in-line agent commission records and their clawbacks, statements and AIT data. R1+: scheduled commission settlement (WP-P7), hierarchical sharing and incentives (R2), biller commission (R1), and the whole module `campaign` (deployed with `bitspay.modules.campaign.enabled=false` in the MVP). §10 tags every WP `[MVP]` or `[R1+]`.
 
 **Module `pricing`**
 - Pricing plans (fee, fee bearer, VAT, MDR, free monthly allowance, in-line commission with min/max clamp, AIT): create, version, validate, schedule, maker-checker activation, expiry, retirement.
@@ -62,13 +64,15 @@ The payment hot path does **not** call this service. transaction-service evaluat
 | VAT withheld at source on commission (SRS COM-005, A-18) | AIT only. `commission.vatBps`, `vatOnCommissionPoisha` and the settlement `vatPoisha` are reserved and never emitted (OPEN D-02) |
 | Commission territory (location) and volume-tier criteria in plans (SRS COM-001) | Not supported in plans; volume targets via incentive rules (OPEN D-27) |
 | Commission settlement to a bank account (SRS COM-004 bank option, MER-006 bank settlement) | Settlement mode `WALLET` only; `BANK` rejected with `422 SERVICE_DISABLED` |
-| Biller fee / commission (SRS FEE-006 biller part) | No biller `txnType` exists; the model accepts one once added |
+| Biller commission (SRS FEE-006 biller part, R1) | Biller **fees** are MVP: plans for `BILL_PAY` / `RECHARGE` (BR-PRC-64). Biller commission (operator share paid by a biller) is deferred to R1; `BILL_PAY` / `RECHARGE` plans must have `commission.type = NONE` |
 | Commission simulation on historical transactions (SRS COM-009, R3) | — |
 | Real-time posting of hierarchical shares | They accrue and settle periodically by design |
 | Single-total commission split (SRS COM-002 "percent split of total commission") | Shares come from a separate operator-funded pool; `poolBasis = AGENT_COMMISSION` emulates the split numerically (OPEN D-07) |
 | Segment-targeted fee waiver at transaction time (SRS CMP-002) | Fee waivers are pricing plans; a campaign "discount" is a post-hoc `FEE_AND_VAT` cashback (OPEN D-43) |
 | Zero-lag fee-version switch | A version is published when it becomes ACTIVE; boundary lag ≤ 30 s accepted and alerted (OPEN D-44) |
-| Bill-payment / recharge triggers | The trigger model accepts any configured txnType; those products are not built |
+| Bill-payment / recharge campaign triggers | `BILL_PAY` and `RECHARGE` are MVP products, but module `campaign` is R1+ (disabled in the MVP); `triggerSpec.txnTypes` is unchanged and gains them with the campaign release |
+| Per-biller fee plans | MVP prices every biller with one plan per txnType (resolved category = payer's, BR-PRC-11); plans cannot match a specific biller or biller category (OPEN D-45) |
+| Module `campaign` in the MVP | Not deployed: `bitspay.modules.campaign.enabled=false` (R1+) |
 | Push / SMS delivery | `notification.requests` only; delivery by admin-service |
 | Points redemption / conversion to e-money | Points are a local, non-monetary counter (`points.enabled = false`) |
 | Physical prize fulfilment | Recorded as a non-monetary prize; fulfilment offline |
@@ -99,46 +103,50 @@ Rules:
 - In this version neither module calls the other. A campaign that needs a fee waiver at transaction time is configured as a pricing plan through the pricing maker-checker flow.
 - Flyway: one location and one history table per area — `db/migration/common` (`flyway_history_common`), `db/migration/pricing` (`flyway_history_pricing`), `db/migration/campaign` (`flyway_history_campaign`), all into `svc_pricing`, run in that order.
 - One outbox `svc_pricing.outbox` written by both modules; `approval.events` and `audit.events` rows carry `data.module = pricing | campaign`.
-- The campaign module can be switched off per deployment with `bitspay.modules.campaign.enabled=false` (no consumers, jobs or controllers registered; R1 goes live with the pricing module only) and is governed at runtime by `FEATURE.CAMPAIGN` (§7.13).
+- The campaign module can be switched off per deployment with `bitspay.modules.campaign.enabled=false` (no consumers, jobs or controllers registered; the MVP and R1 go live with the pricing module only — MVP deployments set it to `false`, CR-PRICING-1) and is governed at runtime by `FEATURE.CAMPAIGN` (§7.13).
 - Outbound calls always carry `X-Actor-Id: pricing-service` (never `pricing-service/campaign`).
 
 ## 2. SRS traceability
 
-| SRS ID | Requirement (short) | Covered by | Status |
-|---|---|---|---|
-| FEE-001 | Configurable fee plans per txn type, channel, user category/tier, merchant category, slab; fixed/%/slab; min/max; free allowance | `pricing_plan_version`, PlanJson, BR-PRC-10..18, `POST /v1/pricing/plans` | Build |
-| FEE-002 | Fee bearer payer, payee, shared, operator | `feeBearer` PAYER/PAYEE/OPERATOR; SHARED reserved | Partial (OPEN D-03) |
-| FEE-003 | VAT on fees at configured rate, posted to VAT payable | `vatBps` → `vatPoisha`; posted by the payment orchestrator | Build |
-| FEE-004 | Fee display before confirmation; fee reversal rules | `POST /v1/pricing/quote` (what-if); fee reversal is decided by the reversal's `reverseFee` — pricing records nothing for fees | Build (quote) / N/A |
-| FEE-005 | Effective-dated plans, scheduling, versioning, maker-checker | Version state machine §3.5, activation scheduler, approvals | Build |
-| FEE-006 | MDR and biller fee/commission | MERCHANT_PAYMENT plans with `feeBearer = PAYEE`, `match.categoryCode` per merchant category | Build (MDR) / Deferred (billers) |
-| MER-006 | Merchant settlement to wallet (instant) or bank, net of MDR | MDR borne by the payee in-line = instant wallet settlement net of MDR | Partial (bank deferred) |
-| COM-001 | Commission plans by txn type, slab, volume tier, location, agent category, period; fixed/%/slab with min/max | Plan `commission` block incl. `minPoisha`/`maxPoisha` clamp; agent category via `match.categoryCode`; period via effective dates; volume via incentive rules | Partial (OPEN D-27) |
-| COM-002 | Hierarchical sharing distributor / sub-distributor / agent, effective-dated | `commission_share_rule`, hierarchy projection, BR-PRC-30..38 | Partial (OPEN D-07) |
-| COM-003 | Real-time accrual per txn with commission ledger entries | INLINE + SHARE accruals within seconds of `TRANSACTION_COMPLETED` | Build |
-| COM-004 | Scheduled settlement daily/weekly/monthly per partner | `settlement_profile`, settlement job, ledger `post-commission-settlement` | Build (wallet only) |
-| COM-005 | AIT/VAT deduction at source, certificates | `aitBps` per plan/split, AIT certificate API | Partial (AIT only, OPEN D-02) |
-| COM-006 | Adjustments, clawbacks, disputes with maker-checker | Clawback on `TRANSACTION_REVERSED`; adjustments and disputes with approvals | Build |
-| COM-007 | Dashboards and statements for operator and partners | `GET /v1/commissions/statements/{walletId}`, `/summary`, `/accruals` | Build (data APIs) |
-| COM-008 | Incentive / target bonuses | `incentive_rule`, month-end evaluation → BONUS accruals | Build (txn-based metrics) |
-| COM-009 | Commission simulation | — | Deferred (R3) |
-| LED-015 | BDT, 2-decimal, banker's rounding for fees/commissions | poisha `long`, integer HALF_EVEN, golden vectors | Build |
-| LED-007 | Human-readable reference for every money movement | `CMS-` on settlements, `CR`/`CC` on rewards and clawbacks, carried on the events | Build |
-| BOM-004/005 | Maker-checker on fee/commission changes and adjustments; checker ≠ maker; multi-level | Local `approval_request` (kernel K5) | Build |
-| ADM-004 | Rules administration without code change | All plans/rules/campaigns are data | Build |
-| AUD-002 | Audit record per state change | `audit.events` in the same DB transaction | Build |
-| PRT-005 | Partner commission data for portal | Statement APIs (partner actor sees own wallet) | Build (data) |
-| CMP-001 | Campaign with name, objective, period, segment, channel, reward type, budget, maker-checker | `campaign`, `/v1/campaigns/**`, `:submit` → approval (2 levels above threshold) | Build |
-| CMP-002 | Reward types: cashback fixed/% with cap, fee waiver/discount, bonus, referral, lucky draw, points | CASHBACK_FIXED/PERCENT, BONUS, REFERRAL, DRAW_PRIZE, POINTS; discount = `FEE_AND_VAT` cashback | Partial (segment-targeted at-transaction waiver: OPEN D-43) |
-| CMP-003 | Segmentation by attributes and uploaded lists | RULE/LIST segments, rule DSL incl. gender and geography codes | Build |
-| CMP-004 | Triggers: first txn, count/volume thresholds, txn types, time windows, merchant/category | Trigger engine BR-CMP-20..29 | Build |
-| CMP-005 | Budget caps per campaign/user/day, auto stop, real-time utilisation | `campaign_budget`, `campaign_budget_day`, `campaign_participant`, BR-CMP-35..39 | Build |
-| CMP-006 | Automated reward distribution from campaign funding ledger | Reward executor → `post-campaign-reward`; `REWARD_GRANTED` with `commandId` and `txnRef` | Build |
-| CMP-007 | Educational campaigns via notification channels | Type EDUCATIONAL → segment snapshot → `notification.requests` (throttled) | Build |
-| CMP-008 | Analytics: participants, rewards, incremental txns, CPA, ROI | `campaign_metric_daily`, control group, `GET …/analytics` | Build |
-| CMP-009 | One reward per NID/device, fraud checks, clawback | `campaign_abuse_claim`, risk filter, ledger clawback | Build |
-| LIM-002/003 | Max balance and receive limits apply to every credit | Rewards evaluated by limits-risk batch; ledger `constraints.destinationMaxBalancePoisha` | Build (OPEN D-09) |
-| LED-011/012 | Accounting completeness (consumer side) | Every grant / clawback / settlement emits an event with its ledger `commandId` | Build |
+Baseline: **SRS v1.2 (14 Oct 2026)**. Column `MVP?` says whether the MVP release delivers the row (`MVP`) or a later release does (`R1+`). No withdrawn SRS v1.2 ID (GLD-031, INT-01, B-18) was traced here.
+
+| SRS ID | Requirement (short) | Covered by | Status | MVP? |
+|---|---|---|---|---|
+| FEE-001 | Configurable fee plans per txn type, channel, user category/tier, merchant category, slab; fixed/%/slab; min/max; free allowance | `pricing_plan_version`, PlanJson, BR-PRC-10..18, `POST /v1/pricing/plans` | Build | MVP |
+| FEE-002 | Fee bearer payer, payee, shared, operator | `feeBearer` PAYER/PAYEE/OPERATOR; SHARED reserved | Partial (OPEN D-03) | MVP |
+| FEE-003 | VAT on fees at configured rate, posted to VAT payable | `vatBps` → `vatPoisha`; posted by the payment orchestrator | Build | MVP |
+| FEE-004 | Fee display before confirmation; fee reversal rules | `POST /v1/pricing/quote` (what-if); fee reversal is decided by the reversal's `reverseFee` — pricing records nothing for fees | Build (quote) / N/A | MVP |
+| FEE-005 | Effective-dated plans, scheduling, versioning, maker-checker | Version state machine §3.5, activation scheduler, approvals | Build | MVP |
+| FEE-006 | MDR and biller fee/commission | MERCHANT_PAYMENT plans with `feeBearer = PAYEE`, `match.categoryCode` per merchant category; biller fees via `BILL_PAY` / `RECHARGE` plans (`PLN-BILL-STD`, `PLN-RECHARGE-NONE`, BR-PRC-64) | Build (MDR) / Build (biller fee config, MVP) / Deferred (biller commission, R1) | MVP (MDR, biller fees) / R1+ (biller commission) |
+| BIL-011 | Internal biller catalogue and simulated biller settlement (MVP) | Plan txnType `BILL_PAY`, payee wallet type `B` (BILLER), seed `PLN-BILL-STD` (FIXED 500 poisha, PAYER, VAT 1500 bps, commission NONE), BR-PRC-64 | Build | MVP |
+| BIL-012 | Mobile recharge via the operator catalogue (MVP) | Plan txnType `RECHARGE`, payee wallet type `B` (MNO biller), seed `PLN-RECHARGE-NONE` (NONE, OPERATOR, commission NONE), BR-PRC-64 | Build | MVP |
+| MER-006 | Merchant settlement to wallet (instant) or bank, net of MDR | MDR borne by the payee in-line = instant wallet settlement net of MDR | Partial (bank deferred) | MVP (wallet) |
+| COM-001 | Commission plans by txn type, slab, volume tier, location, agent category, period; fixed/%/slab with min/max | Plan `commission` block incl. `minPoisha`/`maxPoisha` clamp; agent category via `match.categoryCode`; period via effective dates; volume via incentive rules | Partial (OPEN D-27) | MVP (in-line) |
+| COM-002 | Hierarchical sharing distributor / sub-distributor / agent, effective-dated | `commission_share_rule`, hierarchy projection, BR-PRC-30..38 | Partial (OPEN D-07) | R1+ |
+| COM-003 | Real-time accrual per txn with commission ledger entries | INLINE + SHARE accruals within seconds of `TRANSACTION_COMPLETED` | Build | MVP (INLINE) / R1+ (SHARE) |
+| COM-004 | Scheduled settlement daily/weekly/monthly per partner | `settlement_profile`, settlement job, ledger `post-commission-settlement` | Build (wallet only) | R1+ |
+| COM-005 | AIT/VAT deduction at source, certificates | `aitBps` per plan/split, AIT certificate API | Partial (AIT only, OPEN D-02) | MVP (in-line AIT) |
+| COM-006 | Adjustments, clawbacks, disputes with maker-checker | Clawback on `TRANSACTION_REVERSED`; adjustments and disputes with approvals | Build | MVP |
+| COM-007 | Dashboards and statements for operator and partners | `GET /v1/commissions/statements/{walletId}`, `/summary`, `/accruals` | Build (data APIs) | MVP |
+| COM-008 | Incentive / target bonuses | `incentive_rule`, month-end evaluation → BONUS accruals | Build (txn-based metrics) | R1+ |
+| COM-009 | Commission simulation | — | Deferred (R3) | R1+ |
+| LED-015 | BDT, 2-decimal, banker's rounding for fees/commissions | poisha `long`, integer HALF_EVEN, golden vectors | Build | MVP |
+| LED-007 | Human-readable reference for every money movement | `CMS-` on settlements, `CR`/`CC` on rewards and clawbacks, carried on the events | Build | R1+ |
+| BOM-004/005 | Maker-checker on fee/commission changes and adjustments; checker ≠ maker; multi-level | Local `approval_request` (kernel K5) | Build | MVP |
+| ADM-004 | Rules administration without code change | All plans/rules/campaigns are data | Build | MVP |
+| AUD-002 | Audit record per state change | `audit.events` in the same DB transaction | Build | MVP |
+| PRT-005 | Partner commission data for portal | Statement APIs (partner actor sees own wallet) | Build (data) | MVP (data) |
+| CMP-001 | Campaign with name, objective, period, segment, channel, reward type, budget, maker-checker | `campaign`, `/v1/campaigns/**`, `:submit` → approval (2 levels above threshold) | Build | R1+ |
+| CMP-002 | Reward types: cashback fixed/% with cap, fee waiver/discount, bonus, referral, lucky draw, points | CASHBACK_FIXED/PERCENT, BONUS, REFERRAL, DRAW_PRIZE, POINTS; discount = `FEE_AND_VAT` cashback | Partial (segment-targeted at-transaction waiver: OPEN D-43) | R1+ |
+| CMP-003 | Segmentation by attributes and uploaded lists | RULE/LIST segments, rule DSL incl. gender and geography codes | Build | R1+ |
+| CMP-004 | Triggers: first txn, count/volume thresholds, txn types, time windows, merchant/category | Trigger engine BR-CMP-20..29 | Build | R1+ |
+| CMP-005 | Budget caps per campaign/user/day, auto stop, real-time utilisation | `campaign_budget`, `campaign_budget_day`, `campaign_participant`, BR-CMP-35..39 | Build | R1+ |
+| CMP-006 | Automated reward distribution from campaign funding ledger | Reward executor → `post-campaign-reward`; `REWARD_GRANTED` with `commandId` and `txnRef` | Build | R1+ |
+| CMP-007 | Educational campaigns via notification channels | Type EDUCATIONAL → segment snapshot → `notification.requests` (throttled) | Build | R1+ |
+| CMP-008 | Analytics: participants, rewards, incremental txns, CPA, ROI | `campaign_metric_daily`, control group, `GET …/analytics` | Build | R1+ |
+| CMP-009 | One reward per NID/device, fraud checks, clawback | `campaign_abuse_claim`, risk filter, ledger clawback | Build | R1+ |
+| LIM-002/003 | Max balance and receive limits apply to every credit | Rewards evaluated by limits-risk batch; ledger `constraints.destinationMaxBalancePoisha` | Build (OPEN D-09) | R1+ |
+| LED-011/012 | Accounting completeness (consumer side) | Every grant / clawback / settlement emits an event with its ledger `commandId` | Build | R1+ |
 
 ## 3. Architecture
 
@@ -689,7 +697,7 @@ CREATE TABLE shedlock (name varchar(64) PRIMARY KEY, lock_until timestamptz NOT 
 -- ===== Pricing plans =====
 CREATE TABLE pricing_plan (
   plan_id            text PRIMARY KEY CHECK (plan_id ~ '^PLN-[A-Z0-9-]{2,60}$'),
-  txn_type           text NOT NULL CHECK (txn_type IN ('P2P','CASH_IN','CASH_OUT','MERCHANT_PAYMENT','MERCHANT_REFUND','FLOAT_TRANSFER','REVERSAL')),
+  txn_type           text NOT NULL CHECK (txn_type IN ('P2P','CASH_IN','CASH_OUT','MERCHANT_PAYMENT','MERCHANT_REFUND','FLOAT_TRANSFER','BILL_PAY','RECHARGE','REVERSAL')),
   description        text,
   published_version  int,                 -- version whose JSON is the current fee.rules value (null = nothing / tombstoned)
   retired            boolean NOT NULL DEFAULT false,
@@ -705,8 +713,8 @@ CREATE TABLE pricing_plan_version (
   status                  text NOT NULL CHECK (status IN ('DRAFT','PENDING_APPROVAL','SCHEDULED','ACTIVE','SUPERSEDED','EXPIRED','REJECTED','WITHDRAWN','RETIRED')),
   txn_type                text NOT NULL,
   match_channel           text,
-  match_payer_wallet_type char(1) CHECK (match_payer_wallet_type IN ('C','A','D','M','I')),
-  match_payee_wallet_type char(1) CHECK (match_payee_wallet_type IN ('C','A','D','M','I')),
+  match_payer_wallet_type char(1) CHECK (match_payer_wallet_type IN ('C','A','D','M','I','B')),
+  match_payee_wallet_type char(1) CHECK (match_payee_wallet_type IN ('C','A','D','M','I','B')),
   match_payer_kyc_tier    smallint CHECK (match_payer_kyc_tier BETWEEN 0 AND 9),
   match_category_code     int CHECK (match_category_code BETWEEN 0 AND 99999),
   priority                int NOT NULL CHECK (priority BETWEEN 0 AND 100000),
@@ -1270,11 +1278,11 @@ The paths under `/v1/wallets/{walletId}/…` and `/v1/referrals/…` are served 
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` | |
+| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `BILL_PAY`, `RECHARGE`, `REVERSAL` | `BILL_PAY`, `RECHARGE` since 1.1.0 |
 | channel | enum | N | Y | `X-Channel` values | default null; null matches only plans with `match.channel = null` |
 | amountPoisha | int64 (poisha) | Y | N | 1..10^13 | |
 | payer | object | Y | N | | |
-| payer.walletType | enum{C, A, D, M, I} | Y | N | names also accepted | |
+| payer.walletType | enum{C, A, D, M, I, B} | Y | N | names also accepted | `B` (BILLER) since 1.1.0 — the payee of `BILL_PAY` / `RECHARGE` |
 | payer.kycTier | int32 | Y | N | 0..9 | |
 | payer.categoryCode | int32 | Y | N | ≥ 0 (0 for customers; partner category vocabulary otherwise) | |
 | payee | object | Y | N | same three fields as payer | |
@@ -1795,11 +1803,11 @@ All events are written to `svc_pricing.outbox` in the same DB transaction as the
 | planId | string | Y | N | `^PLN-[A-Z0-9-]{2,60}$`; never reused | Kafka key |
 | version | int32 | Y | N | ≥ 1 | |
 | status | enum{ACTIVE, EXPIRED} | Y | N | | consumers keep only ACTIVE |
-| txnType | enum | Y | N | P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL | |
+| txnType | enum | Y | N | P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL | `BILL_PAY`, `RECHARGE` since 1.1.0 |
 | match | object | Y | N | | all five keys always present |
 | match.channel | enum | Y | Y | `X-Channel` values | null = any |
-| match.payerWalletType | enum{C, A, D, M, I} | Y | Y | | null = any |
-| match.payeeWalletType | enum{C, A, D, M, I} | Y | Y | | null = any |
+| match.payerWalletType | enum{C, A, D, M, I, B} | Y | Y | | null = any |
+| match.payeeWalletType | enum{C, A, D, M, I, B} | Y | Y | | null = any; `B` (BILLER) since 1.1.0 |
 | match.payerKycTier | int32 | Y | Y | 0..9 | null = any |
 | match.categoryCode | int32 | Y | Y | partner category vocabulary | compared with the resolved category |
 | priority | int32 | Y | N | 0..100000 | higher wins |
@@ -2378,7 +2386,7 @@ Names (`name`) per trigger: TXN SELF `"{triggerTxnId}"`; REFERRAL `"ref:{referee
 ### 7.3 Evaluation (module pricing; normative text = `pricing-algorithm` v1)
 
 - **BR-PRC-10** Candidates: `status = ACTIVE`, same `txnType`, `effectiveFrom ≤ at < effectiveTo` (or ∞), every non-null `match` field equal to the transaction value — `channel`, `payerWalletType` ↔ `payer.walletType`, `payeeWalletType` ↔ `payee.walletType`, `payerKycTier` ↔ `payer.kycTier`, `categoryCode` ↔ the resolved category (BR-PRC-11).
-- **BR-PRC-11** Resolved `categoryCode` = `payee.categoryCode` when the payee wallet type ∈ {A, D, M, I}, else `payer.categoryCode`. CASH_OUT → agent (payee); MERCHANT_PAYMENT, FLOAT_TRANSFER → payee; CASH_IN → agent (payer); MERCHANT_REFUND → merchant (payer); P2P → 0. Category codes: AGENT 101 RETAIL / 102 SUPER_AGENT / 103 MERCHANT_AGENT / 104 BANK_AGENT; DISTRIBUTOR 201 MASTER / 202 DISTRIBUTOR / 203 SUB; MERCHANT `3000 + size×100 + MCC group` (e.g. MICRO grocery 3101); INSTITUTION 401–404; customers 0.
+- **BR-PRC-11** Resolved `categoryCode` = `payee.categoryCode` when the payee wallet type ∈ {A, D, M, I}, else `payer.categoryCode`. CASH_OUT → agent (payee); MERCHANT_PAYMENT, FLOAT_TRANSFER → payee; CASH_IN → agent (payer); MERCHANT_REFUND → merchant (payer); P2P → 0; BILL_PAY, RECHARGE (payee wallet type B) → payer (customer, 0). Category codes: AGENT 101 RETAIL / 102 SUPER_AGENT / 103 MERCHANT_AGENT / 104 BANK_AGENT; DISTRIBUTOR 201 MASTER / 202 DISTRIBUTOR / 203 SUB; MERCHANT `3000 + size×100 + MCC group` (e.g. MICRO grocery 3101); INSTITUTION 401–404; customers 0.
 - **BR-PRC-12** Selection: highest `priority`; tie → most non-null `match` fields; tie → highest `version`; tie → lexicographically smallest `planId`. None → the zero result with nulls.
 - **BR-PRC-13** Free allowance: `freeMonthlyCount > 0 && usage.senderMonthlyCountForTxnType < freeMonthlyCount` → fee 0 (hence VAT 0 and PERCENT_OF_FEE commission 0); FIXED / PERCENT_OF_AMOUNT commission still computed.
 - **BR-PRC-14** Fee: FIXED → `fixedPoisha`; PERCENT → `bpsOf(amount, percentBps)`; SLAB → slab with `fromPoisha ≤ amount ≤ toPoisha` (null = ∞) → `slab.fixedPoisha + bpsOf(amount, slab.percentBps)`; NONE → 0. Then, for FIXED / PERCENT / SLAB only, clamp to `[minPoisha, maxPoisha]` (`maxPoisha = 0` = no cap). The clamp is **not** applied when the free allowance zeroed the fee or the type is NONE.
@@ -2396,6 +2404,7 @@ Names (`name`) per trigger: TXN SELF `"{triggerTxnId}"`; REFERRAL `"ref:{referee
 - **BR-PRC-24** `commission.type = NONE` ⇒ `source = null, beneficiary = null, valueBps = 0, fixedPoisha = 0, aitBps = 0, minPoisha = 0, maxPoisha = 0`; otherwise `source ∈ {FEE_INCOME, COMMISSION_PAYABLE}`, `beneficiary ∈ {PAYER, PAYEE}` and the beneficiary must be the agent side of the txnType (CASH_IN → PAYER, CASH_OUT → PAYEE); commission on other txnTypes → warning.
 - **BR-PRC-25** `source = FEE_INCOME` with PERCENT_OF_FEE ⇒ `valueBps ≤ 10000` (error); FIXED with FEE_INCOME → warning "may exceed fee". `commission.maxPoisha = 0 or ≥ commission.minPoisha` (error). `commission.minPoisha > 0` together with PERCENT_OF_FEE and `freeMonthlyCount > 0` → error (undecided case, OPEN D-27).
 - **BR-PRC-26** Regulatory caps (provisional config `bitspay.pricing.caps.<txnType>.maxFeeBps` / `maxFeePoisha`): the sample amounts {100, 1 000, 10 000, 100 000, 1 000 000, 2 500 000} Tk must not breach a cap → error.
+- **BR-PRC-64** (CR-PRICING-1, MVP) A plan with `txnType ∈ {BILL_PAY, RECHARGE}` must have `commission.type = NONE` (biller commission is deferred to R1; error `400 VALIDATION_FAILED` on `commission.type`); `match.payeeWalletType` null or `B`; any fee type and bearer otherwise allowed under BR-PRC-21..23 (OPERATOR ⇒ fee NONE). Evaluation is unchanged (BR-PRC-10..18): one plan per txnType for every biller in the MVP, resolved category = payer's (BR-PRC-11).
 - **BR-PRC-27** Golden self-check: at submit and again at approval the deployed evaluator re-runs every vector of `pricing-golden-vectors.v1.json`; any failure blocks (`409 GOLDEN_SELF_CHECK_FAILED`, metric `bitspay_pricing_golden_selfcheck_failures_total`, alert). A 500 is never returned to the checker.
 
 ### 7.5 In-line commission recording (R1)
@@ -2662,7 +2671,7 @@ Engine rules (kernel K5): checker ≠ maker (also on `X-Actor-User-Id`); a level
 
 Defaults for new campaign specs: `allowedRiskDecisions ["ALLOW"]`, `allowedWalletStatuses ["A"]`, `excludedFlagsMask 1`, `minKycTier 1`, `controlGroupBps 0`, `clawbackSpec {onReversal: true, onFullRefund: true, onPartialRefund: "BELOW_MIN_ONLY", windowDays: 30}`.
 
-Service-level properties: `bitspay.modules.campaign.enabled` (`true`), `bitspay.features.campaign.enabled` (`true`), `bitspay.clients.{ledger,wallet,limits-risk,admin}.base-url`, `bitspay.outbox.relay` (`debezium` | `polling`).
+Service-level properties: `bitspay.modules.campaign.enabled` (`true`; **`false` in the MVP deployment** — module campaign is R1+, CR-PRICING-1), `bitspay.features.campaign.enabled` (`true`), `bitspay.clients.{ledger,wallet,limits-risk,admin}.base-url`, `bitspay.outbox.relay` (`debezium` | `polling`).
 
 ### 8.3 Seed data (profiles `local`, `dev` only; ⚑ all values provisional)
 
@@ -2677,8 +2686,10 @@ Seed plans (`R__seed_plans.sql`, ACTIVE v1, maker / checker `SEED`; category cod
 | `PLN-MERCHANT-MDR-GROCERY` | MERCHANT_PAYMENT | `categoryCode 3101` | PERCENT 100 bps | PAYEE | 1500 | 0 | NONE |
 | `PLN-REFUND-NONE` | MERCHANT_REFUND | — | NONE | OPERATOR | 0 | 0 | NONE |
 | `PLN-FLOAT-NONE` | FLOAT_TRANSFER | — | NONE | OPERATOR | 0 | 0 | NONE |
+| `PLN-BILL-STD` | BILL_PAY | — | FIXED 500 | PAYER | 1500 | 0 | NONE |
+| `PLN-RECHARGE-NONE` | RECHARGE | — | NONE | OPERATOR | 0 | 0 | NONE |
 
-Story values: Rahim → Karim 500 Tk: fee 500, VAT 75; Karim cash-out 500 Tk at Salma: fee 750, VAT 112, Salma 300 / AIT 30; Salma cash-in 1,000 Tk: commission 400 / AIT 40; Rahim → Nirob Store (MICRO grocery 3101) 350 Tk: MDR 350, VAT 52 (the generic plan would give 525 / 79).
+Story values: Rahim → Karim 500 Tk: fee 500, VAT 75; Karim cash-out 500 Tk at Salma: fee 750, VAT 112, Salma 300 / AIT 30; Salma cash-in 1,000 Tk: commission 400 / AIT 40; Rahim → Nirob Store (MICRO grocery 3101) 350 Tk: MDR 350, VAT 52 (the generic plan would give 525 / 79); Rahim pays a DESCO bill of 1,200 Tk: fee 500, VAT 75 (payer bears 575 on top); Rahim recharges 100 Tk on a GP number: fee 0, VAT 0. `PLN-BILL-STD` and `PLN-RECHARGE-NONE` are added by CR-PRICING-1 (MVP; values open under SRS B-26).
 
 Seed share rules (R2): `CSR-CASHOUT-STD` (FEE, 2000 bps) and `CSR-CASHIN-STD` (AMOUNT, 10 bps), splits SUB 5000 / DISTRIBUTOR 3000 / MASTER 2000, AIT 1000.
 
@@ -2729,7 +2740,9 @@ Kernel metrics also exposed: `bitspay_outbox_unpublished_rows` (alert > 1 000 fo
 
 Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/campaign/wp-<n>-<slug>` (Dev-4), `pricing-service/wp-<n>-<slug>` for shared work. Each WP depends only on earlier WPs of this pack and on the stubs / fixtures.
 
-### WP-1 Skeleton, shared kernel and contracts (service lead) — SRS: —
+Scope tags: `[MVP]` = delivered in the MVP release (SRS v1.2); `[R1+]` = later release. In the MVP the campaign module is disabled (`bitspay.modules.campaign.enabled=false`), so the WP-1 start-up test with the flag off is the MVP deployment shape.
+
+### [MVP] WP-1 Skeleton, shared kernel and contracts (service lead) — SRS: —
 - Standalone Gradle project; packages `pricing`, `campaign`, `common` (layered per kernel K9) with `<module>.service.<Module>Facade` facades and `ArchitectureTest`; `docs/MODULES.md`.
 - `ActorContext`, `@RequiresActor`, problem mapper (kernel codes + `reason`), JSON logs with `module`.
 - Flyway locations `common` → `pricing` → `campaign` with their history tables; all §4 DDL; outbox writer (nullable payload only for `fee.rules`) + polling relay; inbox helpers; ShedLock; `idempotency_record`; maker-checker engine with handler registry (no handlers yet); refdata consumer + cache + bootstrap client.
@@ -2738,73 +2751,78 @@ Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/camp
 
 ### Module pricing (Dev-6)
 
-**WP-P2 Evaluator and golden vectors** — FEE-001, FEE-003, FEE-006, LED-015
+
+**[MVP] WP-P2 Evaluator and golden vectors** — FEE-001, FEE-003, FEE-006, LED-015
 - `Rounding.bpsOf`, `PricingEvaluator` (BR-PRC-10..18, `pricing-algorithm` v1), `GoldenVectorsTest` over `pricing-golden-vectors.v1.json` (classpath copy = the contract file), jqwik properties (§11).
 - Acceptance: all 18 CATALOGUE + 3 EXTENSION vectors pass; `bpsOf` equals BigDecimal HALF_EVEN for 10^6 random inputs; service package coverage ≥ 95 %.
 
-**WP-P3 Plan lifecycle and maker-checker** — FEE-005, BOM-004/005, ADM-004
+**[MVP] WP-P3 Plan lifecycle and maker-checker** — FEE-005, BOM-004/005, ADM-004
 - P4–P12, validation BR-PRC-20..27, approval handlers `PricingPlanVersion` / `PricingPlanRetire`, approvals M1–M3, expiry job, `approval.events` + `audit.events`.
 - Acceptance: `plan_submitByMaker_approveBySameUser_422MakerCheckerViolation`; DRAFT → PENDING → ACTIVE persisted; slab gaps rejected with field errors; NONE with min > 0 rejected; SHARED → 400 RESERVED_VALUE; expiry after 72 h (clock-controlled) → REJECTED + `APPROVAL_EXPIRED`.
 
-**WP-P4 Activation, `fee.rules`, snapshot, quote** — FEE-004, FEE-005
+**[MVP] WP-P4 Activation, `fee.rules`, snapshot, quote** — FEE-004, FEE-005
 - ActivationScheduler (BR-PRC-04..09), publish / expire / tombstone / deferred retire, republish P13, `PlanSnapshot`, `GET /v1/pricing/plans`, `POST /v1/pricing/quote`, `GET /v1/pricing/golden-vectors`.
 - Acceptance (Testcontainers Kafka + Debezium or polling relay): a future version publishes nothing until `effectiveFrom`, then exactly one record; retire produces a null-value record on key planId; snapshot API equals the compacted topic content and pages correctly with > 200 plans; golden self-check failure blocks activation; quote: no DB query on the path (datasource proxy counter), catalogue example → expected numbers.
 
-**WP-P5 Partner projection and in-line accruals; statements** — COM-003, COM-007, PRT-005
+**[MVP] WP-P5 Partner projection and in-line accruals; statements** — COM-003, COM-007, PRT-005
 - `partner.events` consumer (version guard, hierarchy versions, default profiles, `tinPresent`), `txn.events` consumer (filter, INLINE accruals, `COMMISSION_ACCRUED`), C1–C3.
 - Acceptance: cash-out fixture delivered twice → one INLINE accrual 300/30 and one event; partner actor reading another wallet → 403; out-of-order partner versions keep the newest projection and all hierarchy versions; REVERSAL rows and FAILED events cause no DB write.
 
-**WP-P6 Hierarchical sharing (R2)** — COM-002
+**[R1+] WP-P6 Hierarchical sharing (R2)** — COM-002
 - Share-rule lifecycle R1–R7 + handler, `ShareCalculator` (BR-PRC-30..38), parking and retry job.
 - Acceptance: Salma examples (a)–(d) reproduced exactly; txn before partner event is parked then accrued; property Σ shares + retained = pool.
 
-**WP-P7 Settlement and AIT** — COM-004, COM-005
+**[R1+] WP-P7 Settlement and AIT** — COM-004, COM-005
 - Profiles S1–S4, SettlementJob (BR-PRC-50..58), ledger client (§6.1.1), settlement approvals, S5–S8, `COMMISSION_SETTLED`, C4.
 - Acceptance: WireMock OK → SETTLED, request body = exactly the five fields; 503 then OK → one SETTLED with the same commandId sent twice; REJECTED → FAILED + profile hold; `:retry` → new settlementId next run; two concurrent runs → one settlement per beneficiary-period; AIT certificate totals = Σ settled + inline.
 
-**WP-P8 Clawback, adjustments, disputes** — COM-006
+**[MVP] WP-P8 Clawback, adjustments, disputes** — COM-006
 - BR-PRC-40..45, adjustments A1–A2 with levels, disputes A3–A5, negative-carry job + `COMMISSION_NEGATIVE_BALANCE`.
 - Acceptance: reversal (reverseCommission true) of an unsettled cash-out → next settlement excludes it; of a settled one → next period reduced, negative period SKIPPED and carried; partial reversal → no clawback; reversal before completion handled; adjustment approved by its maker → 422; negative carry over threshold → exactly one notification per day with the C6 variables.
 
-**WP-P9 Incentives (R2)** — COM-008
+**[R1+] WP-P9 Incentives (R2)** — COM-008
 - R8–R14, counters, month-end job.
 - Acceptance: agent with 1,000 cash-outs in October and tier threshold 1,000 gets one BONUS accrual on 1 November; rerun creates none; reversal decrements the counter.
 
-### Module campaign (Dev-4, R2)
+### Module campaign (Dev-4, R1+ — not deployed in the MVP)
 
-**WP-C2 Projections and activity** — CMP-003, CMP-004 (data)
+**[R1+] WP-C2 Projections and activity** — CMP-003, CMP-004 (data)
 - Consumers `wallet.events`, `customer.events`, `partner.events`, `txn.events` batch consumer (activity, first-txn, DB offsets), list-member resolution, first-txn import I1, partition and retention jobs.
 - Acceptance: `walletEvent_olderVersion_ignored`; `txnBatch_redeliveredAfterCrash_activityCountedOnce`; `firstTxn_secondEvent_notFirst`; `listMember_resolvedOnLaterWalletEvent`; MSISDN never stored (hash only).
 
-**WP-C3 Campaign and segment management with maker-checker** — CMP-001, CMP-003
+**[R1+] WP-C3 Campaign and segment management with maker-checker** — CMP-001, CMP-003
 - K1–K11, G1–G7, handlers `Campaign`, `CampaignCancel`, `CampaignBudgetIncrease`, funding check (§6.1.4), scheduler transitions, `ActiveCampaignIndex`, segment DSL in-memory + SQL, CSV upload streaming, `FEATURE.CAMPAIGN` gate.
 - Acceptance: `submit_budgetAboveThreshold_requiresFinChecker`; `approve_sameUserBothLevels_422`; `scheduler_startsAndEndsCampaign`; property `segmentRule_inMemoryEqualsSql`; `listUpload_duplicateFile_409`; `genderClause_unknownGender_noMatch`; `featureCampaignOff_writes422_pendingRewardsStillPosted`.
 
-**WP-C4 Trigger engine, eligibility and budget reservation** — CMP-002, CMP-004, CMP-005, CMP-009
+**[R1+] WP-C4 Trigger engine, eligibility and budget reservation** — CMP-002, CMP-004, CMP-005, CMP-009
 - BR-CMP-20..39, control group, abuse claims, reward calculator, reservations with slices, BUDGET_EXHAUSTED + notification, evaluation log, CUSTOMER_EVENT triggers, K13.
 - Acceptance: `rahimFirstQrPayment_350Tk_createsPendingReward3500`; `secondQrPayment_firstEver_notEligible`; `riskAllowAndAlert_notEligible`; `sameNidSecondWallet_abuseBlocked`; `distributorBeneficiary_walletTypeNotAllowed`; `controlGroupMember_noReward_progressTracked`; `nthCount_rewardAtFifthTxn`; `timeWindow_crossesMidnight`; `parallel200Txns_budgetNeverExceeded` (200 threads, budget for 50 → exactly 50); jqwik `rewardWithinBounds`.
 
-**WP-C5 Reward executor, limits and ledger posting** — CMP-006, LIM-002/003
+**[R1+] WP-C5 Reward executor, limits and ledger posting** — CMP-006, LIM-002/003
 - Executor (BR-CMP-40..47), attempt-derived commandIds and attempt rows, limits batch client call + release job, ledger client (§6.1.2), PENDING_FUNDING + auto-pause + recheck + `CAMPAIGN_FUNDING_LOW`, `REWARD_GRANTED`, W1, W2, W4, H1, H2.
 - Acceptance: `executor_ledgerOk_grantedAndEventOnce`; `executor_ledger503_retriesSameCommandIdAndBody`; `executor_ledgerExists_treatedAsGranted`; `executor_insufficientFunds_pausesCampaigns_nextAttemptNewCommandId` (attempt 2 = `UUIDv5(campaignId, name + ":2")`); `limitsDecisionLimitExceeded_failedAndReleaseQueued`; `limits409_txnIds_nextAttempt`; `maxBalanceRejected_failedAndReleased`; `rewardGranted_nineFields_commandIdOfPostingAttempt`; `twoExecutors_noDoublePost`.
 
-**WP-C6 Clawback and fraud controls** — CMP-009, CMP-006
+**[R1+] WP-C6 Clawback and fraud controls** — CMP-009, CMP-006
 - BR-CMP-50..53, ledger reversal clawback (default) and manual clawback, W3, W5, W6, handlers `RewardClawback` / `RewardWriteOff`, `REWARD_CLAWED_BACK`, `REWARD_CLAWBACK_MANUAL_REQUIRED`.
 - Acceptance: `reversalBeforePost_cancelsAndReleases`; `reversalAfterGrant_ledgerMode_clawedBackEventOnce` (`clawbackMode LEDGER_REVERSAL`, `clawbackTxnRef CC…`); `alreadyReversed_treatedAsClawedBack`; `manualClawback_pendingManual_notified_recordedWithMode MANUAL`; `partialRefund_aboveMin_noClawback`; `clawbackInsufficientFunds_dailyNewAttempt_thenWriteOff`; `fraudClawback_requiresRiskChecker`.
 
-**WP-C7 Referral, lucky draw, points, educational** — CMP-002, CMP-007
+**[R1+] WP-C7 Referral, lucky draw, points, educational** — CMP-002, CMP-007
 - F1, F2 + `referralCode` from `CUSTOMER_REGISTERED`, qualification (KYC_APPROVED / FIRST_TXN), dual rewards; D1–D4 commit-reveal with WINNER rewards and handler `LuckyDraw`; points ledger + H3 (flag); educational sender.
 - Acceptance: `referral_selfReferral_409`; `referral_kycApproved_rewardsBoth`; `referral_sameNid_rejected`; `referral_codeOnRegistration_createsClaim`; `draw_wrongSeed_400`; `draw_sameSeed_sameWinners`; `educational_1000Recipients_requestIdsDeterministic_pauseStops`.
 
-**WP-C8 Analytics** — CMP-008, CMP-005
+**[R1+] WP-C8 Analytics** — CMP-008, CMP-005
 - Roll-ups in the evaluation / execution transactions; K12; budget gauges; nightly invariant job.
 - Acceptance: hand-computed analytics fixture → exact incrementalTxns / CPA / ROI; `analytics_noControlGroup_incrementalEqualsQualifying`; invariant job reports 0.
 
-### WP-10 Integration on the Compose stack (both owners)
+### [MVP] WP-10 Integration on the Compose stack (both owners)
 - Switch clients to the real services; consume real topics; confirm transaction-service consumes `fee.rules` and passes the golden vectors from this file (SHA-256 equal); walk the Compose scenarios of §11 by hand.
-- Acceptance: scenarios S4–S6, S14, S15 pass on the stack; zero DLQ records during the run; OpenAPI drift clean.
+- Acceptance: scenarios S4–S6, S14, S15 pass on the stack (MVP: S4–S6 plus the CR-PRICING-1 bill-payment and recharge scenario; S14 and S15 run with the R1+ WPs); zero DLQ records during the run; OpenAPI drift clean.
 
-### WP-11 Hardening
+### [MVP] WP-CR-1 BILL_PAY and RECHARGE plans (CR-PRICING-1, contractVersion 1.1.0) — SRS: FEE-006, BIL-011, BIL-012
+- Plan txnType set + `BILL_PAY`, `RECHARGE` (codes `planTxnType`, OpenAPI PlanJson / plan request / PlanHeader / `PricingQuoteRequest` / `Accrual` / `StatementLine`, `PRICING_PLAN_UPSERTED` and `COMMISSION_ACCRUED` schemas, `pricing_plan.txn_type` CHECK); wallet type `B` (BILLER) in `planWalletType`, quote parties and `match.*WalletType` (+ DDL CHECKs); BR-PRC-64; seed plans `PLN-BILL-STD` and `PLN-RECHARGE-NONE` in `R__seed_plans.sql`; MVP deployment profile with `bitspay.modules.campaign.enabled=false`.
+- Acceptance: `quote_billPay_1200Tk_fee500_vat75_payer` (payee walletType B); `quote_recharge_10000_zero_operator`; `planValidation_billPayWithCommission_rejected`; `planValidation_rechargeOperatorWithFee_rejected`; `feeRules_seedBillAndRechargePlansPublished`; `codes_planTxnType_matchesOpenApiAndSchemas`; all existing golden vectors still green (algorithm steps unchanged); `campaignModuleDisabled_mvpProfile_noCampaignBeans`.
+
+### [MVP] WP-11 Hardening
 - PII log-scan test, `docs/TRACEABILITY.md`, chaos tests (kill worker mid-batch, ledger down 10 min, Kafka down), budget hot-row test with slices, local load smoke (no laptop performance claims).
 - Acceptance: no duplicate ledger commands after chaos; budget invariant holds; DoD §12 complete.
 
@@ -2812,7 +2830,7 @@ Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/camp
 
 | Layer | Must-have tests |
 |---|---|
-| Service unit (pricing) | `bpsOf_halfEven_tieToEven` (12.5→12, 17.5→18, 7.5→8, 4.5→4); `evaluator_goldenVectors_allPass`; `evaluator_noCandidate_zeroWithNulls`; `evaluator_effectiveToExclusive`; `evaluator_freeAllowance_skipsMinClamp`; `evaluator_noneFee_neverClamped` (X6); `evaluator_operatorBearer_feeVatZero` (X7); `evaluator_commissionClamp_beforeAit` (X8, X9); `evaluator_slabBoundary_100000_firstSlab`; `evaluator_tieBreak_versionThenPlanId`; `shareCalculator_salmaCashOut_75_45_30_ait_8_4_3`; `shareCalculator_salmaCashIn_50_30_20`; `shareCalculator_remainder_101_gives_51_30_20`; `shareCalculator_missingDistributor_retainOperator` / `_nearestPresentAncestor`; `shareCalculator_noTin_aitRaised`; `planValidation_slabGap_rejected`; `planValidation_operatorWithFee_rejected`; `planValidation_shared_reserved`; `settlementPeriod_weeklySaturdayAnchor`; `businessDate_cutoffEod_shift` |
+| Service unit (pricing) | `bpsOf_halfEven_tieToEven` (12.5→12, 17.5→18, 7.5→8, 4.5→4); `evaluator_goldenVectors_allPass`; `evaluator_noCandidate_zeroWithNulls`; `evaluator_effectiveToExclusive`; `evaluator_freeAllowance_skipsMinClamp`; `evaluator_noneFee_neverClamped` (X6); `evaluator_operatorBearer_feeVatZero` (X7); `evaluator_commissionClamp_beforeAit` (X8, X9); `evaluator_slabBoundary_100000_firstSlab`; `evaluator_tieBreak_versionThenPlanId`; `shareCalculator_salmaCashOut_75_45_30_ait_8_4_3`; `shareCalculator_salmaCashIn_50_30_20`; `shareCalculator_remainder_101_gives_51_30_20`; `shareCalculator_missingDistributor_retainOperator` / `_nearestPresentAncestor`; `shareCalculator_noTin_aitRaised`; `planValidation_slabGap_rejected`; `planValidation_operatorWithFee_rejected`; `planValidation_shared_reserved`; `planValidation_billPayWithCommission_rejected` (BR-PRC-64); `evaluator_billPay_payeeB_categoryFromPayer`; `settlementPeriod_weeklySaturdayAnchor`; `businessDate_cutoffEod_shift` |
 | Service unit (campaign) | `cashbackPercent_halfEven_12_5_to_12`; `cashbackPercent_cappedAt5000`; `perUserRemaining_limitsReward`; `occurrence_volumeThreshold_crossesOnce`; `window_dhakaTimezone`; `controlGroup_hashDeterministic`; `uuidv5_campaignTxn_matchesVector` (`8dd991f0-a010-55ea-94f9-1e4f9c634f58`); `uuidv5_attempt2_suffix`; `txnRef_format_CR_18chars`; `stateMachine_closedIsTerminal` |
 | Property (jqwik) | `bpsOf_equalsBigDecimalHalfEven`; `fee_withinMinMax_whenNotFree`; `vat_neverExceedsFee`; `commission_ait_leGross`; `evaluator_deterministic_underPlanListPermutation`; `shares_sumEqualsAssignedPool_neverNegative`; `clawback_netsToZero_perTxn`; `settlement_net_equals_gross_minus_ait`; `rewardWithinBounds`; `budgetNeverNegativeOrOverTotal`; `segmentRule_inMemoryEqualsSql`; `referralCode_deterministic` |
 | Service (Mockito) | `activate_supersedesPrevious_inOneTxn`; `retire_writesTombstone`; `approval_checkerEqualsMaker_rejected`; `approval_twoLevels_sameCheckerTwice_rejected`; `approval_withdraw_emitsCancelled`; `settlement_heldPartner_rollsForward`; `settlement_belowMinPayout_skipped`; `submit_fundingWarn_inApprovalSummary`; `budgetIncrease_fromExhausted_reactivates`; `cancelScheduled_requiresChecker` |
@@ -2823,6 +2841,7 @@ Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/camp
 | Concurrency (≥ 100 threads) | `settlementJob_parallelRuns_noDoubleSettlement`; `accrual_parallelSameEvent_single`; `activation_parallelSchedulers_singlePublish`; `parallel200Txns_budgetNeverExceeded`; `twoExecutors_noDoublePost`; `parallelReferralClaims_oneWins`; `perUserCount1_parallelTxnsSameWallet_oneReward` |
 | Security / PII | `logs_containNoMsisdnNidDevice`; `projection_storesNoRawMsisdnOrNid`; `partnerReadsOtherWallet_403`; `walletsOffers_otherWallet_403` |
 | Golden vectors | `pricing-golden-vectors.v1.json` passes in CI on every build; its SHA-256 recorded |
+| MVP products (CR-PRICING-1) | `quote_billPay_1200Tk_fee500_vat75_payer`; `quote_recharge_10000_zero_operator`; `planValidation_rechargeOperatorWithFee_rejected`; `feeRules_seedBillAndRechargePlansPublished`; `codes_planTxnType_matchesOpenApiAndSchemas`; `campaignModuleDisabled_mvpProfile_noCampaignBeans`; Compose: Rahim pays DESCO 1,200 Tk → fee 500 / VAT 75 on `TRANSACTION_COMPLETED`, recharge 100 Tk → fee 0 |
 | Manual Compose scenarios | S4 Salma cash-in commission 400/40; S5 P2P fee 500 / VAT 75; S6 cash-out fee 750 / VAT 112 / commission 300 and MDR at Nirob Store; S14 hierarchical shares accrue and settle with AIT (COMMISSION_PAYABLE / AIT_PAYABLE move by the expected totals); S15 first-QR cashback, cap reached, clawback on reversal (ledger mode) |
 
 ## 12. Definition of done (additions to kernel K10)
@@ -2855,8 +2874,12 @@ Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/camp
 | OPEN D-31 | Nullable outbox payload / tombstones | `fee.rules` declares `tombstones: true`; outbox `payload NULL` only for `fee.rules` | ADR-04, §4.1, §5.2.1, BR-PRC-08 |
 | OPEN D-43 | Segment-targeted fee waiver | post-hoc `FEE_AND_VAT` cashback | §1.3, §2 |
 | OPEN D-44 | Fee-version switch lag | publish at `effectiveFrom`; lag ≤ 30 s alerted | ADR-03, BR-PRC-09 |
+| OPEN D-45 | Per-biller fee / bearer (biller profile `feeBearer = BILLER`) and biller commission | MVP: one plan per txnType (`PLN-BILL-STD` PAYER, `PLN-RECHARGE-NONE` OPERATOR) for every biller; plans cannot match a biller; commission NONE (BR-PRC-64); per-biller matching and biller commission R1. MVP value confirmed (MVP decisions 2026-10-14); stays OPEN for R1 | §1.3, §2 FEE-006, BR-PRC-64, §8.3 |
+| SRS B-26 | MVP fee values | `PLN-BILL-STD` FIXED 500 poisha + VAT 15 % payer-borne; `PLN-RECHARGE-NONE` free (OPERATOR) ⚑ | §8.3 |
+| MVP scope | Module `campaign`, commission settlement, sharing, incentives | not deployed / not run in the MVP (`bitspay.modules.campaign.enabled=false`); R1+ WPs in §10 | §1.2, §1.5, §8.2, §10 |
+| Golden vectors for BILL_PAY / RECHARGE | none added in 1.1.0 (the algorithm steps are unchanged; the file and its SHA-256 stay as baselined); covered by WP-CR-1 quote tests | §5.4, §10 WP-CR-1 |
 
-**Deferred items** (interim behaviour in §1.3): SHARED bearer, VAT on commission, commission territory / volume tier, bank settlement, biller pricing, commission simulation, at-transaction campaign waivers, points redemption, physical prize fulfilment.
+**Deferred items** (interim behaviour in §1.3): SHARED bearer, VAT on commission, commission territory / volume tier, bank settlement, biller commission and per-biller plans (R1), commission simulation, at-transaction campaign waivers, points redemption, physical prize fulfilment.
 
 **Assumptions**
 1. ⚑ All fee, commission, AIT, share and campaign values are provisional seeds pending SRS Appendix B-09 and Finance / Marketing policy.
@@ -2880,3 +2903,5 @@ Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/camp
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-06 v1.2 (Parts 0/A/B) + v5.0 overlay + catalogue v1.4 + contract audit §4.5 + GL CCRs (no impact) |
+| 1.1.0 | 2026-10-14 | [CR-PRICING-1](changes/CR-PRICING-1.md) | MVP (SRS v1.2): plan txnType + `BILL_PAY`, `RECHARGE`; wallet type `B` (BILLER) in plan match and quote parties; BR-PRC-64 (no biller commission, R1); seed plans `PLN-BILL-STD`, `PLN-RECHARGE-NONE`; FEE-006 biller fees Build (MVP); §2 traced to SRS v1.2 with `MVP?` column; §10 `[MVP]`/`[R1+]` tags + WP-CR-1; module campaign R1+ (`bitspay.modules.campaign.enabled=false` in the MVP) |
+| 1.1.0 | 2026-10-14 | — | Kind A (documentation only, MVP decisions 2026-10-14): OPEN D-45 MVP value confirmed (one plan per txnType, `PLN-BILL-STD` payer-borne, `PLN-RECHARGE-NONE` free) |

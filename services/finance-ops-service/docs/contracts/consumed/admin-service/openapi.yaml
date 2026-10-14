@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: admin-service (governance + notification)
-  version: 1.0.0
+  version: 1.1.0
   description: Every operation served by admin-service (SVC-15). x-audience marks who may call; x-actors lists allowed actor types, staff roles and SERVICE caller ids. Errors are RFC 9457 problem+json per
     kernel K3.6; x-problem-reasons lists the provider-owned reason values per code. Maker requests return 202 and apply only on final approval (kernel K5).
 servers:

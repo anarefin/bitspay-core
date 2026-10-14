@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/post-recharge → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-recharge(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3e3-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "a847315f-4048-d028-13bd-b433f171cf75"
+      ],
+      "postedAt": "2026-10-14T09:20:05.031Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.1.0"
+  }
+}

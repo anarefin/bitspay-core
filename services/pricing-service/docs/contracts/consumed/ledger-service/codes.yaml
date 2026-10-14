@@ -1,4 +1,4 @@
-# ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.1.0, kernel 1.0.
 # Every value here is owned by ledger-service. Consumers that switch on a set declare it in their codesUsed.
 # Adding a value is additive (minor); removing or renaming one is breaking.
 
@@ -18,6 +18,7 @@ codeSets:
       - {code: 120, name: DISTRIBUTOR_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: distributor, creatableViaApi: true, ownerType: DISTRIBUTOR}
       - {code: 130, name: MERCHANT_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: merchant, creatableViaApi: true, ownerType: MERCHANT}
       - {code: 140, name: INSTITUTION_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: "institutional payer (salary/G2P)", creatableViaApi: true, ownerType: INSTITUTION}
+      - {code: 150, name: BILLER_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: biller, creatableViaApi: true, ownerType: BILLER}
       - {code: 200, name: FEE_INCOME, normalSide: CREDIT, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000200}
       - {code: 210, name: VAT_PAYABLE, normalSide: CREDIT, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000210}
       - {code: 220, name: COMMISSION_PAYABLE, normalSide: CREDIT, tbFlags: [history], onePer: "system (operator-funded commission); debit balance allowed", fixedAccountId: 00000000-0000-0000-0000-000000000220}
@@ -39,11 +40,12 @@ codeSets:
       - {code: 3, name: DISTRIBUTOR, accountTypes: [120]}
       - {code: 4, name: MERCHANT, accountTypes: [130]}
       - {code: 5, name: INSTITUTION, accountTypes: [140]}
+      - {code: 6, name: BILLER, accountTypes: [150]}
       - {code: 9, name: SYSTEM, accountTypes: [200, 210, 220, 230, 240, 300, 400, 410, 420, 900, 910]}
 
   transferCode:
     description: >-
-      TigerBeetle transfer.code. 1001-1016 and 2001-2004 are business codes. 9001-9099 is reserved for technical, net-zero
+      TigerBeetle transfer.code. 1001-1018 and 2001-2004 are business codes. 9001-9099 is reserved for technical, net-zero
       transfers: never on ledger.changes, never in transferIds, GET .../transfers or GET /v1/ledger/commands/{commandId}.
       Identify technical transfers by code (>= 9000), never by legIndex.
     values:
@@ -63,6 +65,8 @@ codeSets:
       - {code: 1014, name: LIEN, description: "pending (hold); also the void leg of a hold"}
       - {code: 1015, name: TRUST_REBALANCE}
       - {code: 1016, name: CLOSURE_PAYOUT}
+      - {code: 1017, name: BILL_PAY_PRINCIPAL}
+      - {code: 1018, name: RECHARGE_PRINCIPAL}
       - {code: 2001, name: FEE}
       - {code: 2002, name: VAT}
       - {code: 2003, name: COMMISSION}
@@ -95,6 +99,8 @@ codeSets:
       - {code: 15, name: release-hold, pattern: void pending, principalCode: 1014, lane: online}
       - {code: 16, name: post-trust-rebalance, pattern: single, principalCode: 1015, lane: online}
       - {code: 17, name: post-closure-payout, pattern: single, principalCode: 1016, lane: online}
+      - {code: 18, name: post-bill-payment, pattern: linked, principalCode: 1017, lane: online}
+      - {code: 19, name: post-recharge, pattern: linked, principalCode: 1018, lane: online}
 
   commandResult:
     description: "result of a command response (HTTP 200). EXISTS = already applied, same outcome. REJECTED is final for its commandId."
@@ -121,21 +127,21 @@ codeSets:
       Tokens that may appear in the command response `detail`. Callers may branch ONLY on these tokens; any other
       `detail` value is free text (raw TigerBeetle result, e.g. "leg 0: exceeds_credits") and must not be parsed.
     values:
-      - {code: NOT_REVERSIBLE, with: OTHER, description: "post-reversal original command type not in {1-6, 8, 12} (or not 12 for pricing-service)"}
+      - {code: NOT_REVERSIBLE, with: OTHER, description: "post-reversal original command type not in {1-6, 8, 12, 18, 19} (or not 12 for pricing-service)"}
       - {code: ACCOUNT_TYPE_MISMATCH, with: OTHER, description: "account-type guard failed"}
       - {code: TRUST_ATTRIBUTION_EXCEEDED, with: INSUFFICIENT_FUNDS, description: "trust account attributed balance would go negative (redeem, rebalance)"}
       - {code: id_already_failed, with: OTHER, description: "replay of a rejected commandId whose journal row is gone (journal retention 8 days)"}
       - {code: IDEMPOTENCY_CONFLICT, with: OTHER, description: "disbursement batch only: this row conflicts with an earlier row body under the same commandId"}
 
   feeBearer:
-    description: "pricing.feeBearer on payment commands 1-6. SHARED is a reserved name: rejected with 400 until enabled (OPEN D-03)."
+    description: "pricing.feeBearer on payment commands 1-6, 18, 19. SHARED is a reserved name: rejected with 400 until enabled (OPEN D-03)."
     values:
       - {code: PAYER, description: "fee + VAT debited from fromAccountId"}
       - {code: PAYEE, description: "fee + VAT debited from toAccountId (e.g. merchant MDR)"}
       - {code: OPERATOR, description: "fee waived; fee = vat = 0"}
 
   commissionSource:
-    description: "pricing.commissionSource on payment commands 1-6: the account the commission and AIT legs are debited from."
+    description: "pricing.commissionSource on payment commands 1-6, 18, 19: the account the commission and AIT legs are debited from."
     values:
       - {code: FEE_INCOME, accountId: 00000000-0000-0000-0000-000000000200}
       - {code: COMMISSION_PAYABLE, accountId: 00000000-0000-0000-0000-000000000220}

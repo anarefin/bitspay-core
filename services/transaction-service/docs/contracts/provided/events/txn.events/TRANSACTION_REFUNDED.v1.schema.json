@@ -68,7 +68,9 @@
         "MERCHANT_PAYMENT",
         "MERCHANT_REFUND",
         "FLOAT_TRANSFER",
-        "REVERSAL"
+        "REVERSAL",
+        "BILL_PAY",
+        "RECHARGE"
       ]
     },
     "status": {
@@ -129,8 +131,10 @@
         "A",
         "D",
         "M",
-        "I"
-      ]
+        "I",
+        "B"
+      ],
+      "description": "Wallet type code; B = BILLER settlement wallet (BILL_PAY / RECHARGE to-side, REVERSAL of them from-side; CR-TRANSACTION-1)."
     },
     "toWalletId": {
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -143,8 +147,10 @@
         "A",
         "D",
         "M",
-        "I"
-      ]
+        "I",
+        "B"
+      ],
+      "description": "Wallet type code; B = BILLER settlement wallet (BILL_PAY / RECHARGE to-side, REVERSAL of them from-side; CR-TRANSACTION-1)."
     },
     "amountPoisha": {
       "minimum": 1,
@@ -337,6 +343,7 @@
         "LEDGER_INVALID_AMOUNT",
         "LEDGER_OTHER",
         "LEDGER_NOT_POSTED",
+        "PROVIDER_REJECTED",
         null
       ],
       "description": "Non-null only on FAILED."

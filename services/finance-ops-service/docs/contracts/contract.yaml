@@ -50,7 +50,7 @@ consumes:
   - producer: ledger-service
     operation: POST /v1/ledger/accounts/balances:batchGet
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: both
     purpose: 'reconciliation: projection verification (BR-REC-27); reporting: daily-close spot check and RR-01 cross-check (BR-RPT-42)'
     fieldsUsed:
@@ -71,7 +71,7 @@ consumes:
   - producer: ledger-service
     operation: GET /v1/ledger/accounts/{id}/transfers
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reconciliation
     purpose: posting-sum check on sampled accounts (REL-002); trust-movement backfill for file recon
     fieldsUsed:
@@ -105,7 +105,7 @@ consumes:
   - producer: ledger-service
     operation: GET /v1/ledger/commands/{commandId}
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reconciliation
     purpose: investigate MISSING_IN_LEDGER; original legs of a reversal; resolve unknown adjustment outcome
     fieldsUsed:
@@ -133,7 +133,7 @@ consumes:
   - producer: ledger-service
     operation: GET /v1/ledger/system-balance-sheet
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reconciliation
     purpose: e-money LIVE mode (EMY-004 on demand); informational EOD cross-check
     fieldsUsed:
@@ -158,7 +158,7 @@ consumes:
   - producer: ledger-service
     operation: POST /v1/ledger/commands/post-adjustment
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reconciliation
     purpose: post an APPROVED reconciliation adjustment (command 11, RCA- reference)
     fieldsUsed:
@@ -190,7 +190,7 @@ consumes:
   - producer: transaction-service
     operation: GET /v1/transactions/{txnRef}
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reconciliation
     purpose: enrich exceptions; resolve a reversal's original txnId
     fieldsUsed:
@@ -209,7 +209,7 @@ consumes:
   - producer: wallet-service
     operation: GET /v1/wallets/{walletId}
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reporting
     purpose: statement header when wallet_dim lacks the wallet (new wallet, ingest lag)
     fieldsUsed:
@@ -229,7 +229,7 @@ consumes:
   - producer: admin-service
     operation: GET /v1/notifications/logs
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reporting
     purpose: ad-hoc RPT-005 notification-delivery views (owner of the report OPEN D-37)
     fieldsUsed:
@@ -260,7 +260,7 @@ consumes:
   - producer: admin-service
     operation: GET /v1/notifications/{notificationId}
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     module: reporting
     purpose: detail of one notification in the RPT-005 ad-hoc view
     fieldsUsed:
@@ -281,7 +281,7 @@ consumes:
   - producer: general-ledger-service
     operation: GET /v1/gl/days/{businessDate}/control-totals
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     module: reconciliation
     purpose: GL tie-out run (GL_TIEOUT, CCR-GL-05)
     fieldsUsed:
@@ -305,7 +305,7 @@ consumes:
   - producer: general-ledger-service
     operation: GET /v1/gl/accounts
     major: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     module: reporting
     purpose: 'R2 (optional, CCR-GL-08): GL account names for GL-based regulatory datasets'
     fieldsUsed:
@@ -334,7 +334,7 @@ consumes:
     topic: ledger.changes
     eventType: LEDGER_TRANSFER_POSTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-ledger
     module: reconciliation
     purpose: balance projection, ledger side of recon_item, watched transfers, watermarks, late-event restatement
@@ -357,7 +357,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_COMPLETED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-txn
     module: reconciliation
     purpose: 'business side of recon_item: expected legs (commands 1–7); wallet-type registry'
@@ -387,7 +387,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_FAILED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-txn
     module: reconciliation
     purpose: 'EXPECT_NONE: a failed transaction must have no posted ledger legs'
@@ -404,7 +404,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REVERSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-txn
     module: reconciliation
     purpose: original item business_status → REVERSED (informational)
@@ -421,7 +421,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REFUNDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-txn
     module: reconciliation
     purpose: original item business_status → PARTIALLY_REFUNDED/REFUNDED
@@ -566,7 +566,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_GRANTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-campaign
     module: reconciliation
     purpose: business side of command 12
@@ -580,7 +580,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_CLAWED_BACK
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-campaign
     module: reconciliation
     purpose: LEDGER_REVERSAL → command 7 mirror of the reward; MANUAL → informational
@@ -600,7 +600,7 @@ consumes:
     topic: commission.events
     eventType: COMMISSION_SETTLED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-commission
     module: reconciliation
     purpose: 'business side of command 13 (multiset: net leg + AIT leg)'
@@ -615,7 +615,7 @@ consumes:
     topic: refdata.events
     eventType: REFDATA_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reconciliation-refdata
     module: reconciliation
     purpose: CUTOFF.EOD, CUTOFF.EOD_GRACE_MINUTES, CALENDAR.*, HOLIDAY, RETENTION.RECON
@@ -634,7 +634,7 @@ consumes:
     topic: gl.events
     eventType: GL_DAY_CLOSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reconciliation-gl
     module: reconciliation
     purpose: trigger the GL tie-out run for (businessDate, revision) (CCR-GL-05)
@@ -652,7 +652,7 @@ consumes:
     topic: ledger.changes
     eventType: LEDGER_TRANSFER_POSTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-ledger-sink
     module: reporting
     purpose: 'sink: rpt.ledger_transfers → postings, balances'
@@ -663,7 +663,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_COMPLETED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-txn-sink
     module: reporting
     purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
@@ -674,7 +674,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_FAILED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-txn-sink
     module: reporting
     purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
@@ -685,7 +685,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REVERSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-txn-sink
     module: reporting
     purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
@@ -696,7 +696,7 @@ consumes:
     topic: txn.events
     eventType: TRANSACTION_REFUNDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-txn-sink
     module: reporting
     purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
@@ -707,7 +707,7 @@ consumes:
     topic: wallet.events
     eventType: WALLET_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-wallet-sink
     module: reporting
     purpose: 'sink: rpt.wallet_dim, wallet_status_history'
@@ -718,7 +718,7 @@ consumes:
     topic: customer.events
     eventType: CUSTOMER_REGISTERED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -729,7 +729,7 @@ consumes:
     topic: customer.events
     eventType: KYC_SUBMITTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -740,7 +740,7 @@ consumes:
     topic: customer.events
     eventType: KYC_APPROVED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -751,7 +751,7 @@ consumes:
     topic: customer.events
     eventType: KYC_REJECTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -762,7 +762,7 @@ consumes:
     topic: customer.events
     eventType: KYC_TIER_CHANGED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -773,7 +773,7 @@ consumes:
     topic: customer.events
     eventType: RISK_GRADE_CHANGED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -784,7 +784,7 @@ consumes:
     topic: customer.events
     eventType: CUSTOMER_PROFILE_UPDATED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-customer-sink
     module: reporting
     purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
@@ -795,7 +795,7 @@ consumes:
     topic: partner.events
     eventType: PARTNER_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-partner-sink
     module: reporting
     purpose: 'sink: rpt.partner_dim, partner_dim_history'
@@ -806,7 +806,7 @@ consumes:
     topic: fee.rules
     eventType: PRICING_PLAN_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-pricing-sink
     module: reporting
     purpose: 'sink: rpt.pricing_plan_dim (tombstone → deleted = 1)'
@@ -817,7 +817,7 @@ consumes:
     topic: commission.events
     eventType: COMMISSION_ACCRUED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-commission-sink
     module: reporting
     purpose: 'sink: rpt.commission_facts, command_ref(COMMISSION)'
@@ -828,7 +828,7 @@ consumes:
     topic: commission.events
     eventType: COMMISSION_SETTLED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-commission-sink
     module: reporting
     purpose: 'sink: rpt.commission_facts, command_ref(COMMISSION)'
@@ -1037,7 +1037,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_GRANTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-domain-sink
     module: reporting
     purpose: 'sink: rpt.domain_events, command_ref(CAMPAIGN)'
@@ -1048,7 +1048,7 @@ consumes:
     topic: campaign.events
     eventType: REWARD_CLAWED_BACK
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-domain-sink
     module: reporting
     purpose: 'sink: rpt.domain_events, command_ref(CAMPAIGN)'
@@ -1213,7 +1213,7 @@ consumes:
     topic: risk.alerts
     eventType: RISK_ALERT_RAISED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-audit-sink
     module: reporting
     purpose: 'sink: rpt.domain_events (RPT-001 suspicious indicators)'
@@ -1224,7 +1224,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-audit-sink
     module: reporting
     purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
@@ -1235,7 +1235,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_DECIDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-audit-sink
     module: reporting
     purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
@@ -1246,7 +1246,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_EXPIRED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-audit-sink
     module: reporting
     purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
@@ -1257,7 +1257,7 @@ consumes:
     topic: audit.events
     eventType: AUDIT_RECORDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-audit-sink
     module: reporting
     purpose: 'sink: rpt.domain_events (RPT-004 audit reports); schema owner admin-service (K4.4)'
@@ -1268,7 +1268,7 @@ consumes:
     topic: refdata.events
     eventType: REFDATA_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     groupId: finance-ops-service.reporting-refdata
     module: reporting
     purpose: 'sink: rpt.refdata_dim (GEO, MCC, REASON_CODE, HOLIDAY, CUTOFF.EOD, CALENDAR.*, RETENTION.*)'
@@ -1279,7 +1279,7 @@ consumes:
     topic: gl.events
     eventType: GL_DAY_CLOSED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1291,7 +1291,7 @@ consumes:
     topic: gl.events
     eventType: GL_DAY_CERTIFIED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1303,7 +1303,7 @@ consumes:
     topic: gl.events
     eventType: GL_PERIOD_STATUS_CHANGED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1315,7 +1315,7 @@ consumes:
     topic: gl.events
     eventType: GL_JOURNAL_POSTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1327,7 +1327,7 @@ consumes:
     topic: gl.events
     eventType: GL_ACCOUNT_UPSERTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1339,7 +1339,7 @@ consumes:
     topic: gl.events
     eventType: GL_EXCEPTION_RAISED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 2.0.0
     groupId: finance-ops-service.reporting-gl-sink
     module: reporting
     purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
@@ -1352,7 +1352,7 @@ consumes:
     topic: notification.requests
     eventType: NOTIFICATION_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     fieldsUsed:
     - '*'
     templates:
@@ -1367,7 +1367,7 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_REQUESTED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     fieldsUsed:
     - '*'
     entityTypes: codes.yaml → entityTypes
@@ -1375,21 +1375,21 @@ consumes:
     topic: approval.events
     eventType: APPROVAL_DECIDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     fieldsUsed:
     - '*'
   - owner: admin-service
     topic: approval.events
     eventType: APPROVAL_EXPIRED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     fieldsUsed:
     - '*'
   - owner: admin-service
     topic: audit.events
     eventType: AUDIT_RECORDED
     version: 1
-    pinnedContractVersion: 1.0.0
+    pinnedContractVersion: 1.1.0
     fieldsUsed:
     - '*'
   data: []

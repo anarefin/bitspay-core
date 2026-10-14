@@ -4,13 +4,13 @@
 |---|---|
 | Service | `limits-risk-service` (`spring.application.name`) |
 | Number / owner | SVC-05 · Dev-5 (single module) |
-| Layer / release | Core, payment hot path · R1 (LIM-009 self-limits and FRD-009 simulation = R2, behind flags) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Core, payment hot path · **MVP** (limits, emergency controls, lists, fraud rules for P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, `BILL_PAY`, `RECHARGE`) · R1+ (`evaluate:batch` callers disbursement / campaign) · R2 (LIM-009 self-limits and FRD-009 simulation, behind flags) |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-LIMITSRISK-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8105 · management 9105 |
 | Schema / role | `svc_limits_risk` (login role `svc_limits_risk`), outbox `svc_limits_risk.outbox` |
 | Depends on (pins) | transaction-service@1 (`txn.events`) · wallet-service@1 (`wallet.events`, `customer.events`, `partner.events`) · disbursement-service@1 (`disbursement.events`) · admin-service@1 (inbound topics `approval.events`, `audit.events`). No synchronous outbound calls. No refdata. |
-| Open decisions | OPEN D-01, OPEN D-04, OPEN D-09, OPEN D-14, OPEN D-15, OPEN D-17, OPEN D-29, OPEN D-30, OPEN D-32 |
+| Open decisions | OPEN D-01, OPEN D-04, OPEN D-09, OPEN D-14, OPEN D-15, OPEN D-17, OPEN D-29, OPEN D-30, OPEN D-32; SRS B-26, A-43 (§13) |
 
 ## 1. Mission and boundaries
 
@@ -32,6 +32,8 @@ It owns the limit and tier configuration, emergency controls, fraud rules and th
 
 ### 1.2 In scope
 
+**MVP vs R1+ (SRS v1.2, CR-LIMITSRISK-1).** The MVP uses the whole single-transaction path: limits engine, emergency controls, black/whitelists and the fraud engine for P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER and the new customer-initiated `BILL_PAY` and `RECHARGE` (to party = biller wallet `B`; seeds §7.11). `evaluate:batch` is built but its callers (disbursement, campaign) are R1+; self-limits and simulation stay R2. §10 tags every WP `[MVP]` or `[R1+]`.
+
 - **Limits engine:**
   - user categories derived from wallet type and category code;
   - tier definitions (user category × KYC tier × risk grade);
@@ -44,7 +46,7 @@ It owns the limit and tier configuration, emergency controls, fraud rules and th
   - batch evaluate for bulk credits.
 - **Fraud engine:**
   - JSON condition DSL compiled in memory;
-  - seeded rule library (20 templates);
+  - seeded rule library (21 templates);
   - rolling aggregates in Redis;
   - rule-weighted score and decision thresholds;
   - rule versioning with maker-checker, shadow mode;
@@ -62,7 +64,9 @@ It owns the limit and tier configuration, emergency controls, fraud rules and th
 | Max-balance enforcement | The ledger enforces it atomically. This service only returns `receiverMaxBalancePoisha` |
 | Product feature switches (`FEATURE.<PRODUCT>`) | Owned by the product owners. This service implements emergency freezes only and owns no product code |
 | Wallet freeze on fraud (`FRAUD_FREEZE` status change on wallet-service) | Reserved, not called in R1. No synchronous outbound call exists |
-| Resumable HOLD / STEP_UP (analyst releases a held payment) | HOLD and STEP_UP are terminal declines in R1: decline + alert (OPEN D-04) |
+| Resumable HOLD / STEP_UP (analyst releases a held payment) | HOLD and STEP_UP are terminal declines in R1: decline + alert (OPEN D-04). The MVP has no OTP / step-up at all (SRS A-43), so STEP_UP is likewise a decline |
+| Distinct-MSISDN velocity for `RECHARGE` | The evaluate request carries no recharge MSISDN; FR-VEL-003 (SHADOW) uses the RECHARGE send count as a proxy. A distinct-MSISDN attribute is R1+ |
+| Biller-side limits | Biller wallets (`B`, user category `BILLER`) get no seeded limits in the MVP (no MAX_BALANCE, so `receiverMaxBalancePoisha = null`) |
 | Performance runs (k6), Grafana dashboards, alert rules, SIEM forwarding, Helm, CI | Not built in this phase. Metrics are exposed; security log lines carry `siem=true` |
 
 ### 1.4 This service must NEVER
@@ -82,32 +86,36 @@ Single module. Package root `com.bracits.bitspay.limitsrisk`. `approval.events` 
 
 ## 2. SRS traceability
 
+Baseline: **SRS v1.2 (14 Oct 2026)**. Each Covered-by cell ends with `· MVP` (delivered in the MVP release) or `· R1+` (later release). No withdrawn SRS v1.2 ID (GLD-031, INT-01, B-18) was traced here.
+
 | SRS ID | Requirement (short) | Covered by (BR / WP / API / event) |
 |---|---|---|
-| LIM-001 | Tiers per KYC level and risk category for each user category | `user_category_map`, `tier_definition`, BR-05-02, BR-05-03 (customer grade from `customer.events`, partner grade from `partner.events`), WP-2, WP-6 |
-| LIM-002 | Limits per txn type and dimension (per-txn min/max, D/W/M count and amount, max balance) | `limit_rule.dimension`, scope groups, BR-05-05..11, `limit_reserve.lua`, WP-2, WP-3 |
-| LIM-003 | Precedence cap → tier → product/channel → override (≤ cap) | BR-05-07, BR-05-21 (completed money always counts), WP-2 |
-| LIM-004 | Individual overrides with expiry, maker-checker, reason | `limit_rule` layer OVERRIDE, `POST /v1/limits/overrides`, BR-05-40, WP-2 |
-| LIM-005 | Emergency freeze / temporary reduction; maker-checker or emergency single approval + post-facto review | `emergency_control`, BR-05-12, WP-5 |
-| LIM-006 | Real-time check ≤ 10 ms p95; calendar resets | `limit_reserve.lua`, BR-05-09, BR-05-19 (guarded expiry), BR-05-21 (re-apply), WP-3, WP-4 |
-| LIM-007 | Visible limits and remaining headroom | `GET /v1/limits/wallets/{walletId}/usage`, BR-05-25, WP-4 |
-| LIM-008 | Limit config changes logged with before/after | `limit_rule_history`, `audit.events`, WP-2 |
-| LIM-009 | Customer self-set lower limits (R2) | layer SELF, `PUT /v1/limits/wallets/{walletId}/self-limits`, BR-05-13, WP-5 |
-| FRD-001 | In-line screening with 5 outcomes | `POST /v1/risk/evaluate` decisions, BR-05-31, WP-8 |
-| FRD-002 | Configurable rule engine (no code change) | Fraud DSL §7.6, WP-7 |
-| FRD-003 | Out-of-the-box rule library | 20 seeded templates §7.8 (geo/SIM/auth ones in SHADOW until the edge layer fills `context`), WP-8 |
-| FRD-004 | Rolling aggregates, ≤ 50 ms p95 | `agg_touch.lua`, bucketed hashes, WP-8 |
-| FRD-005 | Dynamic black/whitelists with expiry | `list_entry`, ListBook, expiry job, WP-6 |
-| FRD-006 | Rule-weighted score (R1); ML (R3) | BR-05-30; ML deferred |
-| FRD-007 | SIM-swap detection | FR-SIM-001 on `ctx.simChangedHoursAgo` (SHADOW until the edge layer sends `context`) |
-| FRD-009 | Simulation / back-testing; versioning + maker-checker (R2) | `fraud_rule_version`, `txn_history`, `/v1/risk/simulations`, WP-7, WP-9 |
-| FRD-011 | Fraud events / decisions auditable | `risk_decision`, `risk.alerts`, `audit.events`, WP-8 |
-| PON-008 | Blacklist management with maker-checker; blocks onboarding and transacting | Blacklist APIs, check API, BR-05-28 (evaluate and batch BLOCK incl. NID/MSISDN/PARTNER), WP-6 |
-| CIC-010 | CICO anti-fraud: velocity, structuring, self-dealing, unusual pairs | Rules FR-CICO-001..004, WP-8 |
-| BOM-004/005 | Maker-checker on limit and blacklist changes; checker ≠ maker; multi-level | `approval_request`, §7.10, WP-2 |
-| PER-003 | P2P / cash-out / merchant p99 ≤ 300 ms (risk budget 50 ms) | §3.7, §9 |
-| DEV-009 | SIM change alerts | FR-SIM-001 (SHADOW until `context` is filled) |
-| AGT-006 | Agent geo-fencing (R2) | DSL-ready (`ctx.geo.*`); deferred |
+| LIM-001 | Tiers per KYC level and risk category for each user category | `user_category_map`, `tier_definition`, BR-05-02, BR-05-03 (customer grade from `customer.events`, partner grade from `partner.events`), WP-2, WP-6 · MVP |
+| LIM-002 | Limits per txn type and dimension (per-txn min/max, D/W/M count and amount, max balance) | `limit_rule.dimension`, scope groups, BR-05-05..11, `limit_reserve.lua`, WP-2, WP-3 · MVP |
+| LIM-003 | Precedence cap → tier → product/channel → override (≤ cap) | BR-05-07, BR-05-21 (completed money always counts), WP-2 · MVP |
+| LIM-004 | Individual overrides with expiry, maker-checker, reason | `limit_rule` layer OVERRIDE, `POST /v1/limits/overrides`, BR-05-40, WP-2 · MVP |
+| LIM-005 | Emergency freeze / temporary reduction; maker-checker or emergency single approval + post-facto review | `emergency_control`, BR-05-12, WP-5 · MVP |
+| LIM-006 | Real-time check ≤ 10 ms p95; calendar resets | `limit_reserve.lua`, BR-05-09, BR-05-19 (guarded expiry), BR-05-21 (re-apply), WP-3, WP-4 · MVP |
+| LIM-007 | Visible limits and remaining headroom | `GET /v1/limits/wallets/{walletId}/usage`, BR-05-25, WP-4 · MVP |
+| LIM-008 | Limit config changes logged with before/after | `limit_rule_history`, `audit.events`, WP-2 · MVP |
+| LIM-009 | Customer self-set lower limits (R2) | layer SELF, `PUT /v1/limits/wallets/{walletId}/self-limits`, BR-05-13, WP-5 · R1+ |
+| BIL-011 | Internal biller catalogue, simulated biller settlement (limits part) | evaluate txnType `BILL_PAY`, to party walletType `B` → user category `BILLER`; customer seeds BR-05-41, §7.11; WP-CR-1 · MVP |
+| BIL-012 | Mobile recharge via the operator catalogue (limits / fraud part) | evaluate txnType `RECHARGE`; customer seeds BR-05-41, §7.11; FR-VEL-003 (SHADOW); WP-CR-1 · MVP |
+| FRD-001 | In-line screening with 5 outcomes | `POST /v1/risk/evaluate` decisions, BR-05-31, WP-8 · MVP |
+| FRD-002 | Configurable rule engine (no code change) | Fraud DSL §7.6, WP-7 · MVP |
+| FRD-003 | Out-of-the-box rule library | 21 seeded templates §7.8 (geo/SIM/auth ones in SHADOW until the edge layer fills `context`), WP-8 · MVP |
+| FRD-004 | Rolling aggregates, ≤ 50 ms p95 | `agg_touch.lua`, bucketed hashes, WP-8 · MVP |
+| FRD-005 | Dynamic black/whitelists with expiry | `list_entry`, ListBook, expiry job, WP-6 · MVP |
+| FRD-006 | Rule-weighted score (R1); ML (R3) | BR-05-30; ML deferred · MVP |
+| FRD-007 | SIM-swap detection | FR-SIM-001 on `ctx.simChangedHoursAgo` (SHADOW until the edge layer sends `context`) · MVP |
+| FRD-009 | Simulation / back-testing; versioning + maker-checker (R2) | `fraud_rule_version`, `txn_history`, `/v1/risk/simulations`, WP-7, WP-9 · R1+ |
+| FRD-011 | Fraud events / decisions auditable | `risk_decision`, `risk.alerts`, `audit.events`, WP-8 · MVP |
+| PON-008 | Blacklist management with maker-checker; blocks onboarding and transacting | Blacklist APIs, check API, BR-05-28 (evaluate and batch BLOCK incl. NID/MSISDN/PARTNER), WP-6 · MVP |
+| CIC-010 | CICO anti-fraud: velocity, structuring, self-dealing, unusual pairs | Rules FR-CICO-001..004, WP-8 · MVP |
+| BOM-004/005 | Maker-checker on limit and blacklist changes; checker ≠ maker; multi-level | `approval_request`, §7.10, WP-2 · MVP |
+| PER-003 | P2P / cash-out / merchant p99 ≤ 300 ms (risk budget 50 ms) | §3.7, §9 · MVP |
+| DEV-009 | SIM change alerts | FR-SIM-001 (SHADOW until `context` is filled) · MVP |
+| AGT-006 | Agent geo-fencing (R2) | DSL-ready (`ctx.geo.*`); deferred · R1+ |
 
 ## 3. Architecture
 
@@ -649,7 +657,7 @@ INSERT INTO config_version VALUES (1, 1, now());
 
 -- ===== limits =====
 CREATE TABLE user_category_map (               -- (walletType, categoryCode) -> user category (LIM-001)
-  wallet_type   char(1) NOT NULL CHECK (wallet_type IN ('C','A','D','M','I')),
+  wallet_type   char(1) NOT NULL CHECK (wallet_type IN ('C','A','D','M','I','B')),
   category_code int     NOT NULL CHECK (category_code >= -1),  -- -1 = any; merchant hundred groups 3100..3400
   user_category text    NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), version bigint NOT NULL DEFAULT 0,
@@ -948,7 +956,7 @@ Request (`EvaluateRequest`):
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | txnId | uuid | Y | N | UUIDv7 | = reservation id = ledger `commandId`; never re-used |
-| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` | `REVERSAL` is a no-counter type, reserved, never sent in R1 |
+| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `BILL_PAY`, `RECHARGE`, `REVERSAL` | `REVERSAL` is a no-counter type, reserved, never sent in R1; `BILL_PAY`, `RECHARGE` since 1.1.0 (to party = biller wallet `B`) |
 | channel | enum | Y | N | `APP`, `USSD`, `PARTNER_APP`, `PORTAL`, `BACKOFFICE`, `API`, `SYSTEM` | = caller's `X-Channel` |
 | deviceId | string | N | Y | ≤ 128 | initiator device |
 | amountPoisha | int64 (poisha) | Y | N | 1..10^13 | |
@@ -957,7 +965,7 @@ Request (`EvaluateRequest`):
 | at | timestamp | N | Y | | default now; = transaction `createdAt` (UUIDv7 time of `txnId`). If \|at − now\| > 5 min the server time is used and `bitspay_limitsrisk_clock_skew_total` increments |
 | context | object Context | N | Y | | edge signals; `null` until the edge layer exists |
 | Party.walletId | uuid | Y | N | | |
-| Party.walletType | enum | Y | N | `C`, `A`, `D`, `M`, `I` (names accepted) | `S` → `400 VALIDATION_FAILED`, reason `SYSTEM_PARTY_NOT_ALLOWED` |
+| Party.walletType | enum | Y | N | `C`, `A`, `D`, `M`, `I`, `B` (names accepted; `B` = BILLER since 1.1.0) | `S` → `400 VALIDATION_FAILED`, reason `SYSTEM_PARTY_NOT_ALLOWED` |
 | Party.kycTier | int32 | Y | N | 0..2 | |
 | Party.categoryCode | int32 | Y | N | 0..99999 | 0 customers; 101–104 agents; 201–203 distributors; `3000 + d×100 + g` merchants; 401–404 institutions |
 | Party.flags | int32 | Y | N | 0..31 | bitmask: 1 AML_WATCH, 2 PIN_RESET_COOLING, 4 PRE_REGISTERED, 8 HAS_OPEN_LIEN, 16 NEW_DEVICE_COOLING |
@@ -1131,7 +1139,7 @@ Errors: `400 VALIDATION_FAILED` (bad uuid, bad `reasonCode`); `403 ACTOR_NOT_ALL
   - `txnType`: the evaluate enum + `DISBURSEMENT`.
   - `walletType`, `kycTier`, `categoryCode`: used only when no profile is held for the wallet.
 - **Item selection:**
-  - Without `txnType`: one item per (`txnType`, `direction`) that has ≥ 1 effective limit, txnTypes in the order P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, SEND before RECEIVE.
+  - Without `txnType`: one item per (`txnType`, `direction`) that has ≥ 1 effective limit, txnTypes in the order P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, SEND before RECEIVE.
   - With `txnType`: its SEND **and** RECEIVE items, even when unlimited.
 - **Values:** "used" includes outstanding reservations. Limits are the effective values after precedence, emergency REDUCE and self-limits.
 
@@ -1141,7 +1149,7 @@ Response 200 (`UsageResponse`):
 |---|---|---|---|---|---|
 | walletId | uuid | Y | N | | |
 | asOf | timestamp | Y | N | | |
-| userCategory | string | Y | N | `CUSTOMER`, `RETAIL_AGENT`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO_MERCHANT`, `SMALL_MERCHANT`, `ENTERPRISE_MERCHANT`, `ONLINE_MERCHANT`, `DISTRIBUTOR`, `MASTER_DISTRIBUTOR`, `SUB_DISTRIBUTOR`, `INSTITUTION` | derived from `walletType` + `categoryCode` (BR-05-02) |
+| userCategory | string | Y | N | `CUSTOMER`, `RETAIL_AGENT`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO_MERCHANT`, `SMALL_MERCHANT`, `ENTERPRISE_MERCHANT`, `ONLINE_MERCHANT`, `DISTRIBUTOR`, `MASTER_DISTRIBUTOR`, `SUB_DISTRIBUTOR`, `INSTITUTION`, `BILLER` | derived from `walletType` + `categoryCode` (BR-05-02) |
 | kycTier | int32 | Y | N | 0..2 | |
 | riskGrade | enum | Y | N | `LOW`, `MEDIUM`, `HIGH` | |
 | maxBalancePoisha | int64 (poisha) | Y | Y | | null = no max |
@@ -1311,7 +1319,7 @@ Bulk rows that fail parsing or normalisation are returned in `rejectedRows` and 
 | `PUT /v1/limits/wallets/{walletId}/self-limits` (R2) | `SelfLimitsRequest` | 200 `SelfLimitsResponse` | 400 (value above the current effective limit), 403 (not own wallet), 422 `SERVICE_DISABLED` (`bitspay.features.self-limits.enabled = false`) |
 | `GET /v1/limits/wallets/{walletId}/self-limits` | — | 200 `SelfLimitsResponse` | 403, 404 |
 
-`UserCategoryMapping`: `walletType` enum{C, A, D, M, I} · `categoryCode` int32 −1..99999 (−1 = any; merchant hundred groups 3100..3400) · `userCategory` enum (§5.1.4 list) · `updatedAt` timestamp.
+`UserCategoryMapping`: `walletType` enum{C, A, D, M, I, B} · `categoryCode` int32 −1..99999 (−1 = any; merchant hundred groups 3100..3400) · `userCategory` enum (§5.1.4 list) · `updatedAt` timestamp.
 
 `TierDefinition`: `id` uuid · `userCategory` · `kycTier` int32 0..2 (null = any) · `riskGrade` enum (null = any) · `nameEn` string · `nameBn` string? · `description` string? · `provisional` bool.
 
@@ -1520,8 +1528,8 @@ Mirror of `contracts/provided/codes.yaml`.
 |---|---|
 | `riskDecision` | `ALLOW`, `ALLOW_AND_ALERT`, `STEP_UP`, `HOLD`, `LIMIT_EXCEEDED`, `BLOCK`, `SERVICE_DISABLED` (precedence SERVICE_DISABLED > BLOCK > LIMIT_EXCEEDED > HOLD > STEP_UP > ALLOW_AND_ALERT > ALLOW) |
 | `alertDecision` | `ALLOW_AND_ALERT`, `STEP_UP`, `HOLD`, `BLOCK`, `LIMIT_EXCEEDED` |
-| `evaluateTxnType` | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` (reserved), `DISBURSEMENT` (batch), `CAMPAIGN_REWARD` (batch) |
-| `partyWalletType` | `C`, `A`, `D`, `M`, `I`, `S` (batch CAMPAIGN_REWARD `from` only) |
+| `evaluateTxnType` | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `BILL_PAY`, `RECHARGE` (both since 1.1.0), `REVERSAL` (reserved), `DISBURSEMENT` (batch), `CAMPAIGN_REWARD` (batch) |
+| `partyWalletType` | `C`, `A`, `D`, `M`, `I`, `B` (BILLER, since 1.1.0), `S` (batch CAMPAIGN_REWARD `from` only) |
 | `limitCode` (grammar) | `<SCOPE>_<SEND\|RECEIVE\|ANY>_<DIMENSION>`; SCOPE = txnType, scope-group code or `ALL` |
 | `limitDimension` | `TXN_ALLOWED`, `PER_TXN_MIN`, `PER_TXN_MAX`, `DAILY_COUNT`, `DAILY_AMOUNT`, `WEEKLY_COUNT`, `WEEKLY_AMOUNT`, `MONTHLY_COUNT`, `MONTHLY_AMOUNT`, `MAX_BALANCE` |
 | `limitDirection` | `SEND`, `RECEIVE`, `ANY` |
@@ -1535,7 +1543,7 @@ Mirror of `contracts/provided/codes.yaml`.
 | `releaseState` | `RELEASED`, `COMMITTED`, `EXPIRED`, `NOT_FOUND` |
 | `releaseReasonCode` (suggested) | `NO_INTENT`, `ROW_FAILED`, `REWARD_FAILED`, `MANUAL` |
 | `riskGrade` | `LOW`, `MEDIUM`, `HIGH` |
-| `userCategory` | `CUSTOMER`, `RETAIL_AGENT`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO_MERCHANT`, `SMALL_MERCHANT`, `ENTERPRISE_MERCHANT`, `ONLINE_MERCHANT`, `DISTRIBUTOR`, `MASTER_DISTRIBUTOR`, `SUB_DISTRIBUTOR`, `INSTITUTION` |
+| `userCategory` | `CUSTOMER`, `RETAIL_AGENT`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO_MERCHANT`, `SMALL_MERCHANT`, `ENTERPRISE_MERCHANT`, `ONLINE_MERCHANT`, `DISTRIBUTOR`, `MASTER_DISTRIBUTOR`, `SUB_DISTRIBUTOR`, `INSTITUTION`, `BILLER` |
 | `fraudRuleCategory` | `VELOCITY`, `PROFILE`, `DEVICE`, `BENEFICIARY`, `STRUCTURING`, `PASS_THROUGH`, `DORMANT`, `MERCHANT`, `AGENT`, `GEO`, `AUTH`, `SIM`, `LIST` |
 | `fraudRuleAction` | `ALERT`, `STEP_UP`, `HOLD`, `BLOCK` |
 | `approvalAction` | `APPLY`, `ACTIVATE`, `DEACTIVATE`, `RETIRE`, `ADD`, `REMOVE` (reserved), `POST_FACTO_REVIEW` |
@@ -1579,15 +1587,15 @@ Mirror of `contract.yaml → consumes`. All pins: `major: 1` / `version: 1`, `pi
 
 | Producer | Artefact | Pinned | Fields used | Why |
 |---|---|---|---|---|
-| transaction-service | `txn.events` `TRANSACTION_COMPLETED` (groups `.reservations`, `.history`) | v1 / 1.0.0 | txnId, txnType, fromWalletId, toWalletId, amountPoisha, createdAt, completedAt (+ history set) | commit / re-apply, profiles, history |
-| transaction-service | `txn.events` `TRANSACTION_FAILED` | v1 / 1.0.0 | txnId, fromWalletId, toWalletId (+ history set) | release |
-| transaction-service | `txn.events` `TRANSACTION_REVERSED` | v1 / 1.0.0 | txnId, txnType, fromWalletId, toWalletId, createdAt, reversedAmountPoisha (+ history set) | optional restore; watermark |
-| transaction-service | `txn.events` `TRANSACTION_REFUNDED` | v1 / 1.0.0 | txnId, txnType, fromWalletId, toWalletId, createdAt, refundedTotalPoisha (+ history set) | optional restore; watermark |
-| wallet-service | `wallet.events` `WALLET_UPSERTED` | v1 / 1.0.0 | walletId, version, ownerType, walletType, msisdn, status, previousStatus, statusReasonCode, kycTier, categoryCode, createdAt, updatedAt | wallet profile |
-| wallet-service | `customer.events` REGISTERED, KYC_APPROVED, RISK_GRADE_CHANGED, PROFILE_UPDATED | v1 / 1.0.0 | customerId, walletIds, riskGrade, nidHash | risk grade, NID blacklist |
-| wallet-service | `partner.events` `PARTNER_UPSERTED` | v1 / 1.0.0 | partnerId, walletId, riskGrade, version | partner risk grade, PARTNER blacklist (OPEN D-29) |
+| transaction-service | `txn.events` `TRANSACTION_COMPLETED` (groups `.reservations`, `.history`) | v1 / 1.1.0 | txnId, txnType, fromWalletId, toWalletId, amountPoisha, createdAt, completedAt (+ history set) | commit / re-apply, profiles, history |
+| transaction-service | `txn.events` `TRANSACTION_FAILED` | v1 / 1.1.0 | txnId, fromWalletId, toWalletId (+ history set) | release |
+| transaction-service | `txn.events` `TRANSACTION_REVERSED` | v1 / 1.1.0 | txnId, txnType, fromWalletId, toWalletId, createdAt, reversedAmountPoisha (+ history set) | optional restore; watermark |
+| transaction-service | `txn.events` `TRANSACTION_REFUNDED` | v1 / 1.1.0 | txnId, txnType, fromWalletId, toWalletId, createdAt, refundedTotalPoisha (+ history set) | optional restore; watermark |
+| wallet-service | `wallet.events` `WALLET_UPSERTED` | v1 / 1.1.0 | walletId, version, ownerType, walletType, msisdn, status, previousStatus, statusReasonCode, kycTier, categoryCode, createdAt, updatedAt | wallet profile |
+| wallet-service | `customer.events` REGISTERED, KYC_APPROVED, RISK_GRADE_CHANGED, PROFILE_UPDATED | v1 / 1.1.0 | customerId, walletIds, riskGrade, nidHash | risk grade, NID blacklist |
+| wallet-service | `partner.events` `PARTNER_UPSERTED` | v1 / 1.1.0 | partnerId, walletId, riskGrade, version | partner risk grade, PARTNER blacklist (OPEN D-29) |
 | disbursement-service | `disbursement.events` `BATCH_ROW_FAILED` | v1 / 1.0.0 | batchId, walletId, commandId | release batch reservation (OPEN D-14) |
-| admin-service | inbound `approval.events`, `audit.events` | v1 / 1.0.0 | `*` (writer) | maker-checker and audit |
+| admin-service | inbound `approval.events`, `audit.events` | v1 / 1.1.0 | `*` (writer) | maker-checker and audit |
 
 No synchronous API is consumed. The reserved `FRAUD_FREEZE` caller row of wallet-service's `POST /v1/wallets/{walletId}/status-changes` is **not** called in R1 and is not pinned.
 
@@ -1745,10 +1753,10 @@ None. limits-risk-service reads no refdata in R1: calendar periods are fixed Asi
   1. exact `(walletType, categoryCode)`;
   2. hundred group `(walletType, floor(categoryCode / 100) × 100)` (merchant size classes 3100, 3200, 3300, 3400);
   3. wildcard `(walletType, -1)`;
-  4. default by wallet type: `C → CUSTOMER`, `A → RETAIL_AGENT`, `D → DISTRIBUTOR`, `M → MICRO_MERCHANT`, `I → INSTITUTION`, and count `bitspay_limitsrisk_unknown_category_total{walletType}`.
+  4. default by wallet type: `C → CUSTOMER`, `A → RETAIL_AGENT`, `D → DISTRIBUTOR`, `M → MICRO_MERCHANT`, `I → INSTITUTION`, `B → BILLER`, and count `bitspay_limitsrisk_unknown_category_total{walletType}`.
 - **BR-05-03 Risk grade.** First match wins:
   1. `HIGH` if `flags & 1` (AML_WATCH);
-  2. the RiskGradeBook entry for the wallet: customer wallets get it from `customer.events`, partner wallets (`A`, `D`, `M`, `I`) from `partner.events` (OPEN D-29);
+  2. the RiskGradeBook entry for the wallet: customer wallets get it from `customer.events`, partner wallets (`A`, `D`, `M`, `I`, `B`) from `partner.events` (OPEN D-29);
   3. `bitspay.risk.limits.default-risk-grade` (`LOW`).
 
   RiskGradeBook holds only non-default grades (`wallet_risk_grade`).
@@ -1813,6 +1821,7 @@ None. limits-risk-service reads no refdata in R1: calendar periods are fixed Asi
   - Raising or removing takes effect after `self-limit.raise-cooling` (24 h): a new SELF row with `effective_from = now + 24 h`; the old row stays until then.
   - No approval request is created (entityType `SelfLimit` is reserved).
 - **BR-05-14 Max balance.** `receiverMaxBalancePoisha` = effective `MAX_BALANCE` of the `to` party for scope `ALL` and direction `RECEIVE` / `ANY` (null if none). It is returned on every decision where computed; callers pass it to the ledger.
+- **BR-05-41 Bill payment and recharge (CR-LIMITSRISK-1, MVP).** `BILL_PAY` and `RECHARGE` are ordinary counter types: the customer is the `from` party (SEND) and the biller / MNO wallet (`B`, user category `BILLER`) the `to` party (RECEIVE); BR-05-04..14 apply unchanged, scope `ALL` counts them. Seeds (§7.11): customer SEND per-txn min/max and daily amount/count per type; no BILLER rule, so the `to` party is unlimited and `receiverMaxBalancePoisha` is null. They join no scope group (`CICO` stays {CASH_IN, CASH_OUT}). `MERCHANT_REFUND` keeps no customer limit; the cumulative-refund cap (≤ original amount, SRS MER-011) is enforced by transaction-service.
 - **BR-05-15 No-counter types.** `limits.no-counter-txn-types` (`[REVERSAL]`): no checks, no counters. The decision comes from emergency controls and blacklist only (fraud bypassed per settings). `reservationId = txnId` with nothing reserved (a release returns `NOT_FOUND`). REVERSAL is reserved and never sent in R1.
 
 ### 7.2 Evaluate algorithm and reservation lifecycle
@@ -2200,7 +2209,7 @@ Grammar:
 ```
 Rule       := { ruleId:/^FR-[A-Z]{2,6}-\d{3}$/, name, category, description?, appliesTo?, condition: Cond,
                 weight: 0..1000, action?: ALERT|STEP_UP|HOLD|BLOCK, mode: ENFORCE|SHADOW, suppressibleByWhitelist: bool }
-AppliesTo  := { txnTypes?: [TxnType], channels?: [Channel], fromWalletTypes?: [C|A|D|M|I], toWalletTypes?: [...] }  -- null/absent = any
+AppliesTo  := { txnTypes?: [TxnType], channels?: [Channel], fromWalletTypes?: [C|A|D|M|I|B], toWalletTypes?: [...] }  -- null/absent = any
 Cond       := { "all": [Cond]1..20 } | { "any": [Cond]1..20 } | { "not": Cond } | Pred
 Pred       := { "op": Op, "left": Operand, "right"?: Operand | [Operand, Operand] }
 Op         := eq | ne | gt | gte | lt | lte          -- numbers, strings (eq/ne), booleans (eq/ne)
@@ -2281,6 +2290,7 @@ Attribute catalogue:
 | FR-CICO-003 Split cash-out | STRUCTURING | CASH_OUT | `{"op":"gte","left":"agg.from.sendCount.1h.CASH_OUT","right":3}` | 35 | ENFORCE |
 | FR-CICO-004 Unusual agent–customer pair frequency | AGENT | CASH_IN, CASH_OUT | `{"op":"gte","left":"pair.from.countToday","right":5}` | 30 | ENFORCE |
 | FR-MUL-001 Mule fan-in | VELOCITY | to walletType C | `{"op":"gte","left":"agg.to.recvCount.24h","right":30}` | 30 | ENFORCE |
+| FR-VEL-003 Recharge velocity (top-ups to many numbers; CR-LIMITSRISK-1) | VELOCITY | RECHARGE; C senders | `{"op":"gte","left":"agg.from.sendCount.1h.RECHARGE","right":5}` | 30 | SHADOW |
 
 Worked example: Rahim → Karim 25,000 Tk from a phone first seen 2 h ago; Karim was never paid before.
 - FR-NEWDEV-001 (45) + FR-BEN-001 (30) = 75 ≥ HOLD 70 → `HOLD`.
@@ -2338,6 +2348,7 @@ All amounts below are in Tk; they are stored ×100 as poisha. `—` = no rule se
 | D | 201 / 202 / 203 | MASTER_DISTRIBUTOR / DISTRIBUTOR / SUB_DISTRIBUTOR |
 | M | 3100 / 3200 / 3300 / 3400 (hundred groups) | MICRO_MERCHANT / SMALL_MERCHANT / ENTERPRISE_MERCHANT / ONLINE_MERCHANT |
 | I | -1 | INSTITUTION |
+| B | -1 | BILLER (CR-LIMITSRISK-1) |
 
 **Customers** (layer TIER, userCategory CUSTOMER):
 
@@ -2351,6 +2362,11 @@ All amounts below are in Tk; they are stored ×100 as poisha. `—` = no rule se
 | P2P RECEIVE D / M | 10,000 / 30,000 | 50,000 / 200,000 | 100,000 / 500,000 |
 | MERCHANT_PAYMENT SEND D / M | 2,000 / 10,000 | 50,000 / 200,000 | 100,000 / 500,000 |
 | DISBURSEMENT RECEIVE D | 10,000 | 100,000 | 500,000 |
+| BILL_PAY SEND per-txn min / max (MVP) | 10 / 50,000 | 10 / 50,000 | 10 / 50,000 |
+| BILL_PAY SEND D (MVP) | 100,000 (20) | 100,000 (20) | 100,000 (20) |
+| RECHARGE SEND per-txn min / max (MVP) | 10 / 1,000 | 10 / 1,000 | 10 / 1,000 |
+| RECHARGE SEND D (MVP) | 5,000 (20) | 5,000 (20) | 5,000 (20) |
+| MERCHANT_REFUND | — (no customer limit; merchant-side cap = original amount, enforced by transaction-service) | — | — |
 | Risk grade HIGH (any tier) | — | D send ALL 20,000 | D send ALL 30,000 |
 
 **Regulatory caps** (layer REGULATORY_CAP): CUSTOMER MAX_BALANCE 500,000; CUSTOMER CASH_OUT SEND DAILY_AMOUNT 50,000; CUSTOMER P2P SEND PER_TXN_MAX 50,000.
@@ -2371,8 +2387,11 @@ All amounts below are in Tk; they are stored ×100 as poisha. `—` = no rule se
 | MASTER_DISTRIBUTOR | 200,000,000 | — | 10,000 | SEND 200,000,000 |
 | SUB_DISTRIBUTOR | — | — | — | — |
 | INSTITUTION | 1,000,000,000 | — | — | — |
+| BILLER (MVP) | — | — | — | — |
 
 Scope group seed: `CICO = {CASH_IN, CASH_OUT}`.
+
+MVP seeds added by CR-LIMITSRISK-1 (SRS B-26, provisional): the BILL_PAY and RECHARGE rows apply to every customer tier (`kycTier` null) as SEND limits; in poisha BILL_PAY per-txn 1,000..5,000,000, daily 10,000,000 / 20; RECHARGE per-txn 1,000..100,000, daily 500,000 / 20. A Tier 0 customer is still bounded by MAX_BALANCE 10,000 Tk. Story check: Rahim (T2) pays a DESCO bill of 1,200 Tk → BILL_PAY SEND per-txn and daily OK, DESCO (`B`) unlimited, `receiverMaxBalancePoisha = null`; a 1,500 Tk recharge → `LIMIT_EXCEEDED` `RECHARGE_SEND_PER_TXN_MAX`.
 
 Story check: Rahim (T2) → Karim (T1) 500 Tk P2P.
 - Rahim SEND D 50,000: OK.
@@ -2491,56 +2510,63 @@ Ignored / filtered events use the kernel `bitspay_consumer_events_ignored_total`
 
 Each WP ends with `./gradlew check` green, the OpenAPI drift check green and `docs/PROGRESS.md` updated. None needs another service running.
 
-### WP-1 Skeleton and contracts
+Scope tags: `[MVP]` = delivered in the MVP release (SRS v1.2); `[R1+]` = later release. Inside `[MVP]` WP-5, self-limits stay R2 behind their flag and `evaluate:batch` is built although its callers (disbursement, campaign) are R1+.
+
+### [MVP] WP-1 Skeleton and contracts
 - Goal: a running empty service that serves the provided contracts.
 - Scope: Gradle project from the build template; profiles `api`, `worker`, `local`, `dev`, `hybrid`; `ActorContextFilter`, `@RequiresActor`, problem+json mapper (kernel codes + this service's reasons/extensions), `LogMaskingFilter`; Flyway V1 (§4.1) with outbox, `processed_event`, `approval_request`, `idempotency_record`; polling outbox relay; every §5 operation as a stub returning the OpenAPI example; fixtures from `fixtures/events/` wired into consumer tests; `ArchitectureTest` (ArchUnit: layer dependencies controller → service → repository / client / messaging; no `double`/`float` in `service.limits`).
 - Acceptance: provider contract test validates every operation's example against `contracts/provided/openapi.yaml`; event envelope tests for both produced eventTypes; ArchUnit green; role cannot read another schema.
 
-### WP-2 Limit configuration and resolution engine
+### [MVP] WP-2 Limit configuration and resolution engine
 - Scope: tables + `V2__seed_provisional.sql` (§7.11); `LimitResolver` (`service.limits`) (BR-05-02..08, 14); `LimitBook` compile + atomic swap; `ConfigReloader` (pub/sub + 1 s poll); change-set, override, categories, tiers, rules and `effective` APIs; maker-checker (§7.10) incl. two levels; `limit_rule_history`; audit + approval events; override expiry job.
 - Acceptance: jqwik `resolver_overrideNeverExceedsCap`; `effective` for Tier 2 / P2P / SEND returns the seeds; `category_hundredGroupMatchesMerchant3101`; approving a change set bumps `config_version` and a second context sees it ≤ 2 s; checker = maker → 422; regulatory-cap change requires 2 levels.
 - SRS: LIM-001, 002, 003, 004, 008, BOM-004, BOM-005.
 
-### WP-3 Redis counters and limits-only evaluate
+### [MVP] WP-3 Redis counters and limits-only evaluate
 - Scope: `PeriodCalculator` (Asia/Dhaka, week start), field set (BR-05-10), check list (BR-05-11); Lua `limit_reserve`, `limit_release`, `limit_reapply`, `idx_state`, `idx_open` with a `ScriptRegistry`; `RedisCounterStore` for `SINGLE_SLOT` and `PER_PARTY`; evaluate without fraud (no-op scorer); per-txn checks; `violatedLimit`; `usage`; idempotent DUP (BR-05-16); 409 `TXN_ID_RELEASED`; 503 on Redis failure.
 - Acceptance: `concurrency_200Threads_sameSender_noOvershoot` and `concurrency_manySenders_oneReceiver_noOvershoot` in both modes; `periods_dhakaMidnightBoundary`; `evaluate_sameTxnIdTwice_sameDecisionNoDoubleCount`.
 - SRS: LIM-002, LIM-006.
 
-### WP-4 Reservation lifecycle and usage
+### [MVP] WP-4 Reservation lifecycle and usage
 - Scope: `txn.events` reservations consumer (FAILED → release, COMPLETED → commit / re-apply), watermark writer, sweeper (leader via `pg_try_advisory_lock`), release API, internal reservation view; usage API (BR-05-25); `wallet.events` consumer (`profile_upsert.lua`, `mh`, reactivation rule).
 - Acceptance: `release_onTransactionFailed_restoresHeadroom`, `release_twice_isNoop`, `commit_thenFailedEvent_doesNotRelease`, `sweeper_doesNotExpireWhenWatermarkBehind`, `sweeper_expiresOrphanAfter10Minutes`, `expiredThenCompleted_reappliesCounters`, `releasedThenCompleted_reappliesCounters`; usage matches counters after 10 mixed transactions.
 - SRS: LIM-006, LIM-007.
 
-### WP-5 Emergency controls, self-limits, batch
+### [MVP] WP-5 Emergency controls, self-limits, batch
 - Scope: emergency control APIs and states (BR-05-12) incl. post-facto review and jobs; REDUCE in the resolver; FREEZE short-circuit; self-limits (BR-05-13) behind the flag; `evaluate:batch` (BR-05-39) incl. `dryRun`, CAMPAIGN_REWARD single party, whole-batch 409 `txnIds`, batch TTL until month key expiry; `disbursement.events` consumer (BATCH_ROW_FAILED release).
 - Acceptance: `emergencyFreeze_cashOutUssd_returnsServiceDisabledWithin2s`; `emergencySingle_requiresPostFactoReviewByOtherUser`; `reduce50pct_halvesDailyLimit`; `batch_1000Items_p95Under300ms` (Testcontainers smoke); `batch_reservation_notExpiredBySweeper`; `batch_releasedTxnId_whole409WithTxnIds`; `batch_dryRun_reservesNothing`; `batchRowFailed_releasesCommandId`, `batchRowFailed_nullCommandId_ignored`.
 - SRS: LIM-005, LIM-009.
 
-### WP-6 Black / whitelist
+### [MVP] WP-6 Black / whitelist
 - Scope: `list_entry` APIs incl. bulk CSV, normalisation + HMAC (BR-05-26), maker-checker, expiry job, `ListBook`, check API (value / valueHash rules), proposal API with duplicate 409 + `entryId`, optional Idempotency-Key, `BLACKLIST_ENTRY_UPSERTED`; evaluate and batch blacklist checks (BR-05-28); `customer.events` consumer (`rg`, `nh`, `wallet_risk_grade`, RiskGradeBook); `partner.events` consumer (`ph`, partner grade, version guard).
 - Acceptance: `blacklist_msisdnNormalization_01And8801Equivalent`; `check_nidWithClearValue_400`; `blacklist_expiredEntry_notListed_andEventActiveFalse`; `evaluate_blacklistedDevice_blocksWithoutReservation`; `evaluate_partnerBlacklisted_blocksTo`; `batch_receiverNidBlacklisted_blocks`; `propose_duplicatePending_409WithEntryId`; `checkApi_valueMaskedInAccessLog`.
 - SRS: FRD-005, PON-008, LIM-001.
 
-### WP-7 Fraud DSL and rule lifecycle
+### [MVP] WP-7 Fraud DSL and rule lifecycle
 - Scope: parser / validator (JSON-pointer errors), compiler, three-valued logic, attribute registry incl. `ctx.*` from `context`, `requiredAggregates`; rule and version APIs, states, approvals, settings, scheduled activation job; `RuleBook` reload.
 - Acceptance: `dsl_unknownAttribute_rejectedWithPointer`; `dsl_missingAttribute_isUnknown_ruleDoesNotFire`; `dsl_notOfUnknown_isUnknown`; `dsl_mulBps_integerFloor`; golden file `dsl-golden.json` (≥ 40 cases); promote SHADOW → ACTIVE leaves exactly one live version.
 - SRS: FRD-002, FRD-009 (versioning).
 
-### WP-8 Fraud aggregates, scoring, decisions, alerts
+### [MVP] WP-8 Fraud aggregates, scoring, decisions, alerts
 - Scope: `agg_touch.lua`, `geo_touch.lua`, `profile_txn.lua`; parallel limits ‖ fraud; attribute resolution; scoring and combiner (BR-05-27, 30..35); compensation release; `risk_decision` + `RISK_ALERT_RAISED`; decision write queue; seeded library (§7.8).
 - Acceptance: one test per seeded rule (`rule_FR_XXX_fires` / `_doesNotFire`); `decision_precedence_matrix`; `hold_releasesReservation`; `allowAndAlert_keepsReservation_andRaisesAlert`; `stepUp_onApiChannel_fallsBackToHold`; `limitExceeded_alertOnlyWhenSettingOn`; full evaluate p95 ≤ 50 ms in the Testcontainers smoke.
 - SRS: FRD-001, 003, 004, 006, 007 (partial), 011, CIC-010.
 
-### WP-9 Simulation and history (R2)
+### [R1+] WP-9 Simulation and history (R2)
 - Scope: `txn_history` writer (group `.history`, partitions, 90-day drop), `SimAggregateStore`, simulation runner + APIs (§7.9).
 - Acceptance: `simulation_replaysKnownSequence_reportsExpectedHits` (1,000-event fixture); `simulation_doesNotTouchRedis`.
 - SRS: FRD-009.
 
-### WP-10 Integration on the Compose stack
+### [MVP] WP-10 Integration on the Compose stack
 - Scope: run in the Compose stack against real `txn.events`, `wallet.events`, `customer.events`, `partner.events`, `disbursement.events`; walk by hand the scenarios limit breach, fraud BLOCK, reservation released after a ledger failure, blacklist propagation to wallet-service, disbursement row failure release.
 - Acceptance: all scenarios pass by hand on the stack (milestone checklist); stubs switched to real services; healthy within 384 MB.
 
-### WP-11 Hardening
+### [MVP] WP-CR-1 BILL_PAY and RECHARGE (CR-LIMITSRISK-1, contractVersion 1.1.0)
+- Scope: evaluate txnType + `BILL_PAY`, `RECHARGE` (codes `evaluateTxnType`, every OpenAPI txnType enum, `RISK_ALERT_RAISED` schema); party walletType `B` (BILLER) and user category `BILLER` (codes, OpenAPI, `user_category_map` CHECK, BR-05-02 default); BR-05-41; MVP seeds of §7.11 in `V2__seed_provisional.sql` (BILL_PAY and RECHARGE customer SEND limits, map row `B -1 BILLER`); fraud rule FR-VEL-003 (SHADOW).
+- Acceptance: `evaluate_billPay1200Tk_allows_toBillerUnlimited_maxBalanceNull`; `evaluate_billPayBelow10Tk_limitExceeded_BILL_PAY_SEND_PER_TXN_MIN`; `evaluate_billPayAbove50000Tk_limitExceeded_PER_TXN_MAX`; `evaluate_recharge1500Tk_limitExceeded_RECHARGE_SEND_PER_TXN_MAX`; `evaluate_recharge21stInDay_limitExceeded_RECHARGE_SEND_DAILY_COUNT`; `evaluate_billPay_countsInAllScope_notInCico`; `category_billerWalletDefaultsToBiller`; `usage_listsBillPayAndRechargeItems`; `rule_FR_VEL_003_fires` / `_doesNotFire` (shadow, no score); `codes_evaluateTxnType_matchesOpenApiAndAlertSchema`.
+- SRS: BIL-011, BIL-012, LIM-002, FRD-003.
+
+### [MVP] WP-11 Hardening
 - Scope: soak in Testcontainers (1 h, 5 % random ledger failures, both Redis modes); Redis primary failover test (only 503s, no ALLOW without reservation); Kafka down 10 min (no expiry, no overshoot); Postgres down (ALLOW path unaffected); `docs/TRACEABILITY.md`; log PII scan.
 - Acceptance: zero overshoot, zero clamped counters; failover yields only 503s.
 - SRS: LIM-006, FRD-004, PER-003 (functional part).
@@ -2549,22 +2575,22 @@ Each WP ends with `./gradlew check` green, the OpenAPI drift check green and `do
 
 | Layer | Must-have tests |
 |---|---|
-| Service unit | `resolver_mostSpecificRuleWins`, `resolver_productChannelLowersTier`, `resolver_overrideRaisesAboveTierButBelowCap`, `resolver_overrideNeverExceedsCap` (jqwik), `resolver_perTxnMin_takesMax`, `resolver_reduceBps_floor`, `resolver_selfLimitOnlyLowers`, `category_unknownFallsBackToWalletTypeDefault`, `category_hundredGroupMatchesMerchant3101`, `riskGrade_amlWatchFlag_mapsHigh`, `riskGrade_partnerFromPartnerEvents`, `periods_dhakaMidnightBoundary` (17:59:59Z vs 18:00:00Z), `periods_weekStartSaturday`, `periods_monthRollover_31Oct`, `fieldSet_includesGroupAndAnyFields`, `limitCode_format` (incl. `_TXN_ALLOWED`), `dsl_*` golden cases, `scorer_capsAtMaxScore`, `combiner_precedenceMatrix`, `normalizer_msisdn_nid_bank`, `hmac_matchesReferenceVector` |
+| Service unit | `category_billerWalletDefaultsToBiller` (BR-05-41), `resolver_billPayAndRechargeSeeds_perTxnAndDaily`, `resolver_mostSpecificRuleWins`, `resolver_productChannelLowersTier`, `resolver_overrideRaisesAboveTierButBelowCap`, `resolver_overrideNeverExceedsCap` (jqwik), `resolver_perTxnMin_takesMax`, `resolver_reduceBps_floor`, `resolver_selfLimitOnlyLowers`, `category_unknownFallsBackToWalletTypeDefault`, `category_hundredGroupMatchesMerchant3101`, `riskGrade_amlWatchFlag_mapsHigh`, `riskGrade_partnerFromPartnerEvents`, `periods_dhakaMidnightBoundary` (17:59:59Z vs 18:00:00Z), `periods_weekStartSaturday`, `periods_monthRollover_31Oct`, `fieldSet_includesGroupAndAnyFields`, `limitCode_format` (incl. `_TXN_ALLOWED`), `dsl_*` golden cases, `scorer_capsAtMaxScore`, `combiner_precedenceMatrix`, `normalizer_msisdn_nid_bank`, `hmac_matchesReferenceVector` |
 | Lua (Testcontainers Redis) | `reserve_withinLimits_incrementsAllPeriods`, `reserve_exceedsDaily_rejectsWithoutWrites`, `reserve_duplicateTxnId_returnsDupWithStoredDecision`, `reserve_dryRun_writesNothing`, `reserve_afterRelease_returnsGone`, `release_restoresExactValues_andMarksRel`, `release_twice_returnsZero`, `release_mismatchedKeys_returnsMinusOne`, `release_expiredPeriodKey_skipped_noTtlLessKey`, `reapply_releasedRecord_reincrements`, `reapply_heldRecord_plainCommit`, `idxState_committedIsFinal`, `idxState_batchNotCommitted`, `aggTouch_returnsBeforeValues_thenIncrements`, `aggTouch_prunesOldBuckets`, `profileUpsert_olderVersionIgnored`, `profileTxn_duplicateTxnIdIgnored` |
 | Concurrency (≥ 100 threads, both modes) | `concurrency_200Threads_sameSender_noOvershoot` (P2P SEND daily amount 50,000 Tk, count 1,000; 200 threads × 500 Tk ⇒ exactly 100 ALLOW, 100 LIMIT_EXCEEDED, counter `P2P:S:a` = 5,000,000), `concurrency_manySenders_oneReceiver_noOvershoot`, `concurrency_mixedReserveAndRelease_countersConsistent` (30 % failures ⇒ final counter = Σ committed), `concurrency_duplicateTxnIdStorm_singleReservation`, `concurrency_perParty_partialRejectCompensates`, `concurrency_releaseAndCompleteRace_countersConsistent` |
-| Integration (Postgres, Redis, Kafka) | `evaluate_p2pRahimToKarim_allowsAndReservesBothParties`, `evaluate_limitExceeded_returnsViolatedLimit`, `evaluate_redisDown_returns503`, `evaluate_aggStoreDown_refuseMode_503`, `release_onTransactionFailed_restoresHeadroom`, `commit_thenFailedEvent_doesNotRelease`, `expiredThenCompleted_reappliesCounters`, `sweeper_doesNotExpireWhenWatermarkBehind`, `sweeper_expiresOrphanAfter10Minutes`, `approval_checkerEqualsMaker_rejected`, `changeSet_twoLevelsForRegulatoryCap`, `configReload_propagatesWithin2s`, `blacklist_expiryJob_publishesInactive`, `walletEvents_reactivation_setsReactivatedAt`, `walletEvents_kycApprovedDtoA_notReactivation` |
+| Integration (Postgres, Redis, Kafka) | `evaluate_billPay1200Tk_allows_toBillerUnlimited_maxBalanceNull`, `evaluate_recharge1500Tk_limitExceeded_RECHARGE_SEND_PER_TXN_MAX`, `evaluate_recharge21stInDay_limitExceeded_RECHARGE_SEND_DAILY_COUNT`, `release_onBillPayFailed_restoresHeadroom`, `evaluate_p2pRahimToKarim_allowsAndReservesBothParties`, `evaluate_limitExceeded_returnsViolatedLimit`, `evaluate_redisDown_returns503`, `evaluate_aggStoreDown_refuseMode_503`, `release_onTransactionFailed_restoresHeadroom`, `commit_thenFailedEvent_doesNotRelease`, `expiredThenCompleted_reappliesCounters`, `sweeper_doesNotExpireWhenWatermarkBehind`, `sweeper_expiresOrphanAfter10Minutes`, `approval_checkerEqualsMaker_rejected`, `changeSet_twoLevelsForRegulatoryCap`, `configReload_propagatesWithin2s`, `blacklist_expiryJob_publishesInactive`, `walletEvents_reactivation_setsReactivatedAt`, `walletEvents_kycApprovedDtoA_notReactivation` |
 | Provider contract | Every operation's request / response examples (incl. `x-additional-examples`) and every error example validate against `contracts/provided/openapi.yaml`; produced events validate against their schemas; `limitCode` pattern; `usage` never null |
 | Consumer contract | Each consumed eventType parsed from `contracts/consumed/*` snapshots and `fixtures/events/*.jsonl`, using only the `fieldsUsed` fields; unknown fields and unknown eventTypes tolerated |
 | Event idempotency | `txnFailed_deliveredTwice_releasedOnce`, `txnCompleted_deliveredTwice_committedOnce`, `walletUpserted_deliveredTwice_idempotent`, `customerEvents_deliveredTwice`, `partnerUpserted_olderVersionIgnored`, `batchRowFailed_deliveredTwice`, `customerEvents_flagOff_ignored` (opt-out) |
 | Property (jqwik) | `counters_reserveReleaseReapplySequences_neverNegative_andEqualCommittedSum`, `resolver_overrideNeverExceedsCap` |
 | Security | `log_noClearMsisdnOrNid` (log scan), `usage_otherCustomersWallet_forbidden`, `evaluate_nonTransactionServiceCaller_403` |
-| Manual Compose scenarios | WP-10 list |
+| Manual Compose scenarios | WP-10 list, plus (MVP) a DESCO bill payment and a GP recharge within and above the seeded limits |
 
 ## 12. Definition of done (additions to kernel K10)
 
 - [ ] Concurrency suite green in **both** `SINGLE_SLOT` and `PER_PARTY` modes, ≥ 200 threads, zero overshoot, zero clamped counters.
 - [ ] Re-apply after expiry demonstrated by a test with a delayed `TRANSACTION_COMPLETED`; sweeper watermark guard demonstrated with a paused consumer.
-- [ ] All 20 seeded rules have firing and non-firing tests; `dsl-golden.json` ≥ 40 cases.
+- [ ] All 21 seeded rules have firing and non-firing tests; `dsl-golden.json` ≥ 40 cases.
 - [ ] Seeds flagged `provisional = true` and listed in `docs/PROVISIONAL-SEEDS.md` for Compliance sign-off.
 - [ ] `bitspay_risk_decisions_total{decision}` exposed and tested.
 - [ ] No clear NID / MSISDN / bank account anywhere in logs, DB or audit payloads (scan test).
@@ -2581,6 +2607,10 @@ Each WP ends with `./gradlew check` green, the OpenAPI drift check green and `do
 | OPEN D-17 | Quote reads `monthlyCountUsed` from usage | field always present; transaction-service is an allowed caller | §5.1.4 |
 | OPEN D-29 | limits-risk scope extension | `partner.events` consumed (partner risk grade, PARTNER fingerprint); batch checks MSISDN/NID/PARTNER | BR-05-03, BR-05-28, §6.5, §5.1.2 |
 | OPEN D-30 | Consumer group ids | `limits-risk-service.<purpose>` | §3.3, `contract.yaml` |
+| SRS B-26 | MVP fee and limit values | BILL_PAY per-txn 10–50,000 Tk, D 100,000 Tk / 20; RECHARGE per-txn 10–1,000 Tk, D 5,000 Tk / 20; all customer tiers; no BILLER limits ⚑ | §7.11, BR-05-41 |
+| SRS A-43 | No OTP / step-up in the MVP | STEP_UP stays a terminal decline + alert (as OPEN D-04) | §1.3, BR-05-32 |
+| MVP deferral | Distinct-MSISDN velocity on RECHARGE | FR-VEL-003 (SHADOW) uses the RECHARGE send count in 1 h as a proxy; a recharge-MSISDN attribute in the evaluate request is R1+ | §1.3, §7.8 |
+| MVP deferral | `evaluate:batch` callers, self-limits, simulation | built / flagged but unused in the MVP (disbursement and campaign are R1+; LIM-009 / FRD-009 R2) | §1.2, §10 |
 | OPEN D-32 | Blacklist entry reason codes | `FRAUD_CONFIRMED`, `MULE_ACCOUNT`, `IDENTITY_FRAUD`, `AML_SUSPICION`, `REGULATORY_INSTRUCTION`, `SANCTIONS`, `OTHER` | §5.1.6, §5.2.2, `codes.yaml` |
 
 **Deferred (interim behaviour):**
@@ -2606,3 +2636,4 @@ Each WP ends with `./gradlew check` green, the OpenAPI drift check green and `do
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-05 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit (no GL CCR applies) |
+| 1.1.0 | 2026-10-14 | [CR-LIMITSRISK-1](changes/CR-LIMITSRISK-1.md) | MVP (SRS v1.2): evaluate txnType + `BILL_PAY`, `RECHARGE`; party walletType `B` and user category `BILLER`; BR-05-41; customer seeds for BILL_PAY / RECHARGE (MERCHANT_REFUND: no customer limit); fraud rule FR-VEL-003 (SHADOW); §2 traced to SRS v1.2 with MVP markers (+ BIL-011, BIL-012); §10 `[MVP]`/`[R1+]` tags + WP-CR-1 |

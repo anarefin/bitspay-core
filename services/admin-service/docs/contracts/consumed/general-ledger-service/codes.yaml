@@ -1,4 +1,4 @@
-# general-ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0.
+# general-ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 2.0.0.
 # Adding a value is additive (MINOR); removing/renaming one impacts consumers that list it (or "*").
 
 codeSets:
@@ -112,6 +112,7 @@ codeSets:
       - {code: "WALLET:D"}
       - {code: "WALLET:M"}
       - {code: "WALLET:I"}
+      - {code: "WALLET:B", description: "BILLER_WALLET (150) accounts (CR-GENERALLEDGER-2, MVP)"}
       - {code: "SYS:FEE_INCOME"}
       - {code: "SYS:VAT_PAYABLE"}
       - {code: "SYS:COMMISSION_PAYABLE"}
@@ -141,17 +142,6 @@ codeSets:
       - {code: NOT_COVERED, severity: ERROR}
       - {code: LEDGER_CONTROL_MISMATCH, severity: ERROR}
       - {code: MAPS_TO_SUSPENSE, severity: WARNING}
-  exportStatus:
-    description: "GlExport.status"
-    values:
-      - {code: GENERATING}
-      - {code: GENERATED}
-      - {code: FAILED}
-      - {code: SUPERSEDED}
-  exportFormat:
-    description: "ERP export format (format SPI)"
-    values:
-      - {code: GENERIC_CSV_V1, description: "data contract provided/data/gl-export-generic-csv.v1.md"}
 
 problemReasons:
   # 400 VALIDATION_FAILED
@@ -163,7 +153,7 @@ problemReasons:
   - {code: VALIDATION_FAILED, reason: NARRATION_TOO_SHORT, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
   - {code: VALIDATION_FAILED, reason: TOO_MANY_LINES, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
   - {code: VALIDATION_FAILED, reason: RULE_SET_INVALID, operations: ["POST /v1/gl/rule-sets"], note: "with errors[] (one per ERROR issue)"}
-  - {code: VALIDATION_FAILED, reason: RANGE_TOO_LARGE, operations: ["GET /v1/gl/reports/trial-balance", "GET /v1/gl/reports/profit-and-loss", "GET /v1/gl/reports/account-ledger/{code}", "GET /v1/gl/journals", "GET /v1/gl/days", "GET /v1/gl/exports"]}
+  - {code: VALIDATION_FAILED, reason: RANGE_TOO_LARGE, operations: ["GET /v1/gl/reports/trial-balance", "GET /v1/gl/reports/profit-and-loss", "GET /v1/gl/reports/account-ledger/{code}", "GET /v1/gl/journals", "GET /v1/gl/days"]}
   - {code: VALIDATION_FAILED, reason: PARENT_CLASS_MISMATCH, operations: ["POST /v1/gl/accounts", "PATCH /v1/gl/accounts/{code}"]}
   - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["*list operations"], note: "kernel-reserved (K3.4)"}
   # 409 STATE_CONFLICT
@@ -171,7 +161,7 @@ problemReasons:
   - {code: STATE_CONFLICT, reason: FUTURE_DATE, operations: ["POST /v1/gl/journals", "POST /v1/gl/journals/{journalId}:reverse"]}
   - {code: STATE_CONFLICT, reason: BEFORE_GL_START, operations: ["POST /v1/gl/journals"]}
   - {code: STATE_CONFLICT, reason: GL_ALREADY_STARTED, operations: ["POST /v1/gl/opening-balances", "POST /v1/approvals/{id}:approve"]}
-  - {code: STATE_CONFLICT, reason: DAY_NOT_CLOSED, operations: ["GET /v1/gl/days/{businessDate}/control-totals", "POST /v1/gl/days/{businessDate}:restate", "POST /v1/gl/exports/{businessDate}:regenerate", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: DAY_NOT_CLOSED, operations: ["GET /v1/gl/days/{businessDate}/control-totals", "POST /v1/gl/days/{businessDate}:restate", "POST /v1/approvals/{id}:approve"]}
   - {code: STATE_CONFLICT, reason: DAY_NOT_READY, operations: ["POST /v1/internal/jobs/gl-day-close:run"], note: "watermark or previous-day condition not met (ignoreCutoff never skips them)"}
   - {code: STATE_CONFLICT, reason: ACCOUNT_IN_USE, operations: ["POST /v1/gl/accounts/{code}:deactivate", "POST /v1/approvals/{id}:approve"]}
   - {code: STATE_CONFLICT, reason: DAYS_NOT_CLOSED, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
@@ -201,7 +191,6 @@ entityTypes:
       - {entityType: GlPeriodClose, actions: [CLOSE], levels: 2}
       - {entityType: GlPeriodReopen, actions: [REOPEN], levels: 2}
       - {entityType: GlYearClose, actions: [CLOSE], levels: 2}
-      - {entityType: GlExport, actions: [REGENERATE], levels: 1}
 
 notificationTemplates:
   # Sender: general-ledger-service. Category INTERNAL. One request per role; recipient.role only.
@@ -249,26 +238,6 @@ notificationTemplates:
       - {name: periodId, type: TEXT, req: true, notes: "string"}
       - {name: periodKind, type: TEXT, req: true, notes: "enum{MONTH, FISCAL_YEAR}"}
       - {name: netResultPoisha, type: MONEY, req: true, notes: "int64 poisha, signed"}
-  - code: GL_EXPORT_READY
-    category: INTERNAL
-    recipient: "recipient.role FIN_MAKER"
-    trigger: "an ERP export version is generated"
-    variables:
-      - {name: businessDate, type: DATE, req: true}
-      - {name: exportVersion, type: INT, req: true}
-      - {name: fileName, type: TEXT, req: true}
-      - {name: lineCount, type: INT, req: true}
-      - {name: totalDebitPoisha, type: MONEY, req: true}
-      - {name: superseded, type: TEXT, req: false, notes: "boolean flag sent as TEXT \"true\"/\"false\" (template variable types have no boolean); \"true\" when it replaces an earlier export of the same date"}
-  - code: GL_EXPORT_FAILED
-    category: INTERNAL
-    recipient: "recipient.role FIN_MAKER"
-    trigger: "an ERP export build fails (unbalanced or technical error)"
-    variables:
-      - {name: businessDate, type: DATE, req: true}
-      - {name: exportVersion, type: INT, req: true}
-      - {name: variant, type: TEXT, req: true, notes: "enum{FAILED, RESTATED}; general-ledger-service sends FAILED (a restatement regenerates and sends GL_EXPORT_READY with superseded=true)"}
-      - {name: errorCode, type: TEXT, req: true, notes: "UNBALANCED or a technical error code"}
 
 txnRefPrefixes:
   - {prefix: GLJ, meaning: "GL journal reference (never a ledger txnRef; no ledger command uses it)", format: "GLJ-{yyyyMMdd}-L-R{revision} for LEDGER_DAY; GLJ-{yyyyMMdd}-{M|A|X|R|I|Y|O}-{6-digit seq per day} otherwise"}
@@ -283,4 +252,3 @@ metrics:
   - {name: bitspay_gl_day_status, type: gauge, labels: [status]}
   - {name: bitspay_gl_control_breaks_total, type: counter, labels: [check]}
   - {name: bitspay_gl_open_exceptions, type: gauge, labels: [severity]}
-  - {name: bitspay_gl_export_last_success_timestamp_seconds, type: gauge, labels: []}

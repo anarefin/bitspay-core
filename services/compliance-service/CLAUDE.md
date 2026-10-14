@@ -3,6 +3,8 @@
 
 You are implementing **compliance-service** (SVC-11) of Bits Pay: AML/CFT and fraud-investigation back office — screening lists (file upload), fuzzy Bangla/English name matching, transaction monitoring scenarios, shared fraud/AML cases, freezes and liens, CTR extraction, STR/CTR goAML XML export, AML/fraud MIS. This folder is the whole world for this service.
 
+**Release scope (CR-COMPLIANCE-1, SRS v1.2):** MVP = basic KYC case and screening clearance for customers and partners, including `BILLER` partners (sub-types UTILITY, EDUCATION, GOVT_FEE, INTERNET_TV, MNO; BR-11-75) — WP-1..5, WP-7 (SCREENING / EDD cases only), WP-11, WP-CR-1. R1+ = AML monitoring, alert / fraud cases, freezes and liens, CTR, STR and regulatory reporting, MIS — WP-6, 8, 9, 10. R1+ operations answer 501 in the MVP build. Never model partner / owner / wallet types as closed enums: unknown values are stored, not DLQ'd.
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins).

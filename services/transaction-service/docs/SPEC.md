@@ -4,13 +4,14 @@
 |---|---|
 | Service | `transaction-service` (`spring.application.name`) |
 | Number / owner | SVC-02 · Dev-2 (Track A) · single module (no merged modules) |
-| Layer / release | Core (hot path) · R1 (float D↔D and liquidity points R2) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Core (hot path) · **MVP** (P2P, cash-in, customer cash-out, on-us merchant payment and refund, float transfer, reversal, bill payment and mobile recharge with the simulated biller provider) · R1+ (external biller/telco providers, off-us QR, PENDING state) · R2 (float D↔D and liquidity points) |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-TRANSACTION-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8102 · management 9102 |
 | Schema / role | `svc_transaction` (login role `svc_transaction`; outbox `svc_transaction.outbox`) |
-| Depends on (pins) | ledger-service@1 (1.0.0) · limits-risk-service@1 (1.0.0) · wallet-service@1 (1.0.0) · pricing-service@1 (1.0.0) · admin-service@1 (1.0.0) |
-| Open decisions | OPEN D-01, D-02, D-03, D-04, D-05, D-10, D-13, D-15, D-16, D-17, D-21, D-24, D-27, D-28, D-30, D-31, D-32, D-33, D-44 (§13) |
+| Depends on (pins) | ledger-service@1 (1.0.0; commands 18/19 at 1.1.0) · limits-risk-service@1 (1.0.0) · wallet-service@1 (1.0.0; `biller-catalogue-cache` at 1.1.0) · pricing-service@1 (1.0.0) · admin-service@1 (1.0.0) |
+| Open decisions | OPEN D-01, D-02, D-03, D-04, D-05, D-10, D-13, D-15, D-16, D-17, D-21, D-24, D-27, D-28, D-30, D-31, D-32, D-33, D-44; MVP deferrals TX-MVP-1..8 (§13) |
+| SRS baseline | SRS v1.2 (14 Oct 2026) |
 
 ## 1. Mission and boundaries
 
@@ -29,13 +30,14 @@ transaction-service is the **payment orchestrator** and the hottest path of Bits
 7. in **one** DB transaction marks the intent `COMPLETED` and writes the `TRANSACTION_COMPLETED` outbox row;
 8. answers `200 COMPLETED`.
 
-The same pipeline serves Salma's cash-in to Rahim at her agent counter, Karim's cash-out at Salma's shop, Rahim's QR payment at Nirob Store, Nirob Store's refund to Rahim, a distributor's float top-up to Salma, and a support-approved reversal. A recovery sweeper guarantees that every intent ends `COMPLETED` or `FAILED` in agreement with the ledger, even if a pod dies between the ledger post and the outcome commit.
+The same pipeline serves Salma's cash-in to Rahim at her agent counter, Karim's cash-out at Salma's shop, Rahim's QR payment at Nirob Store, Nirob Store's refund to Rahim, a distributor's float top-up to Salma, Rahim's DESCO electricity bill and his Grameenphone top-up (MVP: internal biller catalogue, simulated provider), and a support-approved reversal. A recovery sweeper guarantees that every intent ends `COMPLETED` or `FAILED` in agreement with the ledger, even if a pod dies between the ledger post and the outcome commit.
 
 Targets: server-side p99 ≤ 300 ms for P2P, cash-out and merchant payment; design load 5,000 TPS sustained, 10,000 TPS burst for 10 minutes, on one Postgres primary.
 
 ### 1.2 In scope
 
-- Payment APIs: quote (read-only), P2P, cash-in, cash-out, merchant payment, merchant refund (direct and via local maker-checker), float transfer, internal reversal executor.
+- Payment APIs: quote (read-only), P2P, cash-in, cash-out, merchant payment, merchant refund (direct and via local maker-checker), float transfer, internal reversal executor. **[MVP]** all of them.
+- **[MVP] Bill payment and mobile recharge** (CR-TRANSACTION-1, SRS BIL-011, BIL-012): `POST /v1/bills:enquire`, `POST /v1/payments/bill-payment`, `POST /v1/payments/recharge` against the internal biller catalogue (`biller-catalogue-cache`, wallet-service), fulfilled synchronously by the in-process `client.SimulatedBillerClient` (`bitspay.billers.mode = SIMULATED`, no outbound call, SRS A-41), with automatic compensating reversal on provider rejection.
 - Query APIs: lookup by `txnRef` (while online) and per-wallet history (30-day hot window), incl. `clientReference` and `originalTxnRef` filters.
 - Idempotency (Redis critical claim + 7-day Postgres look-back on the intent row), `txnId`/`txnRef` generation, day-partitioned intent table.
 - Wallet status read from the Redis status cache with single-flight fallback to wallet-service; negative cache.
@@ -50,8 +52,10 @@ Targets: server-side p99 ≤ 300 ms for P2P, cash-out and merchant payment; desi
 
 | Deferred | Replacement now |
 |---|---|
-| PIN/OTP/step-up/device binding (AUT, DEV) | Trusted `X-Actor-*` headers via `ActorContext`; risk `STEP_UP` returned as `422 RISK_STEP_UP_REQUIRED` (terminal decline, OPEN D-04) |
-| External two-phase flows (NPSB, bill pay, bank payout, remittance), a `PROCESSING`/`PENDING` status, workflow engines (PAY-002/003/004/006/014) | Not built. The state machine and sweeper are designed so a `PENDING` state can be added later without breaking changes |
+| PIN/OTP/step-up/device binding (AUT, DEV) | Trusted `X-Actor-*` headers via `ActorContext`; risk `STEP_UP` returned as `422 RISK_STEP_UP_REQUIRED` (terminal decline, OPEN D-04). MVP customer cash-out has no OTP and no step-up (SRS A-43). No PIN in the MVP: customers call the payment operations over the REST API themselves (TX-MVP-AUTH) |
+| External two-phase flows (NPSB, ekPay / aggregator bill pay and telco top-up, bank payout, remittance), a `PROCESSING`/`PENDING` status, workflow engines (PAY-002/003/004/006/014) — **R1+** | Not built. MVP bill pay and recharge use the synchronous in-process simulated provider (`bitspay.billers.mode = SIMULATED`; `EKPAY`/`AGGREGATOR` reserved, OPEN TX-MVP-1). The state machine and sweeper are designed so a `PENDING` state can be added later without breaking changes (OPEN TX-MVP-2) |
+| Off-us Bangla QR (scheme routing), merchant settlement to a bank account — **R1** | MVP merchant payment is on-us only (Bangla QR / merchant number of a Bits Pay merchant wallet; settlement stays in the merchant wallet) (SRS A-42) |
+| Agent-assisted bill pay and recharge, USSD bill pay — **R1+** | MVP bill pay and recharge are customer-initiated only (CUSTOMER actor, own wallet) |
 | Bulk disbursement, scheduled transfers, request money | disbursement-service (it calls `POST /v1/payments/p2p` on behalf of the payer for scheduled transfers and request-money accept) |
 | Fee/commission plan configuration, hierarchical commission sharing | pricing-service (this service only evaluates published plans and posts in-line commission) |
 | Limit counters, fraud rules | limits-risk-service (`POST /v1/risk/evaluate`) |
@@ -68,14 +72,15 @@ Targets: server-side p99 ≤ 300 ms for P2P, cash-out and merchant payment; desi
 ### 1.4 This service must NEVER
 
 1. Talk to TigerBeetle or compute balances: only ledger-service moves money.
-2. Read or write another service's database. Redis access is limited to: read `ws:*` (wallet status cache, owned by wallet-service), write `wsn:*` (negative cache, after a wallet-service 404), read/write its own `idem:*` keys on Redis critical.
+2. Read or write another service's database. Redis access is limited to: read `ws:*` (wallet status cache, owned by wallet-service), write `wsn:*` (negative cache, after a wallet-service 404), read `biller:*` (biller catalogue cache, owned by wallet-service), read/write its own `idem:*` keys on Redis critical.
 3. Call wallet-service or pricing-service on the payment path, except the wallet-status cache-miss fallback and the pricing bootstrap/reload.
 4. Answer `COMPLETED` before the outcome row and its outbox row are committed.
 5. Mark an `INITIATED` intent `FAILED` without asking the ledger (`GET /v1/ledger/commands/{commandId}`) — never guess.
 6. Move money when wallet status, limits/risk or pricing cannot be read — refuse with `503 DEPENDENCY_UNAVAILABLE`.
-7. Publish to Kafka directly (outbox only), use `double`/`float` for money, or log PIN, NID, full MSISDN, tokens, `note` or `merchantReference`.
+7. Publish to Kafka directly (outbox only), use `double`/`float` for money, or log PIN, NID, full MSISDN, tokens (incl. electricity tokens), `note`, `merchantReference` or a full `billReference`.
+11. Call the biller provider before the ledger has posted, answer a BILL_PAY / RECHARGE `COMPLETED` before the provider confirmed, or keep money in a biller wallet after the provider refused (BR-TX-101).
 8. Re-send a ledger command with a body different from the stored intent, or reuse a `txnId` for a new attempt.
-9. Write a per-payment `AUDIT_RECORDED` for customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT or FLOAT_TRANSFER (their trail is `txn.events`, OPEN D-05).
+9. Write a per-payment `AUDIT_RECORDED` for customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY or RECHARGE (their trail is `txn.events`, OPEN D-05).
 10. Change anything under `contracts/` without a change request (`../../../docs/global/CHANGE-PROCESS.md`).
 
 ### 1.5 Modules
@@ -84,46 +89,61 @@ Not applicable: single-module service. Package root `com.bracits.bitspay.transac
 
 ## 2. SRS traceability
 
+Baseline: SRS v1.2 (14 Oct 2026). `· MVP` in the Covered-by column marks a requirement the MVP release delivers; `· R1+` marks one deferred beyond the MVP. No withdrawn v1.2 ID (GLD-031, INT-01, B-18) applies to this service.
+
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
-| PAY-001 | P2P transfer | `POST /v1/payments/p2p`; BR-TX-01..15, BR-TX-30..45; WP-6 |
-| PAY-005 | P2B merchant payment (Bangla QR on-us) | `POST /v1/payments/merchant` (`qrPayloadId`, `merchantReference` stored and published); WP-7 |
-| PAY-009 | Saved beneficiaries, recent transactions | `/v1/beneficiaries` CRUD (BR-TX-85); recent = `GET /v1/transactions?walletId=`; WP-10 |
-| PAY-011 | Confirmation (amount, fee, total) and receipt data | `POST /v1/payments/quote` (BR-TX-16..19); PaymentResult and TransactionView receipt fields; WP-7 |
-| PAY-012 | Real-time confirmation to payer and payee | `TRANSACTION_COMPLETED` on `txn.events`; WP-6 |
-| PAY-013 | Validate limits, fees, fraud, AML before commit | Pipeline steps 3–5 before the ledger call; WP-6 |
-| PAY-014 | Pending/unknown outcome for outbound interop | Not applicable (no interop); sweeper pattern ready (deferred) |
-| PAY-015 | Reference/purpose note, configurable purpose codes | `purposeCode`, `note`; PURPOSE_CODE projection (BR-TX-07) |
-| CIC-001 | Cash-in at agent | `POST /v1/payments/cash-in`; WP-7 |
-| CIC-002 | Customer-initiated cash-out | `POST /v1/payments/cash-out`; WP-7 |
-| CIC-005 | CICO via super-agents / service points | Super-agent wallets are `AGENT` actors (partial: outlet cash ledger elsewhere) |
-| CIC-007 | Limits by tier/agent category; fees and commissions | risk evaluate + pricing match on resolved category; commission legs (BR-TX-10..13) |
-| CIC-008 | Receipts for both parties | Event data + query API |
-| MER-004 | Instant merchant notification | `TRANSACTION_COMPLETED` (key = payer wallet, `toWalletId` = merchant) |
-| MER-005 | Category-specific fees | Pricing `match.categoryCode` vs resolved payee category |
-| MER-008 | Merchant refund full/partial, window, maker-checker for enterprise | `POST /v1/payments/merchant-refund`, `/v1/merchant-refund-requests`, `/v1/approvals`; BR-TX-46..53; WP-9 |
-| AGT-002 | Agent cash-in / cash-out | as CIC-001/002 |
-| AGT-005, LIQ-003, LIQ-004 | Float top-up / return execution | `POST /v1/payments/float-transfer` (approval workflow in treasury-service); BR-TX-55..56; WP-9 |
-| DST-004 | E-money transfer distributor ↔ agent | Float transfer with hierarchy from `partner.events` |
-| LED-004 | Balances consistent after commit | Synchronous final status after the ledger result |
-| LED-007 | Unique human-readable ID, client ref, timestamps, channel, status, links | `txnRef`, `clientReference` (= Idempotency-Key, OPEN D-13), `createdAt/completedAt`, `channel`, `originalTxnRef`, `reversalTxnRef` |
-| LED-008 | Idempotent financial APIs | BR-TX-30..38 (Redis + DB look-back + deterministic ledger `commandId`) |
-| LED-009 | Transaction states, audited transitions | §3.5 state machine; every transition emits `txn.events` (chained by governance, OPEN D-05) |
-| LED-010 | Pending resolution / exception queue | Sweeper + `txn_anomaly` + admin endpoints (partial) |
-| LED-011 | Reversals as compensating postings | `POST /v1/internal/reversals` → ledger `post-reversal` |
-| LED-012 | History with filters | 30-day hot window; older in reporting (partial) |
-| LED-015 | Banker's rounding | `HALF_EVEN` in the evaluator; golden vectors G9/G10 |
-| FEE-001..003 | Fee plans, bearer, VAT | In-memory evaluator (§7.3) |
-| FEE-004 | Fee display before confirmation; fee reversal rules | Quote; `reverseFee` on reversal |
-| SUP-006 | Reversal execution with fee/commission flags | `/v1/internal/reversals` (maker-checker done by support) |
-| AUD-001(iii) | Financial transactions audited | `txn.events` chained by governance (OPEN D-05) + `audit.events` for non-payment actions (BR-TX-62) |
-| PER-002 | Horizontal scale without architecture change | Stateless pods; one schema; scale-out triggers in §9 |
-| PER-003 | P2P/cash-out/merchant ≤ 300 ms p99 | Latency budget §3.7 |
-| PER-004 | History (30 days) ≤ 300 ms p95 | Keyset UNION over two indexes (ADR-08) |
-| PER-013 | Hot accounts no bottleneck | No local balance rows; the ledger handles balances |
-| REL-001 | Atomicity, zero discrepancy | Linked ledger chain; intent/outcome/outbox; sweeper |
-| REL-003 | Success rate ≥ 99.9 % | `bitspay_transaction_requests_total{outcome}` |
-| C-01 | Unlicensed products disabled | `bitspay.features.<product>.enabled` + `FEATURE.<PRODUCT>` → `422 SERVICE_DISABLED` (kernel K3.7) |
+| PAY-001 | P2P transfer | `POST /v1/payments/p2p`; BR-TX-01..15, BR-TX-30..45; WP-6 · MVP |
+| PAY-005 | P2B merchant payment (Bangla QR on-us) | `POST /v1/payments/merchant` (`qrPayloadId`, `merchantReference` stored and published); WP-7; on-us only in the MVP, off-us scheme routing R1 (SRS A-42) · MVP |
+| PAY-009 | Saved beneficiaries, recent transactions | `/v1/beneficiaries` CRUD (BR-TX-85); recent = `GET /v1/transactions?walletId=`; WP-10 · MVP |
+| PAY-011 | Confirmation (amount, fee, total) and receipt data | `POST /v1/payments/quote` (BR-TX-16..19); PaymentResult and TransactionView receipt fields; WP-7 · MVP |
+| PAY-012 | Real-time confirmation to payer and payee | `TRANSACTION_COMPLETED` on `txn.events`; WP-6 · MVP |
+| PAY-013 | Validate limits, fees, fraud, AML before commit | Pipeline steps 3–5 before the ledger call; WP-6 · MVP |
+| PAY-014 | Pending/unknown outcome for outbound interop | Not applicable (no interop); sweeper pattern ready (deferred) · R1+ |
+| PAY-015 | Reference/purpose note, configurable purpose codes | `purposeCode`, `note`; PURPOSE_CODE projection (BR-TX-07) · MVP |
+| CIC-001 | Cash-in at agent | `POST /v1/payments/cash-in`; WP-7 · MVP |
+| CIC-002 | Customer-initiated cash-out | `POST /v1/payments/cash-out`; WP-7; no OTP or step-up in the MVP (SRS A-43) · MVP |
+| CIC-005 | CICO via super-agents / service points | Super-agent wallets are `AGENT` actors (partial: outlet cash ledger elsewhere) · MVP |
+| CIC-007 | Limits by tier/agent category; fees and commissions | risk evaluate + pricing match on resolved category; commission legs (BR-TX-10..13) · MVP |
+| CIC-008 | Receipts for both parties | Event data + query API · MVP |
+| MER-004 | Instant merchant notification | `TRANSACTION_COMPLETED` (key = payer wallet, `toWalletId` = merchant) · MVP |
+| MER-005 | Category-specific fees | Pricing `match.categoryCode` vs resolved payee category · MVP |
+| MER-008 | Merchant refund full/partial, window, maker-checker for enterprise | `POST /v1/payments/merchant-refund`, `/v1/merchant-refund-requests`, `/v1/approvals`; BR-TX-46..53; WP-9 · MVP |
+| AGT-002 | Agent cash-in / cash-out | as CIC-001/002 · MVP |
+| AGT-005, LIQ-003, LIQ-004 | Float top-up / return execution | `POST /v1/payments/float-transfer` (approval workflow in treasury-service); BR-TX-55..56; WP-9 · MVP |
+| DST-004 | E-money transfer distributor ↔ agent | Float transfer with hierarchy from `partner.events` · MVP |
+| LED-004 | Balances consistent after commit | Synchronous final status after the ledger result · MVP |
+| LED-007 | Unique human-readable ID, client ref, timestamps, channel, status, links | `txnRef`, `clientReference` (= Idempotency-Key, OPEN D-13), `createdAt/completedAt`, `channel`, `originalTxnRef`, `reversalTxnRef` · MVP |
+| LED-008 | Idempotent financial APIs | BR-TX-30..38 (Redis + DB look-back + deterministic ledger `commandId`) · MVP |
+| LED-009 | Transaction states, audited transitions | §3.5 state machine; every transition emits `txn.events` (chained by governance, OPEN D-05) · MVP |
+| LED-010 | Pending resolution / exception queue | Sweeper + `txn_anomaly` + admin endpoints (partial) · MVP |
+| LED-011 | Reversals as compensating postings | `POST /v1/internal/reversals` → ledger `post-reversal` · MVP |
+| LED-012 | History with filters | 30-day hot window; older in reporting (partial) · MVP |
+| LED-015 | Banker's rounding | `HALF_EVEN` in the evaluator; golden vectors G9/G10 · MVP |
+| FEE-001..003 | Fee plans, bearer, VAT | In-memory evaluator (§7.3) · MVP |
+| FEE-004 | Fee display before confirmation; fee reversal rules | Quote; `reverseFee` on reversal · MVP |
+| SUP-006 | Reversal execution with fee/commission flags | `/v1/internal/reversals` (maker-checker done by support) · MVP |
+| AUD-001(iii) | Financial transactions audited | `txn.events` chained by governance (OPEN D-05) + `audit.events` for non-payment actions (BR-TX-62) · MVP |
+| PER-002 | Horizontal scale without architecture change | Stateless pods; one schema; scale-out triggers in §9 · MVP |
+| PER-003 | P2P/cash-out/merchant ≤ 300 ms p99 | Latency budget §3.7 · MVP |
+| PER-004 | History (30 days) ≤ 300 ms p95 | Keyset UNION over two indexes (ADR-08) · MVP |
+| PER-013 | Hot accounts no bottleneck | No local balance rows; the ledger handles balances · MVP |
+| REL-001 | Atomicity, zero discrepancy | Linked ledger chain; intent/outcome/outbox; sweeper · MVP |
+| REL-003 | Success rate ≥ 99.9 % | `bitspay_transaction_requests_total{outcome}` · MVP |
+| C-01 | Unlicensed products disabled | `bitspay.features.<product>.enabled` + `FEATURE.<PRODUCT>` → `422 SERVICE_DISABLED` (kernel K3.7) · MVP |
+| PAY-002, PAY-003, PAY-004, PAY-006 | External / interop payment flows | Not served (NPSB, Binimoy, wallet-to-bank, add money are R1+); see §1.3 · R1+ |
+| MER-011 | Merchant refund rules: cumulative ≤ original, window, MDR not returned, linked to original | BR-TX-46..53 (`refund_bounds`, `refund.windowDays`, `refund.mdrMode = NONE`, `originalTxnRef`); WP-9 · MVP |
+| BIL-003 | Bill payment by biller and reference | `POST /v1/payments/bill-payment` (BR-TX-93..95, BR-TX-98); WP-CR-1 · MVP |
+| BIL-005 | Bill enquiry / due amount fetch | `POST /v1/bills:enquire` with the simulated provider only (BR-TX-100); real biller enquiry R1 (OPEN TX-MVP-1) · MVP (partial) |
+| BIL-008 | Biller catalogue and biller settlement wallet | consumed `biller-catalogue-cache` (§6.3.5); credit to the biller wallet (type B) by ledger command 18/19 · MVP |
+| BIL-011 | Internal biller catalogue and simulated biller settlement | `client.SimulatedBillerClient` (`bitspay.billers.mode = SIMULATED`), BR-TX-93..103, F-BP; WP-CR-1 · MVP |
+| BIL-012 | Mobile recharge via the operator catalogue, MSISDN/prefix validation, simulated fulfilment | `POST /v1/payments/recharge` (BR-TX-96, BR-TX-98..103), F-RC; WP-CR-1 · MVP |
+| UC-02, UC-04, UC-05 | MVP payment use cases served by this pipeline (send money, cash-out, merchant payment) | F1, F3, F4; WP-6, WP-7 · MVP |
+| UC-14 | Cash-In at Agent | F2; `POST /v1/payments/cash-in`; WP-7 · MVP |
+| UC-15 | Merchant Refund | F5; `POST /v1/payments/merchant-refund`, `/v1/merchant-refund-requests`; WP-9 · MVP |
+| UC-16 | Bill Payment (internal catalogue) | F-BP; `POST /v1/bills:enquire`, `POST /v1/payments/bill-payment`; WP-CR-1 · MVP |
+| UC-17 | Mobile Recharge | F-RC; `POST /v1/payments/recharge`; WP-CR-1 · MVP |
+| A-41, A-42, A-43 | No external biller/telco calls; on-us QR only; no OTP/step-up (trusted headers) | §1.3, BR-TX-99, BR-TX-104 · MVP |
 
 ## 3. Architecture
 
@@ -144,7 +164,7 @@ flowchart LR
   ADM["admin-service"]
   CONS["txn.events readers"]
 
-  APP -- "POST /v1/payments/* v1, GET /v1/transactions v1, /v1/beneficiaries v1" --> TX
+  APP -- "POST /v1/payments/* v1, POST /v1/bills:enquire v1, GET /v1/transactions v1, /v1/beneficiaries v1" --> TX
   STAFF -- "/v1/approvals v1, /v1/merchant-refund-requests v1, /v1/internal/admin v1" --> TX
   DISB -- "POST /v1/payments/p2p v1 (delegated)" --> TX
   TRS -- "POST /v1/payments/float-transfer v1 (forwarded actor)" --> TX
@@ -153,6 +173,7 @@ flowchart LR
   TX -- "POST /v1/risk/evaluate v1, reservations release v1, usage v1" --> LR
   TX -- "GET /v1/wallets/{walletId}/status v1" --> WAL
   WAL -- "wallet-status-cache v1 (Redis ws:)" --> TX
+  WAL -- "biller-catalogue-cache v1 (Redis biller:)" --> TX
   WAL -- "partner.events v1" --> TX
   TX -- "GET /v1/pricing/plans v1" --> PRC
   PRC -- "fee.rules v1, pricing-algorithm v1, pricing-golden-vectors v1" --> TX
@@ -179,7 +200,8 @@ flowchart TB
   end
   subgraph app["service"]
     PP["PaymentPipeline (steps 1-9)"]
-    POL["TxnTypePolicy: P2p, CashIn, CashOut, MerchantPayment, MerchantRefund, FloatTransfer, Reversal"]
+    POL["TxnTypePolicy: P2p, CashIn, CashOut, MerchantPayment, MerchantRefund, FloatTransfer, Reversal, BillPay, Recharge"]
+    BIL["BillerCatalogueService, BillEnquiryService, ProviderConfirmStep, CompensationService"]
     IDS["IdempotencyService"]
     WSS["WalletStatusService"]
     PRS["PricingSnapshotService"]
@@ -207,6 +229,8 @@ flowchart TB
     HR["HttpLimitsRiskClient"]
     HW["HttpWalletClient"]
     HP["HttpPricingClient"]
+    BCC[("BillerCatalogueCache - Redis cache: biller:* read")]
+    SBC["SimulatedBillerClient behind BillerClient (bitspay.billers.mode = SIMULATED, all profiles, no outbound call)"]
   end
   subgraph msg["messaging"]
     OUT["OutboxWriter + PollingOutboxRelay (bitspay.outbox.relay=polling)"]
@@ -223,11 +247,13 @@ flowchart TB
   PP --> HL
   PP --> HR
   PRS --> HP
+  BIL --> BCC
+  BIL --> SBC
   KF --> PRS
   KF --> DB
 ```
 
-`ArchitectureTest` (ArchUnit) enforces: controllers call only services and never use entities or repositories; only services use repositories, clients and messaging; no `double`/`float` in money packages; `DevController` and `FakeLedgerClient` only under profiles `local`/`test`.
+`ArchitectureTest` (ArchUnit) enforces: controllers call only services and never use entities or repositories; only services use repositories, clients and messaging; no `double`/`float` in money packages; `DevController` and `FakeLedgerClient` only under profiles `local`/`test`. `SimulatedBillerClient` is **not** a test double: it is the MVP product-level biller provider, active in every profile when `bitspay.billers.mode = SIMULATED` (the only MVP mode), and must make no outbound network call (ArchUnit: no HTTP client dependency in that class).
 
 ### 3.3 Runtime and deployment (Compose)
 
@@ -238,7 +264,7 @@ flowchart TB
 | `mem_limit` | 448 MB |
 | Infra `depends_on` (healthy) | postgres, kafka-init, redis-critical, redis-cache |
 | Schema | `svc_transaction` (Flyway `spring.flyway.schemas=svc_transaction`, `create-schemas=false` in the stack; Testcontainers `create-schemas=true`) |
-| Redis | critical (`BITSPAY_REDIS_CRITICAL_URL`, AOF, `noeviction`): `idem:*`. cache (`BITSPAY_REDIS_CACHE_URL`): read `ws:*`, write `wsn:*` |
+| Redis | critical (`BITSPAY_REDIS_CRITICAL_URL`, AOF, `noeviction`): `idem:*`. cache (`BITSPAY_REDIS_CACHE_URL`): read `ws:*` and `biller:*`, write `wsn:*` |
 | Clients | `BITSPAY_CLIENTS_LEDGER_BASEURL`, `BITSPAY_CLIENTS_LIMITSRISK_BASEURL`, `BITSPAY_CLIENTS_WALLET_BASEURL`, `BITSPAY_CLIENTS_PRICING_BASEURL` |
 | Hikari | Compose `SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE=8`; production 40 per pod |
 | Consumer groups | `transaction-service.feerules-${HOSTNAME}` (per instance, `fee.rules`), `transaction-service.partner` (`partner.events`), `transaction-service.refdata` (`refdata.events`) — ids per OPEN D-30 |
@@ -489,6 +515,74 @@ sequenceDiagram
   T-->>K: 200 QuoteResult (fee 750, VAT 112, total 50862)
 ```
 
+**F-BP — Bill payment (Rahim pays his DESCO bill 1,250 Tk, fee 5 Tk + VAT 0.75 Tk; MVP, simulated provider), incl. provider rejection**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant BC as Redis cache biller and ws keys
+  participant SB as SimulatedBillerClient (in-process)
+  participant R as limits-risk-service
+  participant DB as Postgres svc_transaction
+  participant L as ledger-service
+  C->>T: POST /v1/bills:enquire (billerId DESCO, billReference 1234567890)
+  T->>BC: GET biller key of DESCO -> ACTIVE, ENQUIRY, pattern 8-12 digits
+  T->>SB: enquire -> due 125000, dueDate 2026-11-15, enquiryRef SIM-ENQ-...
+  T-->>C: 200 BillEnquiryResult
+  C->>T: POST /v1/payments/bill-payment (Idempotency-Key bp-91c2, 125000, enquiryRef)
+  T->>T: step 1 validate, product switch BILL_PAY, catalogue checks, enquiry match, to = biller walletId (type B)
+  T->>T: step 2 idempotency claim -> NEW
+  T->>BC: step 3 pipelined HGET ws for Rahim (C, A) and DESCO wallet (B, A)
+  T->>R: step 4 evaluate BILL_PAY (to walletType B) -> ALLOW
+  T->>T: step 5 PLN-BILL-STD -> fee 500, VAT 75, PAYER
+  T->>DB: step 6 INSERT intent BILL_PAY INITIATED (BP26101400K7M2QX9D)
+  T->>L: step 7 post-bill-payment (command 18, Rahim 100 to DESCO 150)
+  L-->>T: OK, transferIds[3]
+  T->>SB: step 8 confirm (txnRef, biller, reference, amount)
+  alt provider CONFIRMED
+    SB-->>T: CONFIRMED, receipt SIM-BP-BP26101400K7M2QX9D, token null
+    T->>DB: BEGIN, COMPLETED + provider fields, outbox TRANSACTION_COMPLETED (billerId, billReference, providerReceipt), COMMIT
+    T-->>C: 200 PaymentResult COMPLETED + providerReceipt
+  else provider REJECTED (reference ends 0000)
+    SB-->>T: REJECTED
+    T->>DB: BEGIN, provider_status REJECTED, reversal_pending, INSERT REVERSAL intent RV (SYSTEM_ERROR, initiator SYSTEM), COMMIT
+    T->>L: post-reversal (originalCommandId = BP txnId, reverseFee true, reverseCommission true)
+    L-->>T: OK (mirrored legs code 1013)
+    T->>DB: BEGIN, REVERSAL COMPLETED, original FAILED PROVIDER_REJECTED, outbox TRANSACTION_COMPLETED (RV) + TRANSACTION_FAILED (BP), COMMIT
+    T-->>C: 409 STATE_CONFLICT reason PROVIDER_REJECTED with transaction FAILED
+  end
+```
+
+**F-RC — Mobile recharge (Rahim tops up 01712345678 on Grameenphone, 100 Tk, no fee; MVP, simulated provider)**
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant BC as Redis cache biller and ws keys
+  participant SB as SimulatedBillerClient (in-process)
+  participant R as limits-risk-service
+  participant L as ledger-service
+  C->>T: POST /v1/payments/recharge (msisdn 01712345678, PREPAID, 10000, operatorBillerId null)
+  T->>BC: GET biller:mno-prefix:017 -> GP billerId
+  T->>BC: GET biller key of GP -> ACTIVE, MNO, prefixes 017 and 013, PREPAID and POSTPAID, 1000..100000
+  T->>T: operator derived (an operatorBillerId sent must equal it), amount in range, to = GP walletId (type B)
+  T->>T: idempotency claim, wallet status Rahim C and GP B
+  T->>R: evaluate RECHARGE -> ALLOW
+  T->>T: PLN-RECHARGE-NONE -> fee 0, feeBearer OPERATOR
+  T->>T: INSERT intent RECHARGE INITIATED (RC26101400P4N8W2ZA)
+  T->>L: post-recharge (command 19)
+  L-->>T: OK
+  T->>SB: confirm -> CONFIRMED, receipt SIM-RC-RC26101400P4N8W2ZA
+  T->>T: COMPLETED + outbox TRANSACTION_COMPLETED (billerId, msisdn, providerReceipt)
+  T-->>C: 200 PaymentResult COMPLETED
+```
+
+If the pod dies between the ledger post (step 7) and the outcome, the sweeper finds the command posted and runs the provider confirm itself (deterministic per `txnRef`, BR-TX-102) before completing or compensating; a COMPLETED is never written without a provider confirmation.
+
 ### 3.5 State machines
 
 **Transaction (`txn_intent.status`)**
@@ -497,8 +591,9 @@ sequenceDiagram
 stateDiagram-v2
   [*] --> INITIATED: intent committed (step 6)
   [*] --> FAILED: business refusal before the ledger (resolved_by PRE_LEDGER)
-  INITIATED --> COMPLETED: ledger OK or EXISTS (request, re-drive or sweeper)
+  INITIATED --> COMPLETED: ledger OK or EXISTS (request, re-drive or sweeper), and for BILL_PAY or RECHARGE the provider CONFIRMED
   INITIATED --> FAILED: ledger REJECTED, ledger HTTP 400 or 403, or sweeper not-posted twice 60 s apart
+  INITIATED --> FAILED: BILL_PAY or RECHARGE provider REJECTED and compensating REVERSAL COMPLETED (PROVIDER_REJECTED)
   COMPLETED --> REVERSED: REVERSAL transaction completed (full or partial)
   COMPLETED --> PARTIALLY_REFUNDED: refund below the remaining amount (MERCHANT_PAYMENT only)
   COMPLETED --> REFUNDED: refund equals the full amount
@@ -509,7 +604,9 @@ stateDiagram-v2
   REFUNDED --> [*]
 ```
 
-Every transition is a conditional `UPDATE … WHERE status = :expected` (optimistic, `version = version + 1`) in the same DB transaction as its outbox row(s). `INITIATED` never appears on `txn.events`.
+Every transition is a conditional `UPDATE … WHERE status = :expected` (optimistic, `version = version + 1`) in the same DB transaction as its outbox row(s). `INITIATED` never appears on `txn.events`. MVP has no `PENDING` state (OPEN TX-MVP-2): a BILL_PAY / RECHARGE stays `INITIATED` while the ledger post, the provider confirmation or its compensation is in flight, and ends `COMPLETED` or `FAILED` synchronously (or by re-drive / sweeper).
+
+**Provider step of a BILL_PAY / RECHARGE intent (`txn_intent.provider_status`, MVP)**: `null` (not asked) → `CONFIRMED` (receipt stored; intent → COMPLETED) or `REJECTED` (compensation REVERSAL created; intent → FAILED `PROVIDER_REJECTED` when that REVERSAL completes).
 
 **Merchant refund request (`merchant_refund_request.status`, mirrored on `approval_request`)**
 
@@ -547,6 +644,7 @@ stateDiagram-v2
 | ADR-11 One outbox | One outbox `svc_transaction.outbox`, written in the outcome transaction; read by Debezium `outbox-all` (polling relay fallback). `txn.events` rows never have a NULL payload | Kernel K4.2 | — |
 | ADR-12 Partner wallets micro-cache | Caffeine (`expireAfterWrite 2 s`, max 50k) in front of Redis for wallet types `A`, `M`, `D` only; customer wallets always read Redis; `0` disables | Busiest merchant/agent wallets | A freeze reaches partner wallets within 2 s |
 | ADR-13 Idempotency retention | Redis claim TTL 26 h; the 7-day retention of kernel K3.3 rule 1 is met by the 7-day DB look-back on the intent row (`dbLookback = 7 d`) | 7 days of Redis keys at 5k TPS would not fit Redis critical | Duplicates older than 26 h are answered from Postgres (repair of the Redis key) |
+| ADR-14 Simulated biller provider (MVP) | BILL_PAY / RECHARGE are fulfilled by `client.SimulatedBillerClient` behind the `client.BillerClient` port, selected by `bitspay.billers.mode = SIMULATED` (the only MVP value; `EKPAY` and `AGGREGATOR` are reserved for R1 and fail start-up). It is in-process, synchronous, deterministic per `txnRef` and makes no outbound call. The ledger posts first (command 18/19 into the biller wallet); the provider is asked only after ledger OK/EXISTS; a refusal is compensated by an automatic `post-reversal` | SRS A-41 forbids external biller and telco calls in the MVP; posting first keeps the R1 provider seam identical (ask the provider only with money already held in the biller wallet) | No PENDING state; a provider refusal costs one extra ledger command; the R1 provider client replaces the simulated one without a contract change to the payment APIs (OPEN TX-MVP-1, TX-MVP-2) |
 
 ### 3.7 Latency and throughput budget (server side, per request, design peak)
 
@@ -563,7 +661,7 @@ stateDiagram-v2
 | 9 Serialise / reply | 2 ms | — | |
 | **Total** | **≈ 98 ms nominal p99** | hard request deadline 1.5 s | ≥ 200 ms headroom for GC, network, queueing |
 
-Quote p99 30 ms (+ ≤ 300 ms usage call); lookup by `txnRef` p95 20 ms; wallet history p95 300 ms.
+Quote p99 30 ms (+ ≤ 300 ms usage call); lookup by `txnRef` p95 20 ms; wallet history p95 300 ms. BILL_PAY / RECHARGE add one Redis cache round trip at step 1 (catalogue, ≤ 2 ms) and the in-process provider confirm (≤ 1 ms) after step 7; a provider refusal adds one intent insert, one `post-reversal` (20 ms) and one outcome transaction, still within the 300 ms p99 target. Bill enquiry p99 20 ms.
 
 ## 4. Data model
 
@@ -672,15 +770,16 @@ END $$;
 CREATE TABLE IF NOT EXISTS txn_intent (
   txn_id                    uuid        NOT NULL,              -- UUIDv7 = ledger commandId = risk reservation id
   created_at                timestamptz NOT NULL,              -- = UUIDv7 timestamp of txn_id (ms) = risk evaluate `at`
-  txn_ref                   text        NOT NULL CHECK (txn_ref ~ '^(PP|CI|CO|MP|MR|FT|RV)[0-9]{6}00[0-9A-HJKMNP-TV-Z]{8}$'),
+  txn_ref                   text        NOT NULL CHECK (txn_ref ~ '^(PP|CI|CO|MP|MR|FT|RV|BP|RC)[0-9]{6}00[0-9A-HJKMNP-TV-Z]{8}$'),
   txn_type                  text        NOT NULL CHECK (txn_type IN
-                              ('P2P','CASH_IN','CASH_OUT','MERCHANT_PAYMENT','MERCHANT_REFUND','FLOAT_TRANSFER','REVERSAL')),
+                              ('P2P','CASH_IN','CASH_OUT','MERCHANT_PAYMENT','MERCHANT_REFUND','FLOAT_TRANSFER','REVERSAL',
+                               'BILL_PAY','RECHARGE')),
   status                    text        NOT NULL CHECK (status IN
                               ('INITIATED','COMPLETED','FAILED','REVERSED','PARTIALLY_REFUNDED','REFUNDED')),
   failure_code              text        CHECK (failure_code IN ('WALLET_NOT_TRANSACTABLE','LIMIT_EXCEEDED','RISK_BLOCKED',
                               'RISK_HELD_FOR_REVIEW','RISK_STEP_UP_REQUIRED','SERVICE_DISABLED','INSUFFICIENT_FUNDS',
                               'MAX_BALANCE_EXCEEDED','LEDGER_ORIGINAL_NOT_FOUND','LEDGER_ALREADY_REVERSED','LEDGER_HOLD_NOT_FOUND',
-                              'LEDGER_INVALID_AMOUNT','LEDGER_OTHER','LEDGER_NOT_POSTED')),
+                              'LEDGER_INVALID_AMOUNT','LEDGER_OTHER','LEDGER_NOT_POSTED','PROVIDER_REJECTED')),
   failure_detail            text,                               -- internal only (never in a response)
   failure_wallet_id         uuid,                               -- WALLET_NOT_TRANSACTABLE replay (problem walletId)
   failure_wallet_status     text,                               -- status NAME for replay (problem walletStatus)
@@ -699,13 +798,13 @@ CREATE TABLE IF NOT EXISTS txn_intent (
   correlation_id            text,
   device_id                 text        CHECK (length(device_id) <= 128),
   from_wallet_id            uuid        NOT NULL,
-  from_wallet_type          char(1)     NOT NULL CHECK (from_wallet_type IN ('C','A','D','M','I')),
+  from_wallet_type          char(1)     NOT NULL CHECK (from_wallet_type IN ('C','A','D','M','I','B')),  -- B: REVERSAL of BILL_PAY/RECHARGE
   from_kyc_tier             smallint,
   from_category_code        int,
   from_flags                int,
   from_wallet_status        char(1),
   to_wallet_id              uuid        NOT NULL,
-  to_wallet_type            char(1)     NOT NULL CHECK (to_wallet_type IN ('C','A','D','M','I')),
+  to_wallet_type            char(1)     NOT NULL CHECK (to_wallet_type IN ('C','A','D','M','I','B')),    -- B: BILLER (BILL_PAY/RECHARGE)
   to_kyc_tier               smallint,
   to_category_code          int,
   to_flags                  int,
@@ -746,6 +845,18 @@ CREATE TABLE IF NOT EXISTS txn_intent (
   reversal_pending          boolean     NOT NULL DEFAULT false,  -- on originals
   reversal_txn_ref          text,
   reversed_amount_poisha    bigint,                             -- on originals once REVERSED
+  -- BILL_PAY / RECHARGE (MVP, CR-TRANSACTION-1); null on every other type
+  biller_id                 uuid,                               -- partnerId of the biller / operator
+  biller_code               text        CHECK (length(biller_code) <= 16),
+  bill_reference            text        CHECK (length(bill_reference) <= 64),   -- BILL_PAY; never logged in full
+  msisdn                    text        CHECK (msisdn ~ '^01[3-9][0-9]{8}$'),     -- RECHARGE; never logged in full
+  recharge_type             text        CHECK (recharge_type IN ('PREPAID','POSTPAID')),
+  enquiry_ref               text        CHECK (length(enquiry_ref) <= 32),
+  provider_status           text        CHECK (provider_status IN ('CONFIRMED','REJECTED')),  -- null = not asked yet
+  provider_receipt          text        CHECK (length(provider_receipt) <= 64),
+  provider_token            text        CHECK (provider_token ~ '^[0-9]{20}$'),   -- never logged, never on txn.events
+  provider_at               timestamptz,
+  compensation_txn_id       uuid,                               -- REVERSAL row created after provider REJECTED
   ledger_result             text        CHECK (ledger_result IN ('OK','EXISTS','REJECTED','HTTP_400','HTTP_403')),
   ledger_rejection_code     text,
   ledger_detail             text,
@@ -761,7 +872,9 @@ CREATE TABLE IF NOT EXISTS txn_intent (
   CONSTRAINT total_debit_rule CHECK (
     (txn_type = 'REVERSAL' AND total_debit_poisha = amount_poisha) OR
     (txn_type <> 'REVERSAL' AND total_debit_poisha = amount_poisha + CASE WHEN fee_bearer = 'PAYER' THEN fee_poisha + vat_poisha ELSE 0 END)),
-  CONSTRAINT operator_zero_fee CHECK (fee_bearer <> 'OPERATOR' OR txn_type = 'REVERSAL' OR (fee_poisha = 0 AND vat_poisha = 0))
+  CONSTRAINT operator_zero_fee CHECK (fee_bearer <> 'OPERATOR' OR txn_type = 'REVERSAL' OR (fee_poisha = 0 AND vat_poisha = 0)),
+  CONSTRAINT biller_fields CHECK ((txn_type IN ('BILL_PAY','RECHARGE')) = (biller_id IS NOT NULL)
+    AND (txn_type = 'BILL_PAY' OR bill_reference IS NULL) AND (txn_type = 'RECHARGE' OR (msisdn IS NULL AND recharge_type IS NULL)))
 ) PARTITION BY RANGE (created_at);
 
 CREATE INDEX IF NOT EXISTS txn_intent_from_ix      ON txn_intent (from_wallet_id, created_at DESC, txn_id DESC);
@@ -780,7 +893,7 @@ SELECT ensure_partitions((now() AT TIME ZONE 'Asia/Dhaka')::date - 1, 9, '${part
 CREATE TABLE IF NOT EXISTS partner_link (
   wallet_id           uuid PRIMARY KEY,
   partner_id          uuid        NOT NULL UNIQUE,
-  partner_type        text        NOT NULL CHECK (partner_type IN ('AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION')),
+  partner_type        text        NOT NULL CHECK (partner_type IN ('AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION','BILLER')),  -- BILLER rows stored, unused on the money path (catalogue cache is the source)
   sub_type            text        NOT NULL,                 -- e.g. SUPER_AGENT, ENTERPRISE, MASTER
   category_code       int         NOT NULL,
   parent_partner_id   uuid,
@@ -929,6 +1042,8 @@ Rules on the schema:
 - `txn_intent` rows are never deleted by this service; partitions older than the online horizon are detached (R2 archival).
 - The 7-day idempotency look-back query is `SELECT … FROM txn_intent WHERE initiator_actor_id = ? AND idempotency_key = ? AND created_at > now() - interval '7 days'`; it uses the partition-local `*_idem_uq` indexes of ≤ 8 daily partitions.
 - `original_created_at` lets the refund/reversal lock the original by its full primary key (one partition, no scan).
+- A compensation REVERSAL (BR-TX-101) is an ordinary REVERSAL row: `original_txn_id` = the BILL_PAY / RECHARGE, `reason_code = SYSTEM_ERROR`, `approval_id` null, initiator `SYSTEM` / `transaction-service`, channel `SYSTEM`, `idempotency_key = cmp-{originalTxnId}` (unique per original by the `*_idem_uq` index of its partition and the 7-day look-back).
+- Nothing is implemented yet (PROGRESS: WP-0 only), so CR-TRANSACTION-1 edits `V1__init.sql` in place; once V1 ships, further columns go to a new `V<n>__*.sql`.
 
 ### 4.2 Redis keys and caches
 
@@ -937,6 +1052,9 @@ Rules on the schema:
 | critical | `idem:{actorId}:{idempotencyKey}` | `{txnRef}\|{txnId}\|{requestHashHex}\|{claimedAtEpochMs}` | 93,600 s (26 h) | this service (read/write) |
 | cache | `ws:{bucket}` field `base64url_nopad(uuidBytes(walletId))` | `{version}:{statusCode}:{kycTier}:{walletTypeCode}:{categoryCode}:{flags}` | none | wallet-service writes; this service reads (data contract `wallet-status-cache` v1, §6.3) |
 | cache | `wsn:{walletId}` (canonical lower-case uuid) | `1` | 60 s | written here only after a wallet-service `404`; wallet-service deletes it when the wallet becomes READY |
+| cache | `biller:{billerId}` | biller profile JSON (schema 1) | none | wallet-service writes; this service reads (data contract `biller-catalogue-cache` v1, §6.3.5) |
+| cache | `biller:mno-prefix:{prefix}` | operator `billerId` | none | wallet-service writes; this service reads (recharge operator lookup) |
+| cache | `biller:meta` (hash, field `state`) | `EMPTY` / `LOADING` / `READY` | none | wallet-service writes; read on a miss to tell "unknown biller" (READY → 404) from "cache not loaded" (→ 503) |
 | in-process | Caffeine partner-wallet micro-cache | parsed status | 2 s, max 50k | wallet types `A`, `M`, `D` only (ADR-12) |
 | in-process | `PricingSnapshot` | immutable plan map | until replaced | ADR-06 |
 
@@ -964,13 +1082,16 @@ Common to every operation: kernel K3.1 headers (`X-Correlation-Id` generated if 
 
 | Operation | Audience | Actors & roles | Idempotency | Purpose |
 |---|---|---|---|---|
-| `POST /v1/payments/quote` | customer | CUSTOMER (P2P, CASH_OUT, MERCHANT_PAYMENT), AGENT (CASH_IN, FLOAT_TRANSFER), DISTRIBUTOR (FLOAT_TRANSFER), STAFF `OPS_CHECKER`/`FIN_CHECKER` (FLOAT_TRANSFER) | none (read-only) | Wallet-based fee quote |
+| `POST /v1/payments/quote` | customer | CUSTOMER (P2P, CASH_OUT, MERCHANT_PAYMENT, BILL_PAY, RECHARGE), AGENT (CASH_IN, FLOAT_TRANSFER), DISTRIBUTOR (FLOAT_TRANSFER), STAFF `OPS_CHECKER`/`FIN_CHECKER` (FLOAT_TRANSFER) | none (read-only) | Wallet-based fee quote |
 | `POST /v1/payments/p2p` | customer | CUSTOMER (incl. delegated by disbursement-service with the payer's headers) | `Idempotency-Key` | P2P |
 | `POST /v1/payments/cash-in` | partner | AGENT | `Idempotency-Key` | Cash-in |
 | `POST /v1/payments/cash-out` | customer | CUSTOMER | `Idempotency-Key` | Cash-out |
 | `POST /v1/payments/merchant` | customer | CUSTOMER | `Idempotency-Key` | Merchant payment |
 | `POST /v1/payments/merchant-refund` | partner | MERCHANT | `Idempotency-Key` | Direct merchant refund |
 | `POST /v1/payments/float-transfer` | partner | DISTRIBUTOR, AGENT, STAFF `OPS_CHECKER`/`FIN_CHECKER`; forwarded by treasury-service | `Idempotency-Key` | Float top-up / return |
+| `POST /v1/bills:enquire` **[MVP, CR-TRANSACTION-1]** | customer | CUSTOMER | none (read-only) | Bill enquiry (simulated provider) |
+| `POST /v1/payments/bill-payment` **[MVP, CR-TRANSACTION-1]** | customer | CUSTOMER (own wallet) | `Idempotency-Key` | Bill payment |
+| `POST /v1/payments/recharge` **[MVP, CR-TRANSACTION-1]** | customer | CUSTOMER (own wallet) | `Idempotency-Key` | Mobile recharge |
 | `POST /v1/internal/reversals` | service | SERVICE `support-service` | `Idempotency-Key` `rev-{id}-{attempt}` | Reversal executor |
 | `GET /v1/transactions/{txnRef}` | customer | party wallet holders, STAFF (any), SERVICE, SYSTEM | — | Lookup |
 | `GET /v1/transactions` | customer | holder of `walletId`, STAFF (any), SERVICE | — (paged) | Wallet history |
@@ -994,9 +1115,9 @@ Common to every operation: kernel K3.1 headers (`X-Correlation-Id` generated if 
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| txnRef | string | Y | N | `^(PP\|CI\|CO\|MP\|MR\|FT\|RV)\d{6}00[0-9A-HJKMNP-TV-Z]{8}$` (18) | consumers: opaque |
+| txnRef | string | Y | N | `^(PP\|CI\|CO\|MP\|MR\|FT\|RV\|BP\|RC)\d{6}00[0-9A-HJKMNP-TV-Z]{8}$` (18) | consumers: opaque |
 | txnId | uuid | Y | N | UUIDv7 | = ledger `commandId` |
-| txnType | enum | Y | N | `txnType` code set (7) | |
+| txnType | enum | Y | N | `txnType` code set (9) | |
 | status | enum{COMPLETED, FAILED, INITIATED} | Y | N | `INITIATED` only inside a 503 problem | outcome of that request |
 | failureCode | enum | Y | Y | `failureCode` code set | null unless `FAILED` |
 | amountPoisha | int64 (poisha) | Y | N | > 0 | REVERSAL: principal reversed |
@@ -1009,8 +1130,13 @@ Common to every operation: kernel K3.1 headers (`X-Correlation-Id` generated if 
 | toWalletId | uuid | Y | N | internal to | |
 | createdAt | timestamp | Y | N | = UUIDv7 time of `txnId` | |
 | completedAt | timestamp | Y | Y | | null while `INITIATED`; set for COMPLETED and FAILED |
+| billerId | uuid | N | Y | partnerId | BILL_PAY / RECHARGE only (operator biller for RECHARGE); absent on other types (CR-TRANSACTION-1) |
+| billReference | string | N | Y | ≤ 64 | BILL_PAY only |
+| msisdn | string | N | Y | `^01[3-9]\d{8}$` | RECHARGE only |
+| providerReceipt | string | N | Y | ≤ 64, `SIM-BP-<txnRef>` / `SIM-RC-<txnRef>` | non-null only when COMPLETED |
+| token | string | N | Y | `^\d{20}$` | BILL_PAY prepaid electricity only; never logged, never on `txn.events` |
 
-Body → internal from/to: p2p `fromWalletId → toWalletId`; cash-in `agentWalletId → customerWalletId`; cash-out `customerWalletId → agentWalletId`; merchant `customerWalletId → merchantWalletId`; merchant-refund `original.toWalletId → original.fromWalletId`; float-transfer `fromWalletId → toWalletId`; reversals `original.toWalletId → original.fromWalletId`.
+Body → internal from/to: p2p `fromWalletId → toWalletId`; cash-in `agentWalletId → customerWalletId`; cash-out `customerWalletId → agentWalletId`; merchant `customerWalletId → merchantWalletId`; merchant-refund `original.toWalletId → original.fromWalletId`; float-transfer `fromWalletId → toWalletId`; reversals `original.toWalletId → original.fromWalletId`; bill-payment `customerWalletId → biller.walletId`; recharge `customerWalletId → operator.walletId` (biller wallets from the catalogue, type `B`).
 
 ```json
 { "txnRef": "PP26100900K3M9QX2A", "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11", "txnType": "P2P", "status": "COMPLETED",
@@ -1019,7 +1145,7 @@ Body → internal from/to: p2p `fromWalletId → toWalletId`; cash-in `agentWall
   "toWalletId": "0192f2bb-0002-7000-8000-00000000b002", "createdAt": "2026-10-09T08:03:22.101Z", "completedAt": "2026-10-09T08:03:22.161Z" }
 ```
 
-**Payment POST error table** (p2p, cash-in, cash-out, merchant, merchant-refund, float-transfer; "txn" = problem carries `transaction`):
+**Payment POST error table** (p2p, cash-in, cash-out, merchant, merchant-refund, float-transfer, bill-payment, recharge; "txn" = problem carries `transaction`):
 
 | HTTP | `code` | Extensions | When | txn? |
 |---|---|---|---|---|
@@ -1039,6 +1165,10 @@ Body → internal from/to: p2p `fromWalletId → toWalletId`; cash-in `agentWall
 | 422 | `MAKER_CHECKER_VIOLATION` | — | refund requires approval (merchant-refund only) | no |
 | 503 | `DEPENDENCY_UNAVAILABLE` | `retryable: true` | before intent | no |
 | 503 | `DEPENDENCY_UNAVAILABLE` | `retryable: true`, `transaction` (`INITIATED`) | after intent, ledger outcome unknown; retry with the same key | yes |
+| 400 | `VALIDATION_FAILED` `reason` `BILL_REFERENCE_INVALID` / `BILL_AMOUNT_MISMATCH` / `BILL_AMOUNT_OUT_OF_RANGE` / `MSISDN_INVALID` / `OPERATOR_MISMATCH` | `errors[]` | bill-payment / recharge catalogue checks (BR-TX-94..96) | no |
+| 404 | `NOT_FOUND` `reason` `BILLER_NOT_FOUND` | — | unknown biller / operator (BR-TX-93) | no |
+| 409 | `STATE_CONFLICT` `reason` `BILLER_INACTIVE` | — | biller not ACTIVE (not persisted) | no |
+| 409 | `STATE_CONFLICT` `reason` `PROVIDER_REJECTED` | `transaction` | provider refused after the ledger post; money returned by the compensating REVERSAL; FAILED `PROVIDER_REJECTED` (BR-TX-101) | yes |
 
 LIMIT_EXCEEDED problem example:
 ```json
@@ -1064,15 +1194,17 @@ LIMIT_EXCEEDED problem example:
 #### 5.1.1 `POST /v1/payments/quote`
 
 - Actors: the actor rules of the quoted `txnType`'s payment endpoint (incl. wallet binding and, for FLOAT_TRANSFER, the pair and hierarchy rules). No `Idempotency-Key`, no persistence, no risk evaluation, no reservation. p99 30 ms (+ ≤ 300 ms usage call). OPEN D-17.
+- BILL_PAY / RECHARGE (CR-TRANSACTION-1): the request carries `billerId` instead of `toWalletId`; the catalogue is read (BR-TX-93), the biller must be ACTIVE and of the right kind (non-MNO for BILL_PAY, MNO for RECHARGE), the amount must satisfy the biller's rules (BR-TX-95; no enquiry match, no provider call), and the to-wallet is the catalogue's `walletId` (echoed as `toWalletId`, plus `billerId`).
 - Behaviour: product switch; reads both wallets' status (types and directions validated as for the payment); reads the sender's monthly count from limits-risk usage (`direction = SEND` item of the quoted `txnType`, field `monthlyCountUsed`; 300 ms, no retry); evaluates the pricing algorithm with `usage.senderMonthlyCountForTxnType = monthlyCountUsed`. If the count cannot be read (timeout, 5xx/503, 404, field absent), evaluates with `usage.senderMonthlyCountForTxnType = freeMonthlyCount` of the plan (without the free allowance — an upper bound) and returns `feeIsUpperBound: true`. The payment re-evaluates at execution.
 
 Request `QuoteRequest`:
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| txnType | enum{P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER} | Y | N | MERCHANT_REFUND, REVERSAL → 400 | |
-| fromWalletId | uuid | Y | N | debited side (agent for CASH_IN, customer for CASH_OUT/MERCHANT_PAYMENT) | |
-| toWalletId | uuid | Y | N | ≠ fromWalletId | |
+| txnType | enum{P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE} | Y | N | MERCHANT_REFUND, REVERSAL → 400 | |
+| fromWalletId | uuid | Y | N | debited side (agent for CASH_IN, customer for CASH_OUT/MERCHANT_PAYMENT/BILL_PAY/RECHARGE) | |
+| toWalletId | uuid | Y\* | N | ≠ fromWalletId | \* required except for BILL_PAY / RECHARGE, where it is absent (400 if sent with `billerId`) |
+| billerId | uuid | N\* | N | BILL_PAY / RECHARGE only, and then required; other types → 400 | CR-TRANSACTION-1 |
 | amountPoisha | int64 (poisha) | Y | N | 1..10^13 | |
 
 ```json
@@ -1085,7 +1217,8 @@ Response 200 `QuoteResult`:
 |---|---|---|---|---|---|
 | txnType | enum | Y | N | as request | echo |
 | fromWalletId | uuid | Y | N | | echo |
-| toWalletId | uuid | Y | N | | echo |
+| toWalletId | uuid | Y | N | | echo; BILL_PAY / RECHARGE: the biller settlement wallet |
+| billerId | uuid | N | N | | echo; BILL_PAY / RECHARGE only |
 | amountPoisha | int64 (poisha) | Y | N | | echo |
 | feePoisha | int64 (poisha) | Y | N | ≥ 0 | 0 when no plan or `feeBearer = OPERATOR` |
 | vatPoisha | int64 (poisha) | Y | N | ≥ 0 | |
@@ -1111,9 +1244,10 @@ Errors:
 
 | HTTP | `code` | Extensions | When |
 |---|---|---|---|
-| 400 | `VALIDATION_FAILED` | `errors[]` | schema, from = to, txnType not quotable, wallet type vs txnType, float pair |
+| 400 | `VALIDATION_FAILED` | `errors[]` | schema, from = to, txnType not quotable, wallet type vs txnType, float pair; BILL_PAY / RECHARGE `reason` `BILL_AMOUNT_OUT_OF_RANGE` / `OPERATOR_MISMATCH` |
 | 403 | `ACTOR_NOT_ALLOWED` | — | actor rules |
-| 404 | `NOT_FOUND` | — | unknown wallet |
+| 404 | `NOT_FOUND` | — | unknown wallet; `reason BILLER_NOT_FOUND` |
+| 409 | `STATE_CONFLICT` | — | `reason BILLER_INACTIVE` (BILL_PAY / RECHARGE) |
 | 422 | `WALLET_NOT_TRANSACTABLE` | `walletId`, `walletStatus` | status blocks the direction |
 | 422 | `SERVICE_DISABLED` | — | product switch |
 | 503 | `DEPENDENCY_UNAVAILABLE` | `retryable` | wallet status or pricing snapshot unavailable (an unreadable usage count is not an error) |
@@ -1332,6 +1466,7 @@ Errors:
 | reversalTxnRef | string | Y | Y | | non-null only when `status = REVERSED` |
 | reversedAmountPoisha | int64 (poisha) | Y | Y | ≤ amountPoisha | non-null only when `status = REVERSED` |
 | refundedTotalPoisha | int64 (poisha) | Y | N | ≥ 0; 0 unless refunded | MERCHANT_PAYMENT |
+| billerId, billReference, msisdn, providerReceipt, token | as PaymentResult §5.1.0 | N | Y | | BILL_PAY / RECHARGE only; absent on other types (CR-TRANSACTION-1) |
 
 ```json
 { "txnRef": "PP26100900K3M9QX2A", "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11", "txnType": "P2P", "status": "REVERSED",
@@ -1479,6 +1614,91 @@ Errors: 400; 403; 404 (beneficiary wallet unknown; id not owned); 409 `STATE_CON
 | `POST /v1/internal/dev/fake-ledger/chaos` `{mode NONE\|LATENCY\|FAIL_BEFORE_POST\|FAIL_AFTER_POST\|UNAVAILABLE, rate, delayMs}` | echo | profiles `local`/`test` only |
 | `PUT /v1/internal/dev/wallet-cache/{walletId}` `{version, status, kycTier, walletType, categoryCode, flags}` | echo | writes `ws:` in local Redis cache; profiles `local`/`test` only |
 
+#### 5.1.14 `POST /v1/bills:enquire` (MVP, CR-TRANSACTION-1)
+
+- Actors: CUSTOMER with `X-Actor-Wallet-Id`. No `Idempotency-Key`, no persistence, no risk, no pricing. Product switch `FEATURE.BILL_PAY`. p99 20 ms.
+- Behaviour: catalogue read (BR-TX-93), biller checks (BR-TX-94; an MNO biller → 400 `OPERATOR_MISMATCH`, use recharge), then the simulated enquiry (BR-TX-100). ENQUIRY billers get the synthetic bill; OPEN / FIXED billers get their amount rules with the enquiry fields null.
+
+| Field (request) | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| billerId | uuid | Y | N | partnerId of a non-MNO BILLER | unknown → 404 `BILLER_NOT_FOUND` |
+| billReference | string | Y | N | 1..64; fully matches `referencePattern` | else 400 `BILL_REFERENCE_INVALID` |
+
+| Field (response 200 `BillEnquiryResult`) | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| billerId, billerCode, billReference | uuid / string / string | Y | N | | echo + catalogue code |
+| amountMode | enum{ENQUIRY, FIXED, OPEN} | Y | N | | from the catalogue |
+| customerName | string | Y | Y | ≤ 100 | ENQUIRY only (synthetic) |
+| dueAmountPoisha | int64 (poisha) | Y | Y | min..max, whole taka | ENQUIRY only |
+| dueDate | date | Y | Y | | ENQUIRY only (15th of the next Dhaka month) |
+| enquiryRef | string | Y | Y | `^SIM-ENQ-[0-9A-F]{16}$` | ENQUIRY only; valid for the Dhaka month of the enquiry |
+| fixedAmountPoisha | int64 (poisha) | Y | Y | | FIXED only |
+| minAmountPoisha, maxAmountPoisha | int64 (poisha) | Y | N | | from the catalogue |
+
+```json
+{ "billerId": "0192f9b0-0000-7000-8000-0000000000e1", "billerCode": "DESCO", "billReference": "1234567890", "amountMode": "ENQUIRY",
+  "customerName": "SIM CUSTOMER 7890", "dueAmountPoisha": 125000, "dueDate": "2026-11-15", "enquiryRef": "SIM-ENQ-3F9A0C7B21D4E856",
+  "fixedAmountPoisha": null, "minAmountPoisha": 1000, "maxAmountPoisha": 5000000 }
+```
+
+Errors: 400 `VALIDATION_FAILED` (`reason` `BILL_REFERENCE_INVALID`, `OPERATOR_MISMATCH`), 403, 404 `NOT_FOUND` `reason BILLER_NOT_FOUND`, 409 `STATE_CONFLICT` `reason BILLER_INACTIVE`, 422 `SERVICE_DISABLED`, 503 (catalogue unreadable). Never `transaction`.
+
+#### 5.1.15 `POST /v1/payments/bill-payment` (MVP, CR-TRANSACTION-1)
+
+- Actors: CUSTOMER, `X-Actor-Wallet-Id = customerWalletId`; any other actor → 403 (agent-assisted bill pay is R1+). `Idempotency-Key` required (it is the client reference, `clientReference`, OPEN D-13). p99 300 ms.
+- Pipeline: §7.4 steps 1–9 with step 1 = validation + catalogue (BR-TX-93..95, BR-TX-97) and step 8a = provider confirm (BR-TX-98..101).
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| customerWalletId | uuid | Y | N | type C | from |
+| billerId | uuid | Y | N | ACTIVE non-MNO BILLER | to = its catalogue `walletId` (type B) |
+| billReference | string | Y | N | 1..64, matches `referencePattern` | never logged in full |
+| amountPoisha | int64 (poisha) | Y | N | FIXED: = fixed; OPEN: min..max; ENQUIRY: = due amount | BR-TX-95 |
+| enquiryRef | string | N | Y | `^SIM-ENQ-[0-9A-F]{16}$` | ENQUIRY billers; absent → a fresh in-process enquiry is compared |
+
+```json
+{ "customerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "billerId": "0192f9b0-0000-7000-8000-0000000000e1",
+  "billReference": "1234567890", "amountPoisha": 125000, "enquiryRef": "SIM-ENQ-3F9A0C7B21D4E856" }
+```
+
+Response 200 (PaymentResult + biller fields):
+```json
+{ "txnRef": "BP26101400K7M2QX9D", "txnId": "0192fa10-0000-7000-8000-000000000001", "txnType": "BILL_PAY", "status": "COMPLETED", "failureCode": null,
+  "amountPoisha": 125000, "feePoisha": 500, "vatPoisha": 75, "totalDebitPoisha": 125575, "feeBearer": "PAYER", "currency": "BDT",
+  "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f9b1-0000-7000-8000-0000000000e1",
+  "createdAt": "2026-10-14T09:00:01.101Z", "completedAt": "2026-10-14T09:00:01.170Z",
+  "billerId": "0192f9b0-0000-7000-8000-0000000000e1", "billReference": "1234567890", "msisdn": null,
+  "providerReceipt": "SIM-BP-BP26101400K7M2QX9D", "token": null }
+```
+Errors: payment POST error table incl. the biller rows (no `REFUND_EXCEEDS_ORIGINAL`, no `MAKER_CHECKER_VIOLATION`). Provider refusal → 409 `STATE_CONFLICT` `reason PROVIDER_REJECTED` with `transaction` (`status FAILED`, `failureCode PROVIDER_REJECTED`, `providerReceipt null`).
+
+#### 5.1.16 `POST /v1/payments/recharge` (MVP, CR-TRANSACTION-1)
+
+- Actors: CUSTOMER, `X-Actor-Wallet-Id = customerWalletId`; others → 403. `Idempotency-Key` required. p99 300 ms. Operator derived from the MSISDN prefix (BR-TX-96).
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| customerWalletId | uuid | Y | N | type C | from |
+| msisdn | string | Y | N | `^01[3-9]\d{8}$` | else 400 `MSISDN_INVALID`; never logged in full |
+| operatorBillerId | uuid | N | Y | must equal the prefix operator | else 400 `OPERATOR_MISMATCH` |
+| rechargeType | enum{PREPAID, POSTPAID} | Y | N | ∈ operator `rechargeTypes` | else 400 |
+| amountPoisha | int64 (poisha) | Y | N | operator min..max (seed 1,000..100,000) | else 400 `BILL_AMOUNT_OUT_OF_RANGE` |
+
+```json
+{ "customerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "msisdn": "01712345678", "operatorBillerId": null, "rechargeType": "PREPAID", "amountPoisha": 10000 }
+```
+
+Response 200:
+```json
+{ "txnRef": "RC26101400P4N8W2ZA", "txnId": "0192fa20-0000-7000-8000-000000000001", "txnType": "RECHARGE", "status": "COMPLETED", "failureCode": null,
+  "amountPoisha": 10000, "feePoisha": 0, "vatPoisha": 0, "totalDebitPoisha": 10000, "feeBearer": "OPERATOR", "currency": "BDT",
+  "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f9b1-0000-7000-8000-0000000000e7",
+  "createdAt": "2026-10-14T09:05:00.101Z", "completedAt": "2026-10-14T09:05:00.160Z",
+  "billerId": "0192f9b0-0000-7000-8000-0000000000e7", "billReference": null, "msisdn": "01712345678",
+  "providerReceipt": "SIM-RC-RC26101400P4N8W2ZA", "token": null }
+```
+Errors: as §5.1.15.
+
 ### 5.2 Events produced
 
 | Topic | Key (= aggregateId) | Compacted / tombstones | Partitions dev/prod | Retention | eventTypes |
@@ -1500,14 +1720,14 @@ Envelope: kernel K4.1, `producer: "transaction-service"`, `eventVersion: 1`, `ag
 |---|---|---|---|---|---|
 | txnId | uuid | Y | N | | REVERSED/REFUNDED: the original's |
 | txnRef | string | Y | N | `^[A-Z]{2}\d{6}00[0-9A-HJKMNP-TV-Z]{8}$` (18) | REVERSED/REFUNDED: the original's |
-| txnType | enum | Y | N | 7 types | |
+| txnType | enum | Y | N | 9 types (`BILL_PAY`, `RECHARGE` added by CR-TRANSACTION-1) | |
 | status | enum | Y | N | `COMPLETED`, `FAILED`, `REVERSED`, `PARTIALLY_REFUNDED`, `REFUNDED` (per eventType) | |
 | channel | enum | Y | N | `X-Channel` values | |
 | initiatorActorType | enum | Y | N | 8 actor types | refund via approval: the maker's |
 | initiatorActorId | string | Y | N | ≤ 64 | |
 | clientReference | string | Y | N | ≤ 64 `[A-Za-z0-9_-]` | = `Idempotency-Key` of the creating request (OPEN D-13) |
 | fromWalletId / toWalletId | uuid | Y | N | | |
-| fromWalletType / toWalletType | enum{C, A, D, M, I} | Y | N | | |
+| fromWalletType / toWalletType | enum{C, A, D, M, I, B} | Y | N | `B` = biller settlement wallet (CR-TRANSACTION-1) | |
 | amountPoisha | int64 (poisha) | Y | N | > 0 | REVERSAL row: principal reversed |
 | feePoisha, vatPoisha | int64 (poisha) | Y | N | ≥ 0 | REVERSAL row: reversed (0 when not reversed) |
 | feeBearer | enum{PAYER, PAYEE, OPERATOR} | Y | N | never null | `PAYER` when no plan; REVERSAL row: the original's; `SHARED` reserved (OPEN D-03) |
@@ -1535,8 +1755,14 @@ Envelope: kernel K4.1, `producer: "transaction-service"`, `eventVersion: 1`, `ag
 | reverseCommission | bool | Y | Y | | non-null only on REVERSED; false when partial |
 | reversedAmountPoisha | int64 (poisha) | Y | Y | 0 < x ≤ amountPoisha | non-null only on REVERSED |
 | refundedTotalPoisha | int64 (poisha) | Y | Y | 0 < x ≤ amountPoisha | non-null only on REFUNDED; cumulative incl. this refund |
+| billerId | uuid | N | Y | | **optional, additive (CR-TRANSACTION-1)**; BILL_PAY / RECHARGE data only (COMPLETED, FAILED, REVERSED); absent otherwise |
+| billReference | string | N | Y | ≤ 64 | BILL_PAY only (null on RECHARGE) |
+| msisdn | string | N | Y | `^01[3-9]\d{8}$` | RECHARGE only (null on BILL_PAY); PII — consumers never log it in full |
+| providerReceipt | string | N | Y | ≤ 64 | non-null when the provider confirmed; null on FAILED |
 
-Reserved, not emitted: `vatOnCommissionPoisha` (OPEN D-02).
+Reserved, not emitted: `vatOnCommissionPoisha` (OPEN D-02). The electricity `token` is never published.
+
+**BILL_PAY / RECHARGE rows** (CR-TRANSACTION-1): `toWalletType = B`; the four optional fields above are present (unlike every other key, they are not required by the schema, so older v1 readers and fixtures stay valid). A provider refusal publishes, in one DB transaction, `TRANSACTION_COMPLETED` for the compensation REVERSAL row (`fromWalletType B`, `reasonCode SYSTEM_ERROR`, `approvalId null`, `initiatorActorType SYSTEM`, key = the biller wallet) and `TRANSACTION_FAILED` for the original (`failureCode PROVIDER_REJECTED`, `ledgerTransferIds` = the posted legs, `providerReceipt null`). No `TRANSACTION_REVERSED` is emitted for a compensation: the original never was COMPLETED.
 
 **REVERSAL rows** (`txnType = REVERSAL` on COMPLETED/FAILED): `amountPoisha` = principal reversed; fee/VAT/commission/AIT = amounts reversed (0 when not reversed); `commissionBeneficiaryWalletId` = the original's; `feeBearer` = the original's; `pricingPlanId`/`pricingPlanVersion`/`riskDecision`/`riskScore` = null.
 
@@ -1557,46 +1783,64 @@ Full envelope example (`TRANSACTION_COMPLETED`; examples for all four in `contra
     "reversalTxnRef": null, "reverseFee": null, "reverseCommission": null, "reversedAmountPoisha": null, "refundedTotalPoisha": null } }
 ```
 
+BILL_PAY `TRANSACTION_COMPLETED` `data` (envelope as above with `aggregateId` = Rahim's wallet; validates against the v1 schema):
+```json
+{ "txnId": "0192fa10-0000-7000-8000-000000000001", "txnRef": "BP26101400K7M2QX9D", "txnType": "BILL_PAY", "status": "COMPLETED",
+  "channel": "APP", "initiatorActorType": "CUSTOMER", "initiatorActorId": "0192f1aa-0001-7000-8000-0000000000a1", "clientReference": "bp-91c2",
+  "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "fromWalletType": "C", "toWalletId": "0192f9b1-0000-7000-8000-0000000000e1", "toWalletType": "B",
+  "amountPoisha": 125000, "feePoisha": 500, "vatPoisha": 75, "feeBearer": "PAYER", "commissionPoisha": 0, "aitPoisha": 0,
+  "commissionBeneficiaryWalletId": null, "pricingPlanId": "PLN-BILL-STD", "pricingPlanVersion": 1, "riskDecision": "ALLOW", "riskScore": 8,
+  "deviceId": "d-123", "purposeCode": null, "note": null, "merchantReference": null, "qrPayloadId": null, "requestId": null,
+  "reasonCode": null, "approvalId": null, "originalTxnRef": null, "failureCode": null,
+  "ledgerTransferIds": ["1b6f0c52-8e0a-4d2c-9a71-2f4e5d6c7b80", "2c7a1d63-9f1b-4e3d-8b82-3a5f6e7d8c91", "3d8b2e74-a02c-4f4e-9c93-4b6a7f8e9da2"],
+  "createdAt": "2026-10-14T09:00:01.101Z", "completedAt": "2026-10-14T09:00:01.170Z",
+  "reversalTxnRef": null, "reverseFee": null, "reverseCommission": null, "reversedAmountPoisha": null, "refundedTotalPoisha": null,
+  "billerId": "0192f9b0-0000-7000-8000-0000000000e1", "billReference": "1234567890", "msisdn": null, "providerReceipt": "SIM-BP-BP26101400K7M2QX9D" }
+```
+RECHARGE `TRANSACTION_FAILED` after a provider refusal (same shape): `txnType RECHARGE`, `status FAILED`, `toWalletType B`, `failureCode PROVIDER_REJECTED`, `ledgerTransferIds` non-empty, `billerId` = GP, `billReference null`, `msisdn "01712340000"`, `providerReceipt null`.
+
 `TRANSACTION_REVERSED` = the original's `data` with `status: REVERSED`, `reversalTxnRef: "RV26100900Q2D5M8XT"`, `reverseFee`, `reverseCommission`, `reversedAmountPoisha`. `TRANSACTION_REFUNDED` = the original MERCHANT_PAYMENT's `data` with `status: PARTIALLY_REFUNDED|REFUNDED` and `refundedTotalPoisha`. `TRANSACTION_FAILED` before the ledger has `ledgerTransferIds: []` and pricing fields carrying the evaluated values (0 / null if the refusal came before pricing).
 
 ### 5.3 Owned codes (mirror of `contracts/provided/codes.yaml`)
 
 | Kind | Content |
 |---|---|
-| Code sets | `txnType` (7); `paymentResultStatus` (COMPLETED, FAILED, INITIATED); `transactionStatus` (6); `failureCode` (14); `transactionDirection` (DEBIT, CREDIT); `merchantRefundRequestStatus` (6); `quoteTxnType` (5); `auditAction` (13); `anomalyKind` (3) |
-| Problem reasons | `VALIDATION_FAILED` / `INVALID_CURSOR` on `GET /v1/transactions`, `GET /v1/merchant-refund-requests`, `GET /v1/approvals`, `GET /v1/internal/admin/anomalies` |
+| Code sets | `txnType` (9: + `BILL_PAY`, `RECHARGE`); `paymentResultStatus` (COMPLETED, FAILED, INITIATED); `transactionStatus` (6); `failureCode` (15: + `PROVIDER_REJECTED`); `transactionDirection` (DEBIT, CREDIT); `merchantRefundRequestStatus` (6); `quoteTxnType` (7: + `BILL_PAY`, `RECHARGE`); `rechargeType` (PREPAID, POSTPAID); `auditAction` (13); `anomalyKind` (3) |
+| Problem reasons | `VALIDATION_FAILED` / `INVALID_CURSOR` on `GET /v1/transactions`, `GET /v1/merchant-refund-requests`, `GET /v1/approvals`, `GET /v1/internal/admin/anomalies`. CR-TRANSACTION-1: `NOT_FOUND` / `BILLER_NOT_FOUND`; `STATE_CONFLICT` / `BILLER_INACTIVE`, `PROVIDER_REJECTED` (with `transaction`); `VALIDATION_FAILED` / `BILL_REFERENCE_INVALID`, `BILL_AMOUNT_MISMATCH`, `BILL_AMOUNT_OUT_OF_RANGE`, `MSISDN_INVALID`, `OPERATOR_MISMATCH` — on `POST /v1/bills:enquire`, `/v1/payments/bill-payment`, `/v1/payments/recharge`, `/v1/payments/quote` as listed in `codes.yaml` |
 | Problem extensions | `transaction` (PaymentResult; whenever the intent was persisted); `limitCode` (string), `limitParty` (FROM\|TO), `remainingPoisha` (int64\|null), `remainingCount` (int32\|null), `resetsAt` (timestamp\|null) with `LIMIT_EXCEEDED`; `walletId` (uuid), `walletStatus` (status name) with `WALLET_NOT_TRANSACTABLE`; `remainingPoisha` (int64, never null) with `REFUND_EXCEEDS_ORIGINAL` |
 | Entity types (K5) | `MerchantRefund` |
 | Notification templates | none (this service sends no `notification.requests`) |
 | Reason codes | group "Reversal": `WRONG_TRANSFER`, `DISPUTE_UPHELD`, `SYSTEM_ERROR`, `FRAUD_CONFIRMED`; group "Merchant refund" (OPEN D-32): `CUSTOMER_RETURN`, `DUPLICATE_PAYMENT`, `ORDER_CANCELLED`, `PRICE_ADJUSTMENT`, `OTHER` |
-| txnRef prefixes | `PP`, `CI`, `CO`, `MP`, `MR`, `FT`, `RV` — format `{prefix}{yyMMdd}00{8 Crockford base32}` (18 chars), alphabet `0-9A-HJKMNP-TV-Z`, `yyMMdd` = Asia/Dhaka date of `createdAt`, reserved digits always `00` |
-| Product codes (K3.7) | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` |
+| txnRef prefixes | `PP`, `CI`, `CO`, `MP`, `MR`, `FT`, `RV`, `BP` (bill payment), `RC` (recharge) — format `{prefix}{yyMMdd}00{8 Crockford base32}` (18 chars), alphabet `0-9A-HJKMNP-TV-Z`, `yyMMdd` = Asia/Dhaka date of `createdAt`, reserved digits always `00` |
+| Product codes (K3.7) | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE` (names match admin's `FEATURE.BILL_PAY` / `FEATURE.RECHARGE`) |
 | Metrics | §9 |
 
 ### 5.4 Data contracts
 
-None provided. (Consumed data contracts: `wallet-status-cache` §6.3.1, `pricing-algorithm` §6.4.3, `pricing-golden-vectors` §6.4.4.)
+None provided. (Consumed data contracts: `wallet-status-cache` §6.3.1, `biller-catalogue-cache` §6.3.5, `pricing-algorithm` §6.4.3, `pricing-golden-vectors` §6.4.4.)
 
 ## 6. Consumed contracts (mirror of `contract.yaml → consumes`)
 
 | Producer | Artefact | Pinned (major / contractVersion) | Fields used | Why |
 |---|---|---|---|---|
-| ledger-service | `POST /v1/ledger/commands/post-p2p`, `post-cash-in`, `post-cash-out`, `post-merchant-payment`, `post-merchant-refund`, `post-float-transfer` | v1 / 1.0.0 | req `commandId, txnRef, fromAccountId, toAccountId, amountPoisha, pricing.*, constraints.destinationMaxBalancePoisha, metadata.channel, metadata.initiatorActorId`; res `commandId, result, rejectionCode, detail, transferIds, postedAt` | Move the money (pipeline step 7) |
-| ledger-service | `POST /v1/ledger/commands/post-reversal` | v1 / 1.0.0 | req `commandId, txnRef, originalCommandId, reverseFee, reverseCommission, releaseHoldCommandId, amountPoisha`; res as above | Reversal executor |
-| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.0.0 | `path.commandId`; res `commandId, found, result, rejectionCode, transfers[].transferId, transfers[].legIndex` | Sweeper, late-post verifier |
-| limits-risk-service | `POST /v1/risk/evaluate` | v1 / 1.0.0 | full request; res `decision, reasonCodes, riskScore, reservationId, receiverMaxBalancePoisha, usage.senderMonthlyCountForTxnType, violatedLimit.{limitCode, party, dimension, remainingValue, resetsAt}` | Limits + fraud + reservation (step 4) |
-| limits-risk-service | `POST /v1/limits/reservations/{txnId}:release` | v1 / 1.0.0 | `path.txnId`, `req.reasonCode`; res `txnId, released, state` | Release when no intent was committed |
-| limits-risk-service | `GET /v1/limits/wallets/{walletId}/usage` | v1 / 1.0.0 | `path.walletId`, `query.txnType`; res `items[].txnType, items[].direction, items[].monthlyCountUsed` | Quote free-allowance count (OPEN D-17) |
-| wallet-service | data `wallet-status-cache` | v1 / 1.0.0 | bucket/key/field rule, value `version, statusCode, kycTier, walletTypeCode, categoryCode, flags`, negative cache | Wallet status on the hot path |
-| wallet-service | `GET /v1/wallets/{walletId}/status` | v1 / 1.0.0 | `path.walletId`; res `walletId, version, status, kycTier, walletType, categoryCode, flags` | Cache-miss fallback |
+| ledger-service | `POST /v1/ledger/commands/post-p2p`, `post-cash-in`, `post-cash-out`, `post-merchant-payment`, `post-merchant-refund`, `post-float-transfer` | v1 / 1.1.0 | req `commandId, txnRef, fromAccountId, toAccountId, amountPoisha, pricing.*, constraints.destinationMaxBalancePoisha, metadata.channel, metadata.initiatorActorId`; res `commandId, result, rejectionCode, detail, transferIds, postedAt` | Move the money (pipeline step 7) |
+| ledger-service | `POST /v1/ledger/commands/post-bill-payment` (18), `post-recharge` (19) — CR-TRANSACTION-1 | v1 / 1.1.0 | as the payment commands above | Move the money of BILL_PAY / RECHARGE (step 7) |
+| ledger-service | `POST /v1/ledger/commands/post-reversal` | v1 / 1.1.0 | req `commandId, txnRef, originalCommandId, reverseFee, reverseCommission, releaseHoldCommandId, amountPoisha`; res as above | Reversal executor |
+| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.1.0 | `path.commandId`; res `commandId, found, result, rejectionCode, transfers[].transferId, transfers[].legIndex` | Sweeper, late-post verifier |
+| limits-risk-service | `POST /v1/risk/evaluate` | v1 / 1.1.0 | full request; res `decision, reasonCodes, riskScore, reservationId, receiverMaxBalancePoisha, usage.senderMonthlyCountForTxnType, violatedLimit.{limitCode, party, dimension, remainingValue, resetsAt}` | Limits + fraud + reservation (step 4) |
+| limits-risk-service | `POST /v1/limits/reservations/{txnId}:release` | v1 / 1.1.0 | `path.txnId`, `req.reasonCode`; res `txnId, released, state` | Release when no intent was committed |
+| limits-risk-service | `GET /v1/limits/wallets/{walletId}/usage` | v1 / 1.1.0 | `path.walletId`, `query.txnType`; res `items[].txnType, items[].direction, items[].monthlyCountUsed` | Quote free-allowance count (OPEN D-17) |
+| wallet-service | data `wallet-status-cache` | v1 / 1.1.0 | bucket/key/field rule, value `version, statusCode, kycTier, walletTypeCode, categoryCode, flags`, negative cache | Wallet status on the hot path |
+| wallet-service | data `biller-catalogue-cache` — CR-TRANSACTION-1 | v1 / 1.1.0 | keys `biller:{billerId}`, `biller:mno-prefix:{prefix}`, `biller:meta.state`; JSON `schema, billerId, billerCode, subType, category, walletId, referencePattern, amountMode, fixedAmountPoisha, minAmountPoisha, maxAmountPoisha, status, msisdnPrefixes, rechargeTypes` | Biller catalogue for bill pay, recharge, enquiry, quote |
+| wallet-service | `GET /v1/wallets/{walletId}/status` | v1 / 1.1.0 | `path.walletId`; res `walletId, version, status, kycTier, walletType, categoryCode, flags` | Cache-miss fallback |
 | wallet-service | codes `walletStatus`, `walletType`, `categoryCode` | 1.0.0 | all values | Direction, type and category rules |
-| wallet-service | `partner.events` `PARTNER_UPSERTED` | v1 / 1.0.0 | `partnerId, partnerType, subType, categoryCode, walletId, parentPartnerId, ancestorWalletIds, status, version, effectiveFrom` | Float hierarchy, refund maker-checker sub-type |
-| pricing-service | `fee.rules` `PRICING_PLAN_UPSERTED` (+ tombstones) | v1 / 1.0.0 | `planId, version, status, txnType, match, priority, effectiveFrom, effectiveTo, fee, feeBearer, vatBps, freeMonthlyCount, commission` | Pricing snapshot |
-| pricing-service | `GET /v1/pricing/plans` | v1 / 1.0.0 | `query.status, query.limit, query.cursor`; res `items, nextCursor` | Snapshot bootstrap |
-| pricing-service | data `pricing-algorithm` | v1 / 1.0.0 | `*` (every step implemented) | Identical evaluator |
-| pricing-service | data `pricing-golden-vectors` | v1 / 1.0.0 | `schemaVersion, catalogueVersion, rounding, outputFields, vectors[]` | Mandatory test vectors |
-| admin-service | `refdata.events` `REFDATA_UPSERTED` | v1 / 1.0.0 | `type, code, nameEn, nameBn, attributes, version, active` | Purpose/reason codes, product switches, inbound-before-KYC |
-| admin-service | inbound `approval.events` (3 types), `audit.events` | v1 / 1.0.0 | `*` (writer) | Maker-checker and audit trail |
+| wallet-service | `partner.events` `PARTNER_UPSERTED` | v1 / 1.1.0 | `partnerId, partnerType, subType, categoryCode, walletId, parentPartnerId, ancestorWalletIds, status, version, effectiveFrom` | Float hierarchy, refund maker-checker sub-type |
+| pricing-service | `fee.rules` `PRICING_PLAN_UPSERTED` (+ tombstones) | v1 / 1.1.0 | `planId, version, status, txnType, match, priority, effectiveFrom, effectiveTo, fee, feeBearer, vatBps, freeMonthlyCount, commission` | Pricing snapshot |
+| pricing-service | `GET /v1/pricing/plans` | v1 / 1.1.0 | `query.status, query.limit, query.cursor`; res `items, nextCursor` | Snapshot bootstrap |
+| pricing-service | data `pricing-algorithm` | v1 / 1.1.0 | `*` (every step implemented) | Identical evaluator |
+| pricing-service | data `pricing-golden-vectors` | v1 / 1.1.0 | `schemaVersion, catalogueVersion, rounding, outputFields, vectors[]` | Mandatory test vectors |
+| admin-service | `refdata.events` `REFDATA_UPSERTED` | v1 / 1.1.0 | `type, code, nameEn, nameBn, attributes, version, active` | Purpose/reason codes, product switches (incl. `FEATURE.BILL_PAY`, `FEATURE.RECHARGE`), inbound-before-KYC |
+| admin-service | inbound `approval.events` (3 types), `audit.events` | v1 / 1.1.0 | `*` (writer) | Maker-checker and audit trail |
 
 **Outbound headers on every call** (kernel K3.2): `X-Actor-Type: SERVICE`, `X-Actor-Id: transaction-service`, `X-Channel` = the inbound request's channel (`SYSTEM` for the sweeper, late-post verifier, bootstrap, event consumers and jobs), propagated `X-Correlation-Id` (jobs generate one). `X-Device-Id` is never forwarded; the device travels in bodies (`deviceId`). No actor context is forwarded by this service. Ledger commands additionally send `Idempotency-Key = commandId` (logged only by the ledger).
 
@@ -1614,9 +1858,9 @@ None provided. (Consumed data contracts: `wallet-status-cache` §6.3.1, `pricing
 
 ### 6.1 ledger-service
 
-#### 6.1.1 Payment commands (types 1–6)
+#### 6.1.1 Payment commands (types 1–6, 18, 19)
 
-`POST /v1/ledger/commands/post-p2p` (1), `post-cash-in` (2), `post-cash-out` (3), `post-merchant-payment` (4), `post-merchant-refund` (5), `post-float-transfer` (6) — one body shape. Pin v1 / 1.0.0. Called at pipeline step 7, on re-drive (BR-TX-34) and by approved refund execution.
+`POST /v1/ledger/commands/post-p2p` (1), `post-cash-in` (2), `post-cash-out` (3), `post-merchant-payment` (4), `post-merchant-refund` (5), `post-float-transfer` (6), and since ledger 1.1.0 (CR-TRANSACTION-1, MVP) `post-bill-payment` (18, principal code 1017) and `post-recharge` (19, principal code 1018) — one body shape. Pin v1 / 1.0.0 (commands 18 / 19: 1.1.0). Called at pipeline step 7, on re-drive (BR-TX-34) and by approved refund execution.
 
 **commandId derivation (restated for this caller).** Attempt 1 `commandId = txnId` (UUIDv7 generated before the idempotency claim). A new attempt is always a **new payment intent**: a new `Idempotency-Key` ⇒ new `txnId` ⇒ new `commandId`. The same `commandId` is re-sent only with the identical body rebuilt from the stored intent (re-drive). The `txnId` that posted is the one stored; `ledgerTransferIds` come from that command.
 
@@ -1625,7 +1869,7 @@ Body sent (subset of the ledger's contract; every field listed is sent):
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | commandId | uuid | Y | N | stable across retries | = `txnId` |
-| txnRef | string | Y | N | 1..32 `[A-Z0-9-]` | `PP`/`CI`/`CO`/`MP`/`MR`/`FT` |
+| txnRef | string | Y | N | 1..32 `[A-Z0-9-]` | `PP`/`CI`/`CO`/`MP`/`MR`/`FT`/`BP`/`RC` |
 | fromAccountId | uuid | Y | N | type per guard table; ≠ `toAccountId` | internal from |
 | toAccountId | uuid | Y | N | type per guard table | internal to |
 | amountPoisha | int64 (poisha) | Y | N | 1..10^13 | principal |
@@ -1668,15 +1912,15 @@ Response used (single command response, HTTP 200 for OK/EXISTS/REJECTED):
 Ledger rules this service relies on (restated):
 - Same `commandId` + same body (canonical JSON without `metadata`) → `EXISTS` with the original result; different body → HTTP `409 IDEMPOTENCY_CONFLICT`. A `REJECTED` result is final for its `commandId` (journaled synchronously, replayed on retry) (OPEN D-16).
 - HTTP 400 `VALIDATION_FAILED` = structural (nothing journaled; caller bug, never retried unchanged); `REJECTED INVALID_AMOUNT` = semantic (journaled, final). 403 = caller not allowed.
-- Account-type guards (mismatch → `REJECTED OTHER`, `detail: ACCOUNT_TYPE_MISMATCH`): p2p 100→100; cash-in 110→100; cash-out 100→110; merchant-payment 100→130; merchant-refund 130→100; float-transfer {110,120}→{110,120}; commission beneficiary of types 1–6 ∈ {110, 120}. Unknown account → `ACCOUNT_NOT_FOUND`; closed → `ACCOUNT_CLOSED` (OPEN D-16).
-- Leg templates (linked chain, all-or-nothing): leg 0 from→to principal (code 1000 + type); leg 1 bearer account (PAYER → from, PAYEE → to) → FEE_INCOME fee (2001, if fee > 0); leg 2 bearer → VAT_PAYABLE vat (2002, if vat > 0); leg 3 commissionSource → beneficiary `commission − ait` (2003, if > 0); leg 4 commissionSource → AIT_PAYABLE ait (2004, if > 0); legs 5–8 technical balance-bounds legs when `destinationMaxBalancePoisha` is set (never in `transferIds`). Leg indexes are fixed by position.
+- Account-type guards (mismatch → `REJECTED OTHER`, `detail: ACCOUNT_TYPE_MISMATCH`): p2p 100→100; cash-in 110→100; cash-out 100→110; merchant-payment 100→130; merchant-refund 130→100; float-transfer {110,120}→{110,120}; bill-payment and recharge 100→150 (`BILLER_WALLET`); commission beneficiary of types 1–6, 18, 19 ∈ {110, 120} (no commission on 18 / 19 in the MVP seeds). Unknown account → `ACCOUNT_NOT_FOUND`; closed → `ACCOUNT_CLOSED` (OPEN D-16).
+- Leg templates (linked chain, all-or-nothing): leg 0 from→to principal (code 1000 + type for 1–6; 1017 for 18, 1018 for 19); leg 1 bearer account (PAYER → from, PAYEE → to) → FEE_INCOME fee (2001, if fee > 0); leg 2 bearer → VAT_PAYABLE vat (2002, if vat > 0); leg 3 commissionSource → beneficiary `commission − ait` (2003, if > 0); leg 4 commissionSource → AIT_PAYABLE ait (2004, if > 0); legs 5–8 technical balance-bounds legs when `destinationMaxBalancePoisha` is set (never in `transferIds`). Leg indexes are fixed by position.
 - Max-balance semantics: after the whole chain, `available(to) = credits_posted − debits_posted − debits_pending ≤ L`; held funds and pending credits do not count; breach → `REJECTED MAX_BALANCE_EXCEEDED`.
 - Transfer ID derivation (used by the Fake ledger): `transferId(commandId, legIndex)` = first 16 bytes of `SHA-256(uuidBytes(commandId) || uint8(legIndex))`, big-endian u128 rendered as canonical UUID; if 0 or 2^128−1 → `legIndex += 128` and retry. Vector: commandId `0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11` legs 0/1/2 → `fc214b7c-f80c-8143-4f0e-107e2518a302`, `3c9f8cd0-5cc5-1049-aa02-80dfc5c61a13`, `586bb84d-c6dc-fcd7-62fc-a264483349f4`.
 - System accounts (fixed IDs used by the Fake): FEE_INCOME `…0200`, VAT_PAYABLE `…0210`, COMMISSION_PAYABLE `…0220`, AIT_PAYABLE `…0230` (all `00000000-0000-0000-0000-000000000xxx`).
 
 Outcome mapping (BR-TX-44): see §7.4.
 
-Stubs: `stubs/ledger-service/post-{p2p,cash-in,cash-out,merchant-payment,merchant-refund,float-transfer}-{ok,exists,insufficient,max-balance,account-closed,timeout,503,400}.json`. "Magic amount" convention shared with the Fake: `amountPoisha ≥ 9000000` → `REJECTED INSUFFICIENT_FUNDS`; `amountPoisha = 8888800` → `REJECTED MAX_BALANCE_EXCEEDED`; `333300` → `fixedDelay 2000` (timeout). Stub transfer IDs are canonical UUID text copied from the ledger vectors, `detail: null`.
+Stubs: `stubs/ledger-service/post-{p2p,cash-in,cash-out,merchant-payment,merchant-refund,float-transfer,bill-payment,recharge}-{ok,exists,insufficient,max-balance,account-closed,timeout,503,400}.json` (the `bill-payment` / `recharge` ones are generated by the orchestrator's snapshot). "Magic amount" convention shared with the Fake: `amountPoisha ≥ 9000000` → `REJECTED INSUFFICIENT_FUNDS`; `amountPoisha = 8888800` → `REJECTED MAX_BALANCE_EXCEEDED`; `333300` → `fixedDelay 2000` (timeout). Stub transfer IDs are canonical UUID text copied from the ledger vectors, `detail: null`.
 
 #### 6.1.2 `POST /v1/ledger/commands/post-reversal` (type 7)
 
@@ -1686,7 +1930,7 @@ Pin v1 / 1.0.0. `commandId` = reversal `txnId` (new attempt = new key ⇒ new `t
 |---|---|---|---|---|---|
 | commandId | uuid | Y | N | | = reversal txnId |
 | txnRef | string | Y | N | 1..32 | `RV…` |
-| originalCommandId | uuid | Y | N | original command type ∈ {1–6} for this caller | = original `txnId` |
+| originalCommandId | uuid | Y | N | original command type ∈ {1–6, 18, 19} for this caller (18 / 19 reversible since ledger 1.1.0) | = original `txnId` |
 | reverseFee | bool | Y | N | false when partial | mirrors original legs 1–2 |
 | reverseCommission | bool | Y | N | false when partial | mirrors original legs 3–4 |
 | releaseHoldCommandId | uuid | N | Y | OPEN support hold (`DISPUTE_HOLD`/`WRONG_TRANSFER_HOLD`) on the original leg-0 credit account | omitted when none; else `REJECTED HOLD_NOT_FOUND` |
@@ -1734,13 +1978,13 @@ Request sent (wallet data from the status cache):
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | txnId | uuid | Y | N | UUIDv7 | = reservation id = ledger `commandId` |
-| txnType | enum | Y | N | P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER | |
+| txnType | enum | Y | N | P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER; BILL_PAY, RECHARGE (accepted by limits-risk 1.1.0; CR-TRANSACTION-1) | |
 | channel | enum | Y | N | = inbound `X-Channel` | |
 | deviceId | string | N | Y | ≤ 128 | from `X-Device-Id` |
 | amountPoisha | int64 (poisha) | Y | N | 1..10^13 | |
 | from / to | object Party | Y | N | | SEND / RECEIVE |
 | Party.walletId | uuid | Y | N | | |
-| Party.walletType | enum{C, A, D, M, I} | Y | N | | |
+| Party.walletType | enum{C, A, D, M, I, B} | Y | N | `B` only as the `to` party of BILL_PAY / RECHARGE (limits-risk 1.1.0) | |
 | Party.kycTier | int32 | Y | N | 0..2 | |
 | Party.categoryCode | int32 | Y | N | category code set | |
 | Party.flags | int32 | Y | N | 0..31 | |
@@ -1861,7 +2105,7 @@ Errors: `404` (unknown or not READY → write `wsn:`, reply `404 NOT_FOUND`), `5
 | `PENDING_CLOSURE` | `Q` | not via this service (closure payout/redemption only) | no |
 | `CLOSED` | `Z` | no | no |
 
-Wallet types: `C` CUSTOMER, `A` AGENT, `D` DISTRIBUTOR, `M` MERCHANT, `I` INSTITUTION. KYC tier 0..2. Category codes (OPEN D-21): customer `0`; agent `101` RETAIL, `102` SUPER_AGENT, `103` MERCHANT_AGENT, `104` BANK_AGENT; distributor `201` MASTER, `202` DISTRIBUTOR, `203` SUB; merchant `3000 + d×100 + g` (`d`: MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4; `g` = MCC group 01..07, 99), e.g. MICRO grocery `3101`; institution `401`..`404`. Flags bitmask: 1 AML_WATCH, 2 PIN_RESET_COOLING, 4 PRE_REGISTERED, 8 HAS_OPEN_LIEN, 16 NEW_DEVICE_COOLING (passed to risk unchanged). An unknown status or type code in the cache is treated as a corrupt value (miss → status API); an unknown code from the API → `503 DEPENDENCY_UNAVAILABLE` and counted — never treated as allowed.
+Wallet types: `C` CUSTOMER, `A` AGENT, `D` DISTRIBUTOR, `M` MERCHANT, `I` INSTITUTION, `B` BILLER (wallet-service 1.1.0; biller settlement wallets, category codes 501..505). KYC tier 0..2. Category codes (OPEN D-21): customer `0`; agent `101` RETAIL, `102` SUPER_AGENT, `103` MERCHANT_AGENT, `104` BANK_AGENT; distributor `201` MASTER, `202` DISTRIBUTOR, `203` SUB; merchant `3000 + d×100 + g` (`d`: MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4; `g` = MCC group 01..07, 99), e.g. MICRO grocery `3101`; institution `401`..`404`. Flags bitmask: 1 AML_WATCH, 2 PIN_RESET_COOLING, 4 PRE_REGISTERED, 8 HAS_OPEN_LIEN, 16 NEW_DEVICE_COOLING (passed to risk unchanged). An unknown status or type code in the cache is treated as a corrupt value (miss → status API); an unknown code from the API → `503 DEPENDENCY_UNAVAILABLE` and counted — never treated as allowed.
 
 #### 6.3.4 `partner.events` `PARTNER_UPSERTED` (compacted)
 
@@ -1870,8 +2114,8 @@ Pin v1 / 1.0.0. Group `transaction-service.partner` (OPEN D-30). Fixtures: `fixt
 | Field used | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | partnerId | uuid | Y | N | | = key |
-| partnerType | enum | Y | N | AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION | |
-| subType | enum | Y | N | AGENT RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR MASTER\|DISTRIBUTOR\|SUB; INSTITUTION EMPLOYER\|GOVERNMENT\|NGO\|OTHER | float pairs, refund maker-checker |
+| partnerType | enum | Y | N | AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION; BILLER from wallet-service 1.1.0 (stored, not used for float or refunds) | |
+| subType | enum | Y | N | AGENT RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR MASTER\|DISTRIBUTOR\|SUB; INSTITUTION EMPLOYER\|GOVERNMENT\|NGO\|OTHER; BILLER UTILITY\|EDUCATION\|GOVT_FEE\|INTERNET_TV\|MNO | float pairs, refund maker-checker |
 | categoryCode | int32 | Y | N | | stored |
 | walletId | uuid | Y | Y | null until ACTIVE | null → no wallet-keyed effect; version still recorded |
 | parentPartnerId | uuid | Y | Y | = ancestorPartnerIds[0] | |
@@ -1881,6 +2125,22 @@ Pin v1 / 1.0.0. Group `transaction-service.partner` (OPEN D-30). Fixtures: `fixt
 | effectiveFrom | timestamp | Y | N | | stored |
 
 Processing: one DB transaction = `processed_event` insert + version-guarded upsert (`partner_link` by `walletId`, or `partner_version_seen` when `walletId` is null). Unknown eventType → ignored + `bitspay_consumer_events_ignored_total{reason=UNKNOWN_TYPE}`; null value → ignored (`NULL_VALUE`); 5 retries then `partner.events.dlq` (kernel K4.3). Money-path rule: only `ACTIVE` counts as active, except a float RETURN (child → parent) where the child may be `ACTIVE` or `PENDING_TERMINATION` and the parent must be `ACTIVE`.
+
+#### 6.3.5 Data contract `biller-catalogue-cache` v1 (Redis cache cluster; MVP, CR-TRANSACTION-1)
+
+Pin version 1 / producer contractVersion 1.1.0 (CR-WALLET-1). Writer wallet-service (partner module); this service reads only. Same Redis cache cluster as `wallet-status-cache`.
+
+| Key | Value | Used for |
+|---|---|---|
+| `biller:{billerId}` | JSON, `schema = 1` | bill enquiry, bill payment, recharge, BILL_PAY / RECHARGE quotes |
+| `biller:mno-prefix:{prefix}` | operator `billerId` | recharge operator derivation; `{prefix}` = the first 3 digits of the 11-digit local MSISDN (`01712345678` → `017`) |
+| `biller:meta` field `state` | `EMPTY` / `LOADING` / `READY` | on a miss only: READY → the biller is unknown (404); otherwise the cache is not loaded (503) |
+
+Fields used from the biller JSON (`fieldsUsed`): `schema`, `billerId`, `billerCode`, `subType`, `category`, `walletId` (the credit account of commands 18 / 19), `referencePattern`, `amountMode`, `fixedAmountPoisha`, `minAmountPoisha`, `maxAmountPoisha`, `status`, `msisdnPrefixes`, `rechargeTypes`. Not used in the MVP: names, labels, `logoKey`, `categoryCode`, `feeBearer` (the pricing plan decides the fee bearer, OPEN TX-MVP-5), `denominationsPoisha`, `version`, `updatedAt`.
+
+Reader rules (restated from the producer's §5): payable only when `status = ACTIVE` (any other or unknown value → `409 BILLER_INACTIVE`); unknown `subType`, `category` or `amountMode` → not payable (`409 BILLER_INACTIVE`, metric); the reference must **fully** match `referencePattern` (compiled once per `billerId` + `version`, cached in-process); a prefix hit is accepted only if the biller's `subType = MNO` and the prefix is in its `msisdnPrefixes`, otherwise it is a miss; a value that does not parse or has `schema ≠ 1` → `503` + `bitspay_transaction_biller_catalogue_errors_total{kind=corrupt}` (never guessed). The producer's cache-miss fallback `GET /v1/billers/{billerId}` is **not** used in the MVP (OPEN TX-MVP-3): a miss with `biller:meta.state = READY` → `404 BILLER_NOT_FOUND` (`400 MSISDN_INVALID` for a prefix), any other miss → `503`. Redis cache unavailable → `503 DEPENDENCY_UNAVAILABLE`.
+
+Test vectors: the producer's §6 vectors (prefix derivation, `DESCO` reference `12345678` matches, `1234567` does not) are copied into `src/test/resources/billers/` from the consumed snapshot once the orchestrator has taken it.
 
 ### 6.4 pricing-service
 
@@ -1897,7 +2157,7 @@ PlanJson fields used (`data`):
 | planId | string | Y | N | `^PLN-[A-Z0-9-]{2,60}$` | Kafka key |
 | version | int32 | Y | N | ≥ 1 | |
 | status | enum{ACTIVE, EXPIRED} | Y | N | | keep only ACTIVE |
-| txnType | enum | Y | N | 7 types | |
+| txnType | enum | Y | N | 7 types; `BILL_PAY`, `RECHARGE` plans from pricing-service 1.1.0 (CR-TRANSACTION-1; pin moved by the orchestrator) | unknown txnType → plan ignored |
 | match | object | Y | N | all five keys present | |
 | match.channel | enum | Y | Y | `X-Channel` values | null = any |
 | match.payerWalletType | enum{C, A, D, M, I} | Y | Y | | null = any |
@@ -1961,7 +2221,7 @@ Pin version 1 / 1.0.0. pricing-service and transaction-service implement this al
 
 Inputs: `txnType`, `channel`, `amountPoisha`, `payer{walletType, kycTier, categoryCode}`, `payee{walletType, kycTier, categoryCode}`, `usage.senderMonthlyCountForTxnType` (before this txn), `at`.
 
-0. **Resolved category**: `categoryCode` = `payee.categoryCode` when the payee wallet type ∈ {`A`, `D`, `M`, `I`}, else `payer.categoryCode` (CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER → payee; CASH_IN, MERCHANT_REFUND → payer; P2P → 0).
+0. **Resolved category**: `categoryCode` = `payee.categoryCode` when the payee wallet type ∈ {`A`, `D`, `M`, `I`}, else `payer.categoryCode` (CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER → payee; CASH_IN, MERCHANT_REFUND → payer; P2P → 0; BILL_PAY, RECHARGE (payee `B`) → payer, i.e. 0 — pricing-algorithm 1.1.0 keeps the steps unchanged).
 1. Candidates = plans with `status = ACTIVE`, same `txnType`, `effectiveFrom ≤ at < effectiveTo (or ∞)` (`effectiveTo` exclusive), and every non-null `match` field equal to the transaction's value (`categoryCode` vs the resolved category).
 2. Pick highest `priority`; tie → most non-null `match` fields; tie → highest `version`; tie → lexicographically smallest `planId`. **None** → `{planId: null, planVersion: null, feePoisha: 0, vatPoisha: 0, feeBearer: null, commissionPoisha: 0, aitPoisha: 0, commissionSource: null, commissionBeneficiary: null}` — stop.
 3. If `freeMonthlyCount > 0` and `usage.senderMonthlyCountForTxnType < freeMonthlyCount` → fee = 0 (commission still computed on amount-based types).
@@ -2042,13 +2302,13 @@ Processing: `processed_event` + version-guarded upsert of `refdata_item` in one 
 | `BENEFICIARY_CREATED` / `_UPDATED` / `_DELETED` | Beneficiary / id | nickname, txnType (beneficiary wallet id allowed) |
 | `ANOMALY_RESOLVED` | TxnAnomaly / id | `{resolvedAt: null}` → `{resolution (≤ 140)}` |
 
-Per-payment exception: no `AUDIT_RECORDED` for customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER — governance chains `txn.events` (OPEN D-05).
+Per-payment exception: no `AUDIT_RECORDED` for customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE, nor for the automatic compensation REVERSAL of a BILL_PAY / RECHARGE (BR-TX-101) — governance chains `txn.events` (OPEN D-05).
 
 ### 6.7 Reference data read (refdata items and fallbacks)
 
 | Item | Use | Fallback until received |
 |---|---|---|
-| `SYSTEM_PARAM FEATURE.{P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL}` | product switch (kernel K3.7, BR-TX-06) | allowed (config decides) |
+| `SYSTEM_PARAM FEATURE.{P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, BILL_PAY, RECHARGE}` | product switch (kernel K3.7, BR-TX-06); all enabled in the MVP | allowed (config decides) |
 | `SYSTEM_PARAM WALLET.ALLOW_INBOUND_BEFORE_KYC` | credit to `P` wallets | `bitspay.txn.allowInboundBeforeKyc` = false |
 | `PURPOSE_CODE` (all) | P2P `purposeCode` validation | empty projection → any value accepted + `bitspay_transaction_purpose_unvalidated_total` |
 | `REASON_CODE` (Reversal + Merchant refund groups) | refund/reversal `reasonCode` | reversal: closed list in code; refund: Merchant refund group list in code until the projection is non-empty |
@@ -2069,9 +2329,11 @@ No refdata bootstrap call is made; the fallbacks above make the service correct 
 | MERCHANT_PAYMENT | MP | CUSTOMER; actor wallet = `customerWalletId` | C | M | A, C | A, D, X | yes | MERCHANT_PAYMENT | `post-merchant-payment` / 1004 | if risk returns it |
 | MERCHANT_REFUND | MR | MERCHANT (actor wallet = original `toWalletId`); STAFF via approval only | M | C | A, C | A, D, X, P* | yes | MERCHANT_REFUND | `post-merchant-refund` / 1005 | if risk returns it |
 | FLOAT_TRANSFER | FT | DISTRIBUTOR/AGENT (actor wallet = `fromWalletId`, direct parent/child); STAFF `OPS_CHECKER`/`FIN_CHECKER` | D or A | A or D (pairs BR-TX-55) | A, C | A, D, X | yes | FLOAT_TRANSFER | `post-float-transfer` / 1006 | if risk returns it |
-| REVERSAL | RV | SERVICE `support-service` | original to | original from | not checked (ledger rejects closed) | not checked | no | — (no pricing) | `post-reversal` / 1013 | never |
+| REVERSAL | RV | SERVICE `support-service`; SYSTEM `transaction-service` for a BILL_PAY / RECHARGE compensation (BR-TX-101) | original to | original from | not checked (ledger rejects closed) | not checked | no | — (no pricing) | `post-reversal` / 1013 | never |
+| BILL_PAY **[MVP]** | BP | CUSTOMER; actor wallet = `customerWalletId` | C | B (catalogue `walletId` of a non-MNO biller) | A, C | A, D, X | yes | BILL_PAY | `post-bill-payment` (18) / 1017 | if risk returns it |
+| RECHARGE **[MVP]** | RC | CUSTOMER; actor wallet = `customerWalletId` | C | B (catalogue `walletId` of the MNO derived from the MSISDN) | A, C | A, D, X | yes | RECHARGE | `post-recharge` (19) / 1018 | if risk returns it |
 
-Never allowed for any type (except REVERSAL): debit from `P`, `D`, `X`, `F`, `Q`, `Z`; credit to `C`, `F`, `Q`, `Z` (and `P` unless P*). Institution wallets (`I`) are never a party here (disbursement-service posts directly).
+Never allowed for any type (except REVERSAL): debit from `P`, `D`, `X`, `F`, `Q`, `Z`; credit to `C`, `F`, `Q`, `Z` (and `P` unless P*). Institution wallets (`I`) are never a party here (disbursement-service posts directly). Biller wallets (`B`) are only ever the to-side of BILL_PAY / RECHARGE (and the from-side of their REVERSAL); a `B` wallet anywhere else → `400 VALIDATION_FAILED` (BR-TX-03).
 
 ### 7.2 Validation, wallet status and risk
 
@@ -2080,7 +2342,7 @@ Never allowed for any type (except REVERSAL): debit from `P`, `D`, `X`, `F`, `Q`
 - **BR-TX-03** Wallet types must match §7.1. Types come from the status cache, never from the request. Mismatch → `400 VALIDATION_FAILED` (`field` = the body field, message names the type). Not persisted.
 - **BR-TX-04** Direction rules per §7.1, else `422 WALLET_NOT_TRANSACTABLE` with `walletId` and `walletStatus` (status **name**, e.g. `DEBIT_BLOCKED`); persisted FAILED (`resolved_by = PRE_LEDGER`, `riskDecision` null) → `TRANSACTION_FAILED`. No risk call is made, so no reservation exists.
 - **BR-TX-05** Unknown wallet (`wsn:` hit or wallet-service 404) → `404 NOT_FOUND`; not persisted. Cache value that fails to parse → miss (metric).
-- **BR-TX-06** Product switch (kernel K3.7): allowed ⇔ `bitspay.features.<PRODUCT>.enabled` **and** (no `FEATURE.<PRODUCT>` received **or** its `enabled = true`) **and** (`channels` empty **or** `X-Channel ∈ channels`). Else `422 SERVICE_DISABLED` before step 2 (no claim, nothing stored). Applies to quote (for the quoted product), payments, refund requests, approvals' execution (MERCHANT_REFUND) and reversals (REVERSAL).
+- **BR-TX-06** Product switch (kernel K3.7): allowed ⇔ `bitspay.features.<PRODUCT>.enabled` **and** (no `FEATURE.<PRODUCT>` received **or** its `enabled = true`) **and** (`channels` empty **or** `X-Channel ∈ channels`). Else `422 SERVICE_DISABLED` before step 2 (no claim, nothing stored). Applies to quote (for the quoted product), payments, refund requests, approvals' execution (MERCHANT_REFUND), reversals (REVERSAL; not to the automatic compensation of BR-TX-101, which always runs) and bill enquiry (BILL_PAY).
 - **BR-TX-07** `purposeCode` (P2P only; other types → 400 if present): when the PURPOSE_CODE projection is non-empty it must be an active code whose `appliesTo` contains `P2P` (else 400); when `requiresNote = true`, `note` is mandatory (else 400). Empty projection → accepted + `bitspay_transaction_purpose_unvalidated_total`. `note` ≤ 140 chars, control characters stripped, never logged.
 - **BR-TX-08** Risk decision mapping (persisted FAILED unless stated):
 
@@ -2111,7 +2373,7 @@ Never allowed for any type (except REVERSAL): debit from `P`, `D`, `X`, `F`, `Q`
 - **BR-TX-22** Slab lookup: first slab with `fromPoisha ≤ amount ≤ (toPoisha ?? ∞)`; a gap (invalid plan) → no fee from that plan's slab = plan treated as invalid → evaluation error metric and the plan is skipped at load time.
 - **BR-TX-23** Golden vectors: every `tier: CATALOGUE` vector (G1–G12, X1, X2, X6, X7, X8, X9) must pass in `pricing_goldenVectors_all`; the file is byte-identical to the pinned snapshot (checksum test). The evaluator is never "improved" locally; a difference is a re-pin of `pricing-algorithm`.
 - **BR-TX-24** Worked example G2 (Karim's cash-out 50,000 at Salma, `PLN-CASHOUT-STD`): fee = hev(50000 × 150 / 10000) = 750; VAT = hev(750 × 1500 / 10000) = hev(112.5) = 112; commission gross = hev(750 × 4000 / 10000) = 300; AIT = hev(300 × 1000 / 10000) = 30; net to Salma (PAYEE) = 270 from FEE_INCOME; total debit = 50000 + 750 + 112 = 50,862.
-- **BR-TX-16** Quote actors and validation: as the quoted payment (BR-TX-01..06, float pair/hierarchy BR-TX-55); `txnType` ∈ {P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER} else 400. No idempotency claim, no persistence, no risk evaluate, no reservation.
+- **BR-TX-16** Quote actors and validation: as the quoted payment (BR-TX-01..06, float pair/hierarchy BR-TX-55; BILL_PAY / RECHARGE: BR-TX-93, BR-TX-94 without the reference check, BR-TX-95 range / fixed rule only, BR-TX-97 parties, with `billerId` in place of `toWalletId`); `txnType` ∈ {P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE} else 400. No idempotency claim, no persistence, no risk evaluate, no reservation.
 - **BR-TX-17** Quote usage: `GET /v1/limits/wallets/{fromWalletId}/usage?txnType={txnType}` (300 ms, no retry); `usage = monthlyCountUsed` of the `SEND` item. On any failure (timeout, 5xx/503, 404, missing item) → evaluate with `usage = plan.freeMonthlyCount` (i.e. without allowance) and `feeIsUpperBound = true`; metric `bitspay_transaction_quote_usage_unavailable_total`. The usage call is skipped when the chosen plan has `freeMonthlyCount = 0` (`feeIsUpperBound = false`).
 - **BR-TX-18** Quote output: `feeBearer` never null (no plan → `PAYER`); `totalDebitPoisha` per BR-TX-13; `creditToPayeePoisha = amount − (feeBearer = PAYEE ? fee + vat : 0)`; `pricingPlanId/Version` from the evaluator; `quotedAt = at` = server now.
 - **BR-TX-19** Quote errors never carry `transaction`; an unreadable usage count is never an error.
@@ -2147,7 +2409,7 @@ Never allowed for any type (except REVERSAL): debit from `P`, `D`, `X`, `F`, `Q`
 
 - **BR-TX-45** Events are written only in the outcome transaction (or the PRE_LEDGER FAILED insert), never outside a DB transaction. Kafka key = `fromWalletId` of the transaction in `data` (original's for REVERSED/REFUNDED).
 
-Pipeline (all payment types; REVERSAL skips steps 3–5):
+Pipeline (all payment types; REVERSAL skips steps 3–5; step 1 of BILL_PAY / RECHARGE includes the catalogue read BR-TX-93):
 
 | Step | What | Store / dependency | On failure |
 |---|---|---|---|
@@ -2158,6 +2420,7 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 | 5 | Pricing (in-memory, uses `usage` from step 4) | snapshot | not ready → 503 + release |
 | 6 | Insert `txn_intent` INITIATED (+ 7-day look-back) | Postgres | DB down → 503 + release |
 | 7 | Ledger command (`commandId = txnId`) | ledger-service | BR-TX-44 |
+| 8a | BILL_PAY / RECHARGE only: provider confirm (in-process `SimulatedBillerClient`) | — | REJECTED → compensation BR-TX-101 |
 | 8 | One DB transaction: conditional UPDATE + outbox `txn.events` (+ refund/reversal side effects, + `audit.events` where required) | Postgres | DB down → reply 503 with `INITIATED`; sweeper resolves |
 | 9 | Reply 200 (COMPLETED) or the mapped problem with `transaction` | — | — |
 
@@ -2194,7 +2457,7 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 
 - **BR-TX-70** Leadership: `pg_try_advisory_lock(71020000)` on a dedicated connection; one leader across pods; lock lost ⇒ stop the loop. Late-post verifier uses `71020001`.
 - **BR-TX-71** Each pass: `status = 'INITIATED' AND created_at < now() − sweepAfter (30 s) AND created_at > now() − lookback (7 d)` ordered by `created_at`, limit 500. Rows older than `stuckAlertAfter` (5 min) also get anomaly `STUCK_INITIATED` (once).
-- **BR-TX-72** Lookup interpretation order: `result = REJECTED` → FAILED with the BR-TX-44 mapping (whatever `found` says); `found = true` and `result ∈ {OK, EXISTS}` → COMPLETED (`resolved_by = SWEEPER`, transfer IDs ordered by `legIndex`); otherwise not posted: `sweep_attempts = 0` → set `sweep_attempts = 1`, `last_swept_at = now`; `sweep_attempts ≥ 1` and `last_swept_at ≤ now − failRecheckAfter (60 s)` → FAILED `LEDGER_NOT_POSTED`. Refund/reversal side effects on the original are applied exactly as on the request path (shared `OutcomeRecorder`).
+- **BR-TX-72** Lookup interpretation order: `result = REJECTED` → FAILED with the BR-TX-44 mapping (whatever `found` says); `found = true` and `result ∈ {OK, EXISTS}` → COMPLETED (`resolved_by = SWEEPER`, transfer IDs ordered by `legIndex`); otherwise not posted: `sweep_attempts = 0` → set `sweep_attempts = 1`, `last_swept_at = now`; `sweep_attempts ≥ 1` and `last_swept_at ≤ now − failRecheckAfter (60 s)` → FAILED `LEDGER_NOT_POSTED`. Refund/reversal side effects on the original are applied exactly as on the request path (shared `OutcomeRecorder`). BILL_PAY / RECHARGE originals follow BR-TX-102 (provider confirm or compensation before any final state).
 - **BR-TX-73** Ledger lookup error → skip the row; metric; never FAILED on error.
 - **BR-TX-74** Late-post verifier: rows `FAILED` with `resolved_by = SWEEPER` and `completed_at` 10–15 min ago are looked up once more; found → anomaly `LATE_POST_DETECTED`, `bitspay_transaction_late_post_detected_total`, critical alert; no automatic state change (ops resolves via support reversal or reconciliation).
 - **BR-TX-75** Start-up validation fails fast unless `redriveWindow < sweepAfter`, `failRecheckAfter ≥ 60 s`, `intentDeadline + ledger read timeout < takeoverAfter`, and `sweeper.lookback ≤ 7 d` (ledger journal retention 8 days).
@@ -2212,6 +2475,22 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 - Concurrent refunds on one original serialize on `SELECT … FOR UPDATE`; the `refund_bounds` CHECK is the last guard.
 - Concurrent reversal requests on one original: the first sets `reversal_pending` under the lock; others get 409.
 - Sweeper vs re-drive vs request path: every final write is the conditional `UPDATE … WHERE status = 'INITIATED'`; the loser writes no event.
+- BILL_PAY / RECHARGE: the provider answer is deterministic per `txnRef`, so concurrent askers agree; the compensation REVERSAL is unique per original (`cmp-{originalTxnId}` key + the original row lock in BR-TX-101 a), so at most one compensation is posted.
+
+### 7.12 Bill payment and mobile recharge (MVP, CR-TRANSACTION-1)
+
+- **BR-TX-93** Catalogue read (step 1, before the idempotency claim; also for bill enquiry and BILL_PAY / RECHARGE quotes): `GET biller:{billerId}` (and for a recharge first `GET biller:mno-prefix:{prefix}`) on the Redis cache cluster per the consumed `biller-catalogue-cache` v1 (§6.3.5). Miss with `biller:meta.state = READY` → `404 NOT_FOUND` `reason BILLER_NOT_FOUND`; miss in any other state, unparsable value or `schema ≠ 1`, or Redis cache unavailable → `503 DEPENDENCY_UNAVAILABLE` (no claim, nothing stored). Never guess a biller, its status or its wallet.
+- **BR-TX-94** Biller checks: `status = ACTIVE` else `409 STATE_CONFLICT` `reason BILLER_INACTIVE` (not persisted); unknown `subType` / `category` / `amountMode` → same 409 + metric. Bill payment and bill enquiry need `subType ≠ MNO`, recharge needs `subType = MNO` (else `400 VALIDATION_FAILED` `reason OPERATOR_MISMATCH`, `field` = `billerId` / `operatorBillerId`). `billReference` must fully match `referencePattern` (Java regex, compiled once per `billerId` + `version`), else `400 VALIDATION_FAILED` `reason BILL_REFERENCE_INVALID`. Example: DESCO `^[0-9]{8,12}$`, `12345678` passes, `1234567` → 400.
+- **BR-TX-95** Amount rules: `FIXED` → `amountPoisha = fixedAmountPoisha`; `OPEN` → `minAmountPoisha ≤ amount ≤ maxAmountPoisha`; both else `400 reason BILL_AMOUNT_OUT_OF_RANGE`. `ENQUIRY` → the amount must equal the due amount of the simulated enquiry (BR-TX-100) for this biller, reference and current Dhaka month; with `enquiryRef` it must also equal the recomputed `enquiryRef`; a mismatch (other amount, stale month, other bill) → `400 reason BILL_AMOUNT_MISMATCH`. No partial or over-payment of an ENQUIRY bill in the MVP. The kernel has no generic 422 code, so these catalogue refusals are 400 (OPEN TX-MVP-8).
+- **BR-TX-96** Recharge: `msisdn` must match `^01[3-9]\d{8}$` (else `400 reason MSISDN_INVALID`); prefix = its first 3 digits; `biller:mno-prefix:{prefix}` → operator `billerId` (miss with READY → `400 reason MSISDN_INVALID`); the operator must list the prefix in `msisdnPrefixes`; `operatorBillerId`, when sent, must equal the derived operator (else `400 reason OPERATOR_MISMATCH`); `rechargeType ∈ rechargeTypes` (else `400 VALIDATION_FAILED`, `field rechargeType`); amount within the operator's `minAmountPoisha..maxAmountPoisha` (seed 1,000..100,000) else `BILL_AMOUNT_OUT_OF_RANGE`. Example: `01712345678` → prefix `017` → GP; `operatorBillerId` = ROBI → 400 `OPERATOR_MISMATCH`.
+- **BR-TX-97** Parties: from = `customerWalletId` (type `C`, CUSTOMER actor with `X-Actor-Wallet-Id` = it; any other actor type → 403); to = the catalogue `walletId` of the biller / operator (type `B` in the wallet status cache; a different type → `503` + metric, never paid). Direction rules per §7.1 (biller wallet credit allowed in `A`, `D`, `X`). Risk evaluate is sent with `txnType BILL_PAY` / `RECHARGE` and `to.walletType B`; pricing uses `txnType BILL_PAY` / `RECHARGE` (resolved category = payer's, 0; seeds `PLN-BILL-STD`, `PLN-RECHARGE-NONE` §8.2). The biller profile's `feeBearer` is not applied by this service (OPEN TX-MVP-5).
+- **BR-TX-98** Pipeline order for BILL_PAY / RECHARGE: 1 validate + product switch + catalogue → 2 idempotency → 3 wallet status → 4 risk evaluate → 5 pricing → 6 intent (stores `biller_id`, `biller_code`, `bill_reference` / `msisdn` + `recharge_type`, `enquiry_ref`) → 7 ledger command 18 `post-bill-payment` / 19 `post-recharge` (customer 100 → biller 150) → **8a provider confirm** (synchronous, in-process, only after ledger `OK` / `EXISTS`) → 8 outcome + outbox → 9 reply. Ledger REJECTED / 400 / 403 / unknown are handled exactly as BR-TX-44 and the provider is never asked. The intent becomes `COMPLETED` only with `provider_status = CONFIRMED` (receipt and token stored in the outcome transaction).
+- **BR-TX-99** Simulated provider (`client.SimulatedBillerClient` behind `client.BillerClient`, `bitspay.billers.mode = SIMULATED`, the only MVP mode; `EKPAY` / `AGGREGATOR` → start-up failure, R1 OPEN TX-MVP-1): no outbound HTTP; deterministic and idempotent per `txnRef` (re-asking returns the same answer). It **rejects** iff the bill reference (BILL_PAY) or the MSISDN (RECHARGE) ends with `bitspay.billers.simulated.rejectSuffix` (`0000`, reserved test references); otherwise it **confirms** with `providerReceipt = "SIM-BP-" + txnRef` / `"SIM-RC-" + txnRef` and, for a BILL_PAY to a `category = UTILITY_ELECTRICITY` biller with `amountMode ≠ ENQUIRY` (prepaid meter), `token` = the unsigned big-endian integer of `SHA-256(txnRef)` mod 10^20, left-padded to 20 digits (else `token = null`; OPEN TX-MVP-4). Metric `bitspay_transaction_provider_confirm_total{txn_type, outcome}`.
+- **BR-TX-100** Simulated bill enquiry (ENQUIRY billers only; OPEN / FIXED return the amount rules with the enquiry fields null): `period` = `yyyyMM` of now in Asia/Dhaka; `h` = first 8 bytes of `SHA-256(billerCode + "|" + billReference + "|" + period)` as an unsigned long; `steps = (maxAmountPoisha − minAmountPoisha) / 100`; `dueAmountPoisha = minAmountPoisha + (h mod (steps + 1)) × 100`, then rounded down to whole taka (multiple of 100) and clamped to `[minAmountPoisha, maxAmountPoisha]`; `dueDate` = the 15th of the month after `period`; `customerName = "SIM CUSTOMER " +` the last 4 characters of the reference; `enquiryRef = "SIM-ENQ-" +` the first 16 upper-case hex characters of `SHA-256(billerId + "|" + billReference + "|" + period + "|" + dueAmountPoisha)`. Nothing is stored; the payment recomputes it (BR-TX-95).
+- **BR-TX-101** Compensation on provider refusal: (a) in one DB transaction lock the original `FOR UPDATE` (full primary key), set its `provider_status = REJECTED`, `provider_at`, `reversal_pending = true`, and insert a REVERSAL intent `INITIATED` (`RV…`, from = biller wallet, to = customer wallet, `amount` = original amount, fee / VAT / commission / AIT = the original's, `reverse_fee = reverse_commission = true`, `reason_code = SYSTEM_ERROR`, `approval_id` null, initiator `SYSTEM` / `transaction-service`, channel `SYSTEM`, `idempotency_key = cmp-{originalTxnId}`), recording its id in `compensation_txn_id`; (b) `post-reversal` (`commandId` = REVERSAL `txnId`, `originalCommandId` = original `txnId`, `reverseFee = reverseCommission = true`, no hold, no amount); (c) on `OK` / `EXISTS`, one DB transaction: REVERSAL `COMPLETED`, original `FAILED` with `failureCode PROVIDER_REJECTED` (its `ledger_transfer_ids` kept, `reversal_pending = false`, `reversal_txn_ref` stays null), outbox `TRANSACTION_COMPLETED` (REVERSAL) + `TRANSACTION_FAILED` (original); reply `409 STATE_CONFLICT` `reason PROVIDER_REJECTED` with `transaction`. No audit row (customer payment outcome, OPEN D-05); metric `bitspay_transaction_compensations_total`. The limits reservation is released by `TRANSACTION_FAILED` as usual. (d) `post-reversal` outcome unknown → reply `503` with `transaction` (`INITIATED`); a same-key retry or the sweeper finishes it (BR-TX-102). (e) `post-reversal` REJECTED (not expected: biller wallets have no outgoing postings in the MVP) → REVERSAL `FAILED`, anomaly `LEDGER_STATE_MISMATCH` + critical alert, the original stays `INITIATED` with `provider_status = REJECTED` and is excluded from automatic resolution (OPEN TX-MVP-7).
+- **BR-TX-102** Re-drive and sweeper for BILL_PAY / RECHARGE originals (`status = INITIATED`): ledger lookup `REJECTED` → FAILED per BR-TX-44 (provider never asked); not posted → BR-TX-72 unchanged; posted and `provider_status` null → ask the provider (BR-TX-99, deterministic) and continue with BR-TX-98 / BR-TX-101; `provider_status = REJECTED` and no compensation row → create it (BR-TX-101 a); compensation row present → nothing (that REVERSAL row is resolved by its own re-drive / sweep, and its `COMPLETED` finalises the original through the shared `OutcomeRecorder`). Same-key retry within `redriveWindow` re-sends the identical ledger command, or the identical compensation command when `provider_status = REJECTED`.
+- **BR-TX-103** Exposure of biller data: `billerId`, `billReference` (BILL_PAY), `msisdn` (RECHARGE), `providerReceipt` on PaymentResult, TransactionView and `txn.events` `TRANSACTION_COMPLETED` / `FAILED` / `REVERSED`; `token` only on PaymentResult and TransactionView (party wallet holders, STAFF), never on events. Logs carry `billerCode` and the masked reference / MSISDN (last 4 characters) only; `token` is never logged.
+- **BR-TX-104** MVP scope rules: BILL_PAY / RECHARGE and bill enquiry are customer-initiated only (agent-assisted R1+); merchant payment is on-us only — `merchantWalletId` must be a Bits Pay merchant wallet and `qrPayloadId` an on-us Bangla QR decoded by the channel (off-us scheme routing R1, SRS A-42); customer cash-out has no OTP or step-up — trusted `X-Actor-*` headers, risk `STEP_UP` stays a terminal `422 RISK_STEP_UP_REQUIRED` (SRS A-43, OPEN D-04). A support reversal (`POST /v1/internal/reversals`) of a `COMPLETED` BILL_PAY / RECHARGE is allowed (ledger 18 / 19 are reversible) but the simulated provider is not told (OPEN TX-MVP-6).
 
 ## 8. Configuration
 
@@ -2237,7 +2516,10 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 | `bitspay.txn.query.hotWindowDays` / `.onlineMonths` | 30 / 24 | history window / lookup horizon | onlineMonths OPEN D-24 |
 | `bitspay.txn.beneficiary.maxPerWallet` | 50 | | |
 | `bitspay.txn.quote.usageTimeout` | 300 ms | BR-TX-17 | OPEN D-17 |
-| `bitspay.features.{P2P,CASH_IN,CASH_OUT,MERCHANT_PAYMENT,MERCHANT_REFUND,FLOAT_TRANSFER,REVERSAL}.enabled` | true | static product switch (K3.7) | |
+| `bitspay.features.{P2P,CASH_IN,CASH_OUT,MERCHANT_PAYMENT,MERCHANT_REFUND,FLOAT_TRANSFER,REVERSAL,BILL_PAY,RECHARGE}.enabled` | true | static product switch (K3.7); all nine are MVP products | |
+| `bitspay.billers.mode` | `SIMULATED` | biller provider client (ADR-14). `SIMULATED` = `client.SimulatedBillerClient`, the only MVP value, active in every profile; `EKPAY`, `AGGREGATOR` reserved for R1 → start-up failure | OPEN TX-MVP-1 |
+| `bitspay.billers.simulated.rejectSuffix` | `0000` | references / MSISDNs ending with it are refused by the simulated provider (BR-TX-99) | |
+| `bitspay.billers.catalogue.patternCacheSize` | 1,000 | compiled `referencePattern` cache (per `billerId` + `version`) | |
 | `bitspay.audit.payments.enabled` | false (fixed) | per-payment audit stays off (ADR-09) | OPEN D-05 |
 | `bitspay.clients.ledger` | `http` (`fake` in profile `local`) | ledger client choice (ADR-10); every other client is HTTP only and points at WireMock in `local` | |
 | `bitspay.clients.{ledger,limitsrisk,wallet,pricing}.base-url` | `http://localhost:8099` (WireMock) in `local`; env `BITSPAY_CLIENTS_*_BASEURL` in Compose | | |
@@ -2255,6 +2537,10 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 | `PLN-CASHOUT-STD` v2 | CASH_OUT | PERCENT 150 bps, VAT 1500 bps; commission PERCENT_OF_FEE 4000 bps, source FEE_INCOME, beneficiary PAYEE, AIT 1000 bps (G2) |
 | `PLN-MERCHANT-STD` | MERCHANT_PAYMENT | PERCENT 150 bps, bearer PAYEE, VAT 1500 bps (G4) |
 | `PLN-REFUND-NONE`, `PLN-FLOAT-NONE` | MERCHANT_REFUND, FLOAT_TRANSFER | fee NONE, commission NONE |
+| `PLN-BILL-STD` **[MVP]** | BILL_PAY | FIXED 500 poisha, bearer PAYER, VAT 1500 bps (75 poisha), commission NONE (biller commission R1); SRS B-26 |
+| `PLN-RECHARGE-NONE` **[MVP]** | RECHARGE | fee NONE, bearer OPERATOR, commission NONE; SRS B-26 |
+
+Limits seeds that apply (owned by limits-risk-service, provisional, SRS B-26): BILL_PAY per txn 1,000..5,000,000 poisha, daily 10,000,000 poisha / 20; RECHARGE per txn 1,000..100,000 poisha, daily 500,000 poisha / 20. Seed biller catalogue (owned by wallet-service, SRS B-25): DESCO, DPDC, TITAS, WASA (ENQUIRY), BTCL-INT, SCHOOL-DEMO (OPEN), GP (017, 013), ROBI (018), AIRTEL (016), BANGLALINK (019, 014), TELETALK (015).
 
 ### 8.3 Fake ledger client (behaviour contract for `FakeLedgerClient`)
 
@@ -2311,18 +2597,21 @@ Pipeline (all payment types; REVERSAL skips steps 3–5):
 | `bitspay_transaction_purpose_unvalidated_total` | counter | — |
 | `bitspay_transaction_quote_usage_unavailable_total` | counter | — |
 | `bitspay_transaction_anomalies_open` | gauge | `kind` |
+| `bitspay_transaction_provider_confirm_total` | counter | `txn_type` (BILL_PAY, RECHARGE), `outcome` (CONFIRMED, REJECTED) |
+| `bitspay_transaction_compensations_total` | counter | `txn_type`, `outcome` (COMPLETED, FAILED, UNKNOWN) |
+| `bitspay_transaction_biller_catalogue_errors_total` | counter | `kind` (miss_not_ready, corrupt, unavailable, unknown_enum) |
 
-Alert conditions (rules not built in this phase; metrics are exposed): p99 end-to-end > 300 ms for 5 min on P2P/CASH_OUT/MERCHANT_PAYMENT; oldest INITIATED > 180 s; any late post; ledger CB open > 1 min; `pricing_plans_loaded == 0` on a ready pod; UNAVAILABLE ratio > 1 % for 5 min; DLQ records on consumed topics.
+Alert conditions (rules not built in this phase; metrics are exposed): p99 end-to-end > 300 ms for 5 min on P2P/CASH_OUT/MERCHANT_PAYMENT/BILL_PAY/RECHARGE; any compensation with outcome FAILED; oldest INITIATED > 180 s; any late post; ledger CB open > 1 min; `pricing_plans_loaded == 0` on a ready pod; UNAVAILABLE ratio > 1 % for 5 min; DLQ records on consumed topics.
 
-**Logging and PII.** JSON logs per kernel K9 (`txnRef` field). Never logged: PIN, NID, full MSISDN (this service handles none), tokens, `note`, `merchantReference`. Wallet IDs allowed. Problem `detail` never leaks SQL or stack traces.
+**Logging and PII.** JSON logs per kernel K9 (`txnRef` field). Never logged: PIN, NID, full MSISDN (only RECHARGE handles one; logged masked to its last 4 digits), tokens (incl. electricity tokens), `note`, `merchantReference`, full `billReference` (last 4 characters only). Wallet IDs allowed. Problem `detail` never leaks SQL or stack traces.
 
 **Security.** Trusted headers via `ActorContextFilter`; `@RequiresActor` on every controller method. `/v1/internal/**` not exposed by the future gateway. Dev endpoints and `FakeLedgerClient` exist only in profiles `local`/`test` (bean conditional + `ArchitectureTest`).
 
 ## 10. Work packages (build order for Claude Code)
 
-Every WP is completable with only this folder, `00-global/`, Docker (Postgres, Redis × 2, Kafka, WireMock) and the stubs/fixtures. Each ends with `./gradlew check` green, OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated.
+Scope tags: `[MVP]` = needed for the MVP release (all baseline WPs: every product they build is an MVP product); `[R1+]` = after the MVP (none yet; R1 provider integration will be a later CR). Every WP is completable with only this folder, `00-global/`, Docker (Postgres, Redis × 2, Kafka, WireMock) and the stubs/fixtures. Each ends with `./gradlew check` green, OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated.
 
-### WP-1 Skeleton and contracts
+### WP-1 [MVP] Skeleton and contracts
 - Gradle project from the build template; package `com.bracits.bitspay.transaction`; virtual threads; profiles `local`/`dev`/`hybrid`.
 - Flyway `V1__init.sql` (§4.1) with outbox/inbox; `ActorContextFilter`, `@RequiresActor`, problem+json mapper incl. every owned extension member (`transaction`, `limitCode`, `limitParty`, `remainingPoisha`, `remainingCount`, `resetsAt`, `walletId`, `walletStatus`).
 - All §5.1 operations as controllers + DTOs returning stub responses; springdoc served; stubs and fixtures wired; provider contract tests red → green on shapes.
@@ -2330,63 +2619,69 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 - **Acceptance:** provider contract tests for every operation example and every `txn.events` example pass; `flyway_twiceFromEmpty_idempotent`; role cannot read another schema; missing `X-Actor-Type` → 400 problem with `errors[].field`.
 - Depends on: —.
 
-### WP-2 Repository, partitions, IDs
+### WP-2 [MVP] Repository, partitions, IDs
 - `ensure_partitions`, `PartitionMaintenanceJob`; `TxnRefGenerator`, UUIDv7 generator with `createdAt` extraction; `TxnRepository` (Spring Data JPA, native queries where needed: insert intent with 7-day look-back, conditional outcome update, find by ref/id partition-pruned, lock original by full PK, keyset history query).
 - **Acceptance:** `txnRef_formatAndReservedDigits00`, `partition_dhakaBoundary_1800Z`, `insert_refCollision_regenerates`, `findByRef_prunesToOnePartition` (EXPLAIN), `history_unionKeyset_sortedAndCursorStable`.
 - Depends on: WP-1.
 
-### WP-3 Pricing evaluator, snapshot, golden vectors
+### WP-3 [MVP] Pricing evaluator, snapshot, golden vectors
 - Side-effect-free evaluator per §6.4.3 (`long` + `BigDecimal HALF_EVEN`); `PricingSnapshot` + `FeeRulesListener` (per-instance group, from earliest, tombstones, envelope `data`) + paged bootstrap client + readiness + admin endpoints.
 - Golden file copied from the consumed snapshot.
 - **Acceptance:** `pricing_goldenVectors_all` (G1–G12, X1, X2, X6–X9); jqwik properties (fee ≥ 0, clamp respected, vat = hev(fee × bps), net commission = gross − ait ≥ 0, no plan → zeros + bearer PAYER downstream); stale version ignored; tombstone removes; EXPIRED removes; bootstrap follows `nextCursor`; readiness DOWN until loaded.
 - Depends on: WP-1.
 
-### WP-4 Idempotency and wallet status
+### WP-4 [MVP] Idempotency and wallet status
 - Lua scripts + `IdempotencyService` (BR-TX-30..39); `WalletStatusService` (bucket/field encoding, pipelined HGET, partner micro-cache, `wsn:` negative cache, single-flight fallback, CB/bulkhead); `DirectionRules`, `WalletTypeRules` (§7.1).
 - **Acceptance:** `walletCache_bucketAndFieldEncoding_matchesContract` (vectors from the consumed snapshot), `walletCache_miss_singleFlight_oneHttpCallFor500Concurrent`, `walletCache_bothDown_returns503`, `walletCache_404_writesNegativeCache`, `directionMatrix_allStatusesAllTypes`, `idem_conflict_differentHash_409`, `idem_dbLookback7d_replays`.
 - Depends on: WP-2.
 
-### WP-5 Ledger and risk clients (Http + Fake ledger + stubs)
+### WP-5 [MVP] Ledger and risk clients (Http + Fake ledger + stubs)
 - `client.LedgerClient` (`HttpLedgerClient`: timeouts, CB, bulkhead, no retry; `FakeLedgerClient` per §8.3 + chaos); `client.HttpLimitsRiskClient` (tested against the WireMock stubs incl. magic amounts), `ReservationReleaser`, usage client.
 - **Acceptance:** `fakeLedger_transferIds_matchDerivationVectors`, `fakeLedger_linkedChain_allOrNothing`, `fakeLedger_sameCommandDifferentBody_conflict`, `fakeLedger_maxBalance_afterFeeLegs_holdsExcluded`, `FakeLedgerContractTest` green against WireMock; risk timeout → `RiskUnavailableException` within 160 ms; consumer contract tests for every consumed operation parsed from `contracts/consumed/`.
 - Depends on: WP-1.
 
-### WP-6 P2P end to end, outbox, events
+### WP-6 [MVP] P2P end to end, outbox, events
 - `PaymentPipeline` steps 1–9, `P2pPolicy`, `OutcomeRecorder`, outbox writer, polling relay, PRE_LEDGER FAILED path; product switches; refdata listener (PURPOSE_CODE, REASON_CODE, FEATURE.*, WALLET.ALLOW_INBOUND_BEFORE_KYC).
 - **Acceptance:** `p2p_happyPath_completedAndOutboxEnvelope` (schema-validated, key = from wallet), `p2p_duplicateIdempotencyKey_returnsOriginalResult`, `p2p_insufficientFunds_422WithTransactionBody`, `p2p_riskLimitExceeded_persistedFailedWithLimitExtensions`, `p2p_riskTimeout_503_keyDeleted_releaseCalled`, `p2p_risk409_503_noRelease`, `p2p_blockedSender_422WalletNotTransactable`, `p2p_featureDisabledByRefdata_422NoSideEffect`, `p2p_channelNotInFeatureChannels_422`, `p2p_100ThreadsSameKey_onePostingOneEvent`, `refdata_sameEventTwice_appliedOnce`.
 - Depends on: WP-3, WP-4, WP-5.
 
-### WP-7 Cash-in, cash-out, merchant payment, quote
+### WP-7 [MVP] Cash-in, cash-out, merchant payment, quote
 - Policies for CASH_IN, CASH_OUT, MERCHANT_PAYMENT (commission legs, PAYEE bearer, resolved category); quote with usage call and `feeIsUpperBound`.
 - **Acceptance:** `cashIn_commissionFromCommissionPayable_G3Body`, `cashOut_feeAndCommission_G2Body` (assert ledger body), `merchant_payeeBearer_totalDebitEqualsAmount_G4`, `quote_matchesPaymentPricing_forAllSeedPlans`, `quote_usageUnavailable_feeIsUpperBoundTrue`, `quote_noKey_noPersistence`, `cashOut_toCustomerWallet_400`, `merchant_toBlockedMerchant_422`.
 - Depends on: WP-6.
 
-### WP-8 Recovery sweeper, re-drive, chaos
+### WP-8 [MVP] Recovery sweeper, re-drive, chaos
 - `RecoverySweeper` (advisory-lock leadership), `LatePostVerifier`, re-drive (BR-TX-34), takeover (BR-TX-35), anomaly queue + admin endpoints, start-up validation (BR-TX-75).
 - **Acceptance:** `sweeper_crashAfterLedgerPost_completesOnceAndPublishesOnce` (Fake `FAIL_AFTER_POST`), `sweeper_crashBeforeLedger_failsAfterTwoChecks60sApart` (clock injected), `sweeper_rejectedLookup_failsWithMapping`, `sweeper_ledgerLookupError_neverFails`, `sweeper_twoPods_onlyLeaderRuns`, `redrive_retryWithin20s_completesViaExists`, `redrive_after20s_returns503Initiated`, `takeover_noRowAfter10s_processesFresh`, `latePost_detected_createsAnomaly`, `ledger409_staysInitiated_anomaly`, `ledger400_failedLedgerOther_409`.
 - Depends on: WP-6.
 
-### WP-9 Merchant refund (+ maker-checker) and float transfer
+### WP-9 [MVP] Merchant refund (+ maker-checker) and float transfer
 - `partner.events` listener + `partner_link` (skip null walletId, record version); `MerchantRefundPolicy` with original row lock; refund requests + approvals (kernel K5), `approval.events`, audit, expiry and execution jobs.
 - `FloatTransferPolicy` with pair + hierarchy rules (RETURN with PENDING_TERMINATION child), STAFF override.
 - **Acceptance:** `refund_partialThenRest_statusPartiallyThenRefunded`, `refund_exceedsRemaining_422WithRemainingPoisha`, `refund_afterWindow_409`, `refund_concurrent50Threads_neverExceedsOriginal`, `refund_enterpriseDirect_422MakerChecker`, `approval_checkerEqualsMaker_422`, `approval_twoLevelsAboveThreshold_distinctCheckers`, `approval_executionUnknown_jobCompletes`, `approval_expiry_eventAndAudit`, `float_distToChild_ok`, `float_returnFromPendingTermination_ok`, `float_toNonChild_403`, `float_missingProjection_503`, `float_staffOverride_requiresRequestId_audited`, `float_serviceActor_403`, `partnerEvents_olderVersion_ignored`, `partnerEvents_nullWalletId_versionRecordedOnly`.
 - Depends on: WP-6.
 
-### WP-10 Reversal, queries, beneficiaries
+### WP-10 [MVP] Reversal, queries, beneficiaries
 - `/v1/internal/reversals` (BR-TX-57..60, partial), query APIs (`clientReference`, `originalTxnRef`, clamp, cursor), beneficiary CRUD.
 - **Acceptance:** `reversal_completed_originalReversed_twoEventsAndAudit`, `reversal_partial_flagsFalse_originalReversed`, `reversal_partialWithFlags_400`, `reversal_amountAbovePrincipal_400`, `reversal_twice_409`, `reversal_ofRefundedPayment_409`, `reversal_concurrent20_onlyOneLedgerCall`, `reversal_nonServiceActor_403`, `reversal_reasonOutsideGroup_400`, `query_byRef_nonParty_404`, `query_byRef_foreignPrefix_404`, `query_fromTsBeyond30d_clamped`, `query_clientReference_returnsOneItem`, `query_invalidCursor_400Reason`, `beneficiary_max50_409`.
 - Depends on: WP-6, WP-9.
 
-### WP-11 Integration on the Compose stack
+### WP-11 [MVP] Integration on the Compose stack
 - Profile `dev`: real ledger, limits-risk, wallet (Redis cache), pricing (`fee.rules`), wallet partner module (`partner.events`), admin (`refdata.events`).
 - Walk the payment scenarios by hand on the stack (P2P, cash-in, cash-out, merchant, refund, float, reversal, crash-after-post); run `FakeLedgerContractTest` against the real ledger image; fix drift only via a change request.
 - **Acceptance:** scenarios green on the stack; golden-vector checksum equals the pricing snapshot; envelopes validated against `contracts/provided/events/`.
 - Depends on: WP-1..WP-10.
 
-### WP-12 Hardening
+### WP-12 [MVP] Hardening
 - Chaos walk-through on the stack (kill the container during a payment, flush Redis cache, stop Kafka, stop ledger 30 s) asserting zero money discrepancy (intents vs ledger lookups) via a recon check script; `docs/TRACEABILITY.md`; PII log-scan test; JMH micro-benchmark of the evaluator (< 5 µs/eval with 500 plans). No k6/perf runs in this phase.
 - **Acceptance:** after chaos every INITIATED row resolves within 2 min and `count(COMPLETED) == count(ledger commands found)`; log-scan clean.
 - Depends on: WP-11.
+
+### WP-CR-1 [MVP] Bill payment and mobile recharge with the simulated biller provider (CR-TRANSACTION-1)
+- Contracts 1.1.0 (`contracts/provided/*`): `POST /v1/bills:enquire`, `POST /v1/payments/bill-payment`, `POST /v1/payments/recharge`; PaymentResult / TransactionView biller fields; quote `billerId`; `txnType` BILL_PAY / RECHARGE, prefixes BP / RC, `failureCode PROVIDER_REJECTED`, the 8 biller problem reasons; `txn.events` optional fields.
+- `BillerCatalogueCache` (consumed `biller-catalogue-cache` v1, §6.3.5) with the meta-state miss rule and the compiled-pattern cache; `BillerCatalogueService` (BR-TX-93..97); `BillPayPolicy`, `RechargePolicy`; `client.BillerClient` port + `client.SimulatedBillerClient` (BR-TX-99, BR-TX-100; `bitspay.billers.mode`, start-up check); provider step 8a and `CompensationService` (BR-TX-101) in the shared `OutcomeRecorder`; sweeper / re-drive extension (BR-TX-102); ledger client commands 18 / 19 (stubs from the orchestrator's snapshot; `FakeLedgerClient` extended with commands 18 / 19 and the 100→150 guard — no new fake); `V1__init.sql` columns (§4.1); product switches `FEATURE.BILL_PAY` / `FEATURE.RECHARGE`; metrics.
+- **Acceptance:** `billEnquiry_enquiryMode_deterministicPerReferenceAndMonth`, `billEnquiry_openMode_returnsRulesOnly`, `billEnquiry_mnoBiller_400OperatorMismatch`, `billPay_happyPath_completedReceiptAndEvent`, `billPay_ledgerBody_command18_customerToBillerWallet`, `billPay_referencePatternMismatch_400BillReferenceInvalid`, `billPay_enquiryAmountMismatch_400BillAmountMismatch`, `billPay_fixedAmountWrong_400OutOfRange`, `billPay_unknownBiller_404BillerNotFound`, `billPay_inactiveBiller_409NotPersisted`, `billPay_catalogueNotReady_503`, `billPay_providerRejected_compensatedFailed409`, `billPay_compensationUnknown_503Initiated_retryFinishesFailed`, `billPay_crashAfterLedgerPost_sweeperAsksProviderOnce`, `billPay_electricityPrepaid_token20Digits`, `billPay_agentActor_403`, `billPay_featureDisabled_422NoSideEffect`, `billPay_100ThreadsSameKey_oneLedgerCallOneProviderConfirm`, `recharge_happyPath_operatorDerivedFromPrefix`, `recharge_operatorMismatch_400`, `recharge_msisdnInvalid_400`, `recharge_unknownPrefix_400MsisdnInvalid`, `recharge_amountOutOfRange_400`, `recharge_rechargeTypeNotOffered_400`, `quote_billPay_byBillerId_matchesPayment`, `billers_modeNotSimulated_startupFails`, `simulatedBiller_noOutboundHttp` (ArchUnit), `logs_neverContainTokenOrFullMsisdn`.
+- Depends on: WP-6, WP-7, WP-8, WP-10 (reversal executor reused for the compensation).
 
 ## 11. Test plan
 
@@ -2402,8 +2697,9 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 | Event idempotency | each consumed fixture delivered twice → single effect; produced events: one test per eventType asserting outbox row, key and schema |
 | Concurrency (≥ 100 threads) | `p2p_100ThreadsSameKey_onePostingOneEvent`, `p2p_100ThreadsDistinctKeys_sameSender_noLostUpdates`, `refund_concurrent50Threads_neverExceedsOriginal`, `reversal_concurrent20_onlyOneLedgerCall`, `sweeperAndRedrive_race_singleEvent` |
 | Chaos / sweeper | `sweeper_crashAfterLedgerPost_completesOnceAndPublishesOnce`, `sweeper_crashBeforeLedger_failsAfterTwoChecks60sApart`, `sweeper_ledgerLookupError_neverFails`, `sweeper_twoPods_onlyLeaderRuns`, `latePost_detected_createsAnomaly`, `ledgerTimeout_503Initiated_thenRetryCompletes`, `ledgerCircuitOpen_fast503` |
-| Security / PII | `logs_neverContainNoteOrMerchantReference`, `devEndpoints_absentInDevProfile`, `internalReversal_customerActor_403` |
-| Manual Compose scenarios | WP-11 walk-through: P2P, cash-in, cash-out, merchant, partial refund, enterprise refund via approval, float top-up and return, full and partial reversal, crash after post |
+| Security / PII | `logs_neverContainNoteOrMerchantReference`, `devEndpoints_absentInDevProfile`, `internalReversal_customerActor_403`, `logs_neverContainTokenOrFullMsisdn`, `simulatedBiller_noOutboundHttp` |
+| Bill pay / recharge (MVP, CR-TRANSACTION-1) | every WP-CR-1 acceptance test; `simulatedBiller_rejectSuffix_deterministic`, `simulatedBiller_receiptFormat`, `billEnquiry_dueAmount_wholeTakaWithinRange` (property, jqwik), `compensation_uniquePerOriginal_concurrent20`, `billPay_supportReversalOfCompleted_allowed`, `contract_billerProblems_reasonsPerOperation`, `txnEvents_billPayAndRecharge_validateAgainstSchema` |
+| Manual Compose scenarios | WP-11 walk-through: P2P, cash-in, cash-out, merchant, partial refund, enterprise refund via approval, float top-up and return, full and partial reversal, crash after post; WP-CR-1: DESCO enquiry + payment, GP recharge, a `…0000` reference refused and compensated |
 
 ## 12. Definition of done (additions to kernel K10)
 
@@ -2413,6 +2709,7 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 - [ ] Every problem response carries exactly the extension members declared for its `code` in `codes.yaml → problemExtensions`; every persisted refusal carries `transaction`, every non-persisted one none.
 - [ ] No `AUDIT_RECORDED` written for customer payment outcomes; all other state changes audited.
 - [ ] Human review of `service` and `entity` packages done.
+- [ ] MVP (WP-CR-1): no BILL_PAY / RECHARGE is `COMPLETED` without `provider_status = CONFIRMED`; every provider refusal ends with the money back in the customer wallet (compensation REVERSAL COMPLETED) or an open `LEDGER_STATE_MISMATCH` anomaly; `SimulatedBillerClient` makes no network call.
 
 ## 13. Open decisions, deferred items, assumptions
 
@@ -2421,6 +2718,7 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 | OPEN D-01 | Idempotency-Key retention | ≥ 7 days: Redis 26 h + 7-day DB look-back | §5.1, BR-TX-36/39, ADR-13, §8.1 |
 | OPEN D-02 | VAT withheld on commission | not posted; `vatOnCommissionPoisha` reserved, not emitted | §1.3, §5.2, §6.4.3 |
 | OPEN D-03 | `SHARED` fee bearer | reserved, never produced; parser accepts it | §5.1.0, §5.2, §6.4.1 |
+| TX-MVP-AUTH (decided, MVP decisions 2026-10-14) | Customer authorisation in the MVP (no PIN management, no OTP) | MVP transactions start from staff / agent channels, or from customers themselves over the REST API (`X-Channel` `API` / `APP`). No PIN, OTP or step-up: the authenticated channel / gateway sets the trusted `X-Actor-*` headers (A-43); the existing contract is unchanged. Per-customer PIN, OTP and step-up in R1. A fixed-PIN option ([CR-TRANSACTION-2](changes/CR-TRANSACTION-2.md)) was rejected | §1.3, §5 common headers |
 | OPEN D-04 | HOLD / STEP_UP semantics | terminal decline, persisted FAILED | BR-TX-08, failureCode |
 | OPEN D-05 | Tamper-evident trail of payment outcomes | no per-payment `AUDIT_RECORDED`; governance chains `txn.events` | §1.4, ADR-09, §6.6, BR-TX-62 |
 | OPEN D-10 | txnRef layout / opaque references | 18 chars, reserved digits `00`; consumers opaque 1..32 | §5.3, ADR-02, BR-TX-40 |
@@ -2437,8 +2735,16 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 | OPEN D-32 | Merchant-refund reason seeds; `reasonCode`/`approvalId` on `txn.events` | 5 refund codes; fields published | codes.yaml, §5.1.6, §5.2 |
 | OPEN D-33 | Delegated P2P under the future auth layer | disbursement-service calls with the payer's CUSTOMER headers | §5.1.2 |
 | OPEN D-44 | Fee-version switch lag | publication lag ≤ 30 s accepted; evaluator enforces the effective window | §6.4.1 |
+| OPEN TX-MVP-1 | Real biller / telco providers: ekPay and aggregator seam (R1) | `bitspay.billers.mode = SIMULATED` only; `EKPAY` / `AGGREGATOR` reserved (start-up failure); the `client.BillerClient` port is the seam; bill enquiry is simulated (BIL-005 partial) | ADR-14, BR-TX-99, BR-TX-100, §8.1 |
+| OPEN TX-MVP-2 | `PENDING` / `PROCESSING` state for asynchronous provider outcomes (R1) | none in the MVP: provider confirm is synchronous, the intent stays `INITIATED` until confirmed or compensated | §3.5, BR-TX-98, BR-TX-102 |
+| OPEN TX-MVP-3 | Biller cache-miss fallback `GET /v1/billers/{billerId}` (wallet-service) | not used; miss with `biller:meta.state = READY` → 404, other misses → 503; wallet-service 1.1.0 now publishes the operation (CR-WALLET-1); wiring the fallback (consume entry + client) is deferred to R1 | §6.3.5, BR-TX-93 |
+| OPEN TX-MVP-4 | Electricity token rule | token only for `UTILITY_ELECTRICITY` billers with `amountMode ≠ ENQUIRY` (prepaid); the seed catalogue has none (SRS B-25) | BR-TX-99 |
+| OPEN TX-MVP-5 | Biller `feeBearer = BILLER`, per-biller fees and biller commission (R1) | the pricing plan decides (`PLN-BILL-STD` PAYER, `PLN-RECHARGE-NONE` OPERATOR); the resolved category of a `B` payee is the payer's (0), so per-biller plans cannot match by category; commission deferred (SRS B-26) | BR-TX-97, §8.2 |
+| OPEN TX-MVP-6 | Provider notification of a support reversal of a COMPLETED BILL_PAY / RECHARGE (R1) | ledger reversal only; the simulated provider is not told | BR-TX-104 |
+| OPEN TX-MVP-7 | Compensation refused by the ledger | REVERSAL FAILED + `LEDGER_STATE_MISMATCH` anomaly; original stays INITIATED (`provider_status REJECTED`); ops resolves (runbook to be written) | BR-TX-101 e |
+| OPEN TX-MVP-8 | HTTP status of `BILL_AMOUNT_MISMATCH` | the MVP brief asked for 422, but the kernel K3.6 closed `code` list has no generic 422 code; served as `400 VALIDATION_FAILED` `reason BILL_AMOUNT_MISMATCH` (like the other catalogue refusals). A kernel change (kind E) would be needed for 422 | BR-TX-95, codes.yaml |
 
-**Deferred (interim behaviour):** MDR refund on merchant refund (`refund.mdrMode = NONE`); external two-phase flows; resumable HOLD/STEP_UP; beneficiaries' `last_used_at`; partition archival hand-off (R2); reversal of disbursement rows and of MERCHANT_REFUND rows (not served: 404 / 409).
+**Deferred (interim behaviour):** MDR refund on merchant refund (`refund.mdrMode = NONE`); external two-phase flows (R1+: ekPay, aggregators, NPSB; MVP uses the simulated biller provider); off-us QR and bank settlement for merchants (R1, SRS A-42); OTP / step-up (SRS A-43); agent-assisted bill pay and recharge (R1+); resumable HOLD/STEP_UP; beneficiaries' `last_used_at`; partition archival hand-off (R2); reversal of disbursement rows and of MERCHANT_REFUND rows (not served: 404 / 409).
 
 **Assumptions**
 1. All seeds marked provisional in §8 (refund window, enterprise threshold, `allowInboundBeforeKyc = false`, pricing seeds) await SRS Appendix B-05/B-09.
@@ -2448,6 +2754,8 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 5. `PENDING_CLOSURE` wallets cannot be debited here (closure payout is a wallet-service ledger command).
 6. Partner sub-types `SUPER_AGENT` and `ENTERPRISE` arrive verbatim in `partner.events.subType`.
 7. `txn.events` retention 7 d is the producer's declaration; the local stack may keep it longer.
+8. MVP (SRS v1.2): A-41 no external biller or telco call — fulfilment is the in-process simulated provider; A-42 merchant payment is on-us only; A-43 no OTP or step-up, trusted `X-Actor-*` headers. Seed billers and MNO prefixes await SRS B-25; MVP fee and limit values await SRS B-26; the pilot audience and exit criteria are SRS B-24.
+9. limits-risk-service (1.1.0) accepts `txnType BILL_PAY` / `RECHARGE` and `walletType B`, pricing-service (1.1.0) publishes BILL_PAY / RECHARGE plans, ledger-service (1.1.0) serves commands 18 / 19 with reversals; this pack's pins on those producers are moved by the orchestrator.
 
 **Provenance** (sources consolidated into this baseline):
 - Old spec: SVC-02 transaction-service v1.2 with the v5.0 overlay (no sharding, one schema, 5k TPS, Gradle, Compose scope).
@@ -2462,3 +2770,5 @@ Every WP is completable with only this folder, `00-global/`, Docker (Postgres, R
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-02 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit (§4.2) |
+| 1.1.0 | 2026-10-14 | [CR-TRANSACTION-1](changes/CR-TRANSACTION-1.md) | MVP: txnTypes BILL_PAY (BP, ledger 18) and RECHARGE (RC, ledger 19); `POST /v1/bills:enquire`, `/v1/payments/bill-payment`, `/v1/payments/recharge`; quote `billerId`; PaymentResult / TransactionView biller fields; `failureCode PROVIDER_REJECTED`; 8 biller problem reasons; `txn.events` optional `billerId`, `billReference`, `msisdn`, `providerReceipt`; consumes `biller-catalogue-cache` v1; `SimulatedBillerClient` (`bitspay.billers.mode`); compensation reversal; BR-TX-93..104; WP-CR-1; SRS v1.2 trace with MVP markers; WP scope tags |
+| 1.1.0 | 2026-10-14 | — | Kind A (documentation only, MVP decisions 2026-10-14): TX-MVP-AUTH recorded (customers transact over REST without a PIN in the MVP); CR-TRANSACTION-2 (fixed PIN) rejected. Contract unchanged |

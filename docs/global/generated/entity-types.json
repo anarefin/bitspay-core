@@ -389,13 +389,6 @@
           "CLOSE"
         ],
         "levels": 2
-      },
-      {
-        "entityType": "GlExport",
-        "actions": [
-          "REGENERATE"
-        ],
-        "levels": 1
       }
     ],
     "service": "general-ledger-service"

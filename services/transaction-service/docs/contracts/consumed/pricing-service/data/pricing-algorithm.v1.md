@@ -17,10 +17,10 @@ The algorithm is a pure function. It performs no I/O, reads no clock (the caller
 | Name | Type | Notes |
 |---|---|---|
 | `plans` | list of `PlanJson` | the evaluator's current snapshot: one value per `planId` (the latest `fee.rules` value; tombstoned plans removed) |
-| `txnType` | enum `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` | |
+| `txnType` | enum `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `BILL_PAY`, `RECHARGE`, `REVERSAL` | `BILL_PAY`, `RECHARGE` added in contractVersion 1.1.0 (CR-PRICING-1); the steps below are unchanged |
 | `channel` | enum `X-Channel` values, or null | null matches only plans whose `match.channel` is null |
 | `amountPoisha` | int64, 1..10^13 | principal |
-| `payer`, `payee` | `{walletType enum{C,A,D,M,I}, kycTier int32 0..9, categoryCode int32 ≥ 0}` | `categoryCode` 0 for customers; partner codes per the wallet-service category vocabulary (AGENT 101–104, DISTRIBUTOR 201–203, MERCHANT `3000 + size×100 + MCC group`, INSTITUTION 401–404) |
+| `payer`, `payee` | `{walletType enum{C,A,D,M,I,B}, kycTier int32 0..9, categoryCode int32 ≥ 0}` | `categoryCode` 0 for customers; partner codes per the wallet-service category vocabulary (AGENT 101–104, DISTRIBUTOR 201–203, MERCHANT `3000 + size×100 + MCC group`, INSTITUTION 401–404) |
 | `usage.senderMonthlyCountForTxnType` | int32 ≥ 0 | sender's count for this `txnType` in the current month **before** this transaction; absent → 0 |
 | `at` | timestamp | evaluation instant; absent → caller's current time |
 
@@ -65,6 +65,7 @@ evaluate(plans, in) -> Result
   if in.payee.walletType in {A, D, M, I}:  cat = in.payee.categoryCode
   else:                                    cat = in.payer.categoryCode
   // CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER → payee; CASH_IN, MERCHANT_REFUND → payer; P2P → 0
+  // BILL_PAY, RECHARGE (payee walletType B = BILLER) → payer (customer, 0)
 
   at    = in.at ?? now()
   usage = in.usage?.senderMonthlyCountForTxnType ?? 0

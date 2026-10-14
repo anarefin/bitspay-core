@@ -1,7 +1,9 @@
 <!-- Generated from docs/CLAUDE.md of the v6 pack; paths adjusted to the bitspay-core layout. -->
 # pricing-service — agent instructions
 
-You are implementing **pricing-service** of Bits Pay: modules `pricing` (fees, VAT, MDR, quote, `fee.rules`, commissions, sharing, AIT, settlement — lead, Dev-6) and `campaign` (campaigns, segments, rewards, clawback — Dev-4, R2). This folder is the whole world for this service.
+You are implementing **pricing-service** of Bits Pay: modules `pricing` (fees, VAT, MDR, quote, `fee.rules`, commissions, sharing, AIT, settlement — lead, Dev-6) and `campaign` (campaigns, segments, rewards, clawback — Dev-4, R1+). This folder is the whole world for this service.
+
+Release scope (SRS v1.2, CR-PRICING-1): the **MVP** ships module `pricing` only — plans for P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, `BILL_PAY` and `RECHARGE` (seeds `PLN-BILL-STD`, `PLN-RECHARGE-NONE`; no biller commission until R1), quote, `fee.rules`, in-line commission records. Module `campaign` is R1+ and runs with `bitspay.modules.campaign.enabled=false` in the MVP. SPEC §10 tags each WP `[MVP]` or `[R1+]`.
 
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages per module).

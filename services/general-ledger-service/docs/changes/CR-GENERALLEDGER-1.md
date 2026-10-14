@@ -11,7 +11,7 @@
 | Baseline hash | *(written by `cr analyse`)* |
 
 ## 1. Motivation
-SRS v1.1 (14 Oct 2026) adopts the General Ledger service: new module 4.34 GLD-001…GLD-034, REC-012 (GL tie-out), PER-014 (GL performance), UC-13 (daily GL close & ERP export), new Appendix A/B ids (A-39, A-40, B-18…B-23), and LED-013/LED-014/BOM-006/BOM-007/INT-01/REL-002 re-worded to delegate their GL part to GLD. The pack's traceability must cite the new ids.
+SRS v1.1 (14 Oct 2026) adopts the General Ledger service: new module 4.34 GLD-001…GLD-034, REC-012 (GL tie-out), PER-014 (GL performance), UC-13 (daily GL close; its journal file export part was later withdrawn by CR-GENERALLEDGER-2), new Appendix A/B ids (A-39, A-40, B-18…B-23), and LED-013/LED-014/BOM-006/BOM-007/INT-01/REL-002 re-worded to delegate their GL part to GLD. The pack's traceability must cite the new ids.
 
 ## 2. Change (before → after)
 Documentation only, in SPEC.md:

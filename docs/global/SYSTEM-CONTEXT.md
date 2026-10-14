@@ -35,6 +35,33 @@ Numbers 04, 10, 13 and 14 are retired: they were merged into 03, 06, 12 and 15. 
 | S3-compatible object store | — | — |
 | nginx edge proxy | — | — |
 
+**MVP release (SRS v1.2, Architecture v4).** The MVP ships six features:
+- P2P
+- merchant payment (on-us)
+- merchant refund
+- agent cash-in / cash-out
+- bill payment against an internal biller catalogue
+- mobile recharge
+
+Billers and mobile operators are partner type `BILLER` with wallet type `B` / ledger account 150. transaction-service products `BILL_PAY` and `RECHARGE` post ledger commands 18 / 19 and are confirmed by `SimulatedBillerClient`, with no external call.
+
+| Service | MVP role |
+|---|---|
+| ledger-service | MVP |
+| transaction-service | MVP |
+| wallet-service | MVP |
+| limits-risk-service | MVP |
+| pricing-service | MVP (pricing module; campaign off) |
+| treasury-service | MVP (issuance and agent float only) |
+| compliance-service | MVP (KYC and screening only) |
+| support-service | MVP (reversals and wrong-transfer only) |
+| admin-service | MVP |
+| general-ledger-service | MVP (GL-R1a; no journal export) |
+| disbursement-service | out of MVP (R1+) |
+| finance-ops-service | out of MVP (R1+) |
+
+Each SPEC §10 tags its work packages `[MVP]` or `[R1+]`. The change requests are CR-LEDGER-1, CR-WALLET-1, CR-TRANSACTION-1, CR-PRICING-1, CR-LIMITSRISK-1, CR-GENERALLEDGER-2, CR-ADMIN-1, CR-TREASURY-1, CR-COMPLIANCE-1, CR-SUPPORT-1, CR-FINANCEOPS-1 and CR-DISBURSEMENT-1.
+
 ## 2. Layered view (hand-maintained)
 
 ```mermaid
@@ -91,18 +118,18 @@ This diagram is a simplified overview. The exact, generated graph is below; each
 
 ```mermaid
 flowchart LR
-  ledger_service["ledger-service<br/>v1.0.0"]
-  transaction_service["transaction-service<br/>v1.0.0"]
-  wallet_service["wallet-service<br/>v1.0.0"]
-  limits_risk_service["limits-risk-service<br/>v1.0.0"]
-  pricing_service["pricing-service<br/>v1.0.0"]
+  ledger_service["ledger-service<br/>v1.1.0"]
+  transaction_service["transaction-service<br/>v1.1.0"]
+  wallet_service["wallet-service<br/>v1.2.0"]
+  limits_risk_service["limits-risk-service<br/>v1.1.0"]
+  pricing_service["pricing-service<br/>v1.1.0"]
   treasury_service["treasury-service<br/>v1.0.0"]
   disbursement_service["disbursement-service<br/>v1.0.0"]
   support_service["support-service<br/>v1.0.0"]
   compliance_service["compliance-service<br/>v1.0.0"]
   finance_ops_service["finance-ops-service<br/>v1.0.0"]
-  admin_service["admin-service<br/>v1.0.0"]
-  general_ledger_service["general-ledger-service<br/>v1.0.0"]
+  admin_service["admin-service<br/>v1.1.0"]
+  general_ledger_service["general-ledger-service<br/>v2.0.0"]
   admin_service -- "7 topics" --> admin_service
   admin_service -- "case.events" --> compliance_service
   admin_service -- "disbursement.events" --> disbursement_service
@@ -160,7 +187,7 @@ flowchart LR
   transaction_service -- "REST" --> ledger_service
   transaction_service -- "REST" --> limits_risk_service
   transaction_service -- "REST + 3 topics" --> pricing_service
-  transaction_service -- "REST + data:wallet-status-cache, partner.events" --> wallet_service
+  transaction_service -- "REST + 3 topics" --> wallet_service
   treasury_service -- "REST + 4 topics" --> admin_service
   treasury_service -- "REST + ledger.changes" --> ledger_service
   treasury_service -- "REST" --> transaction_service

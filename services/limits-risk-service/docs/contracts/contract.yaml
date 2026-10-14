@@ -1,7 +1,7 @@
 service: limits-risk-service
 number: "05"
 modules: []
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 kernel: "1.0"
 owner: Dev-5
 
@@ -47,7 +47,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.reservations
       purpose: "commit the reservation (re-apply counters when it was expired/released, OPEN D-15); sender/receiver profile facts; partition watermark"
       fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, amountPoisha, createdAt, completedAt]
@@ -56,7 +56,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_FAILED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.reservations
       purpose: "release both parties' reservation exactly once; partition watermark"
       fieldsUsed: [txnId, fromWalletId, toWalletId]
@@ -65,7 +65,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REVERSED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.reservations
       purpose: "only with bitspay.risk.limits.restore-on-reversal=true: decrement the original's counters when still in the same period; otherwise watermark only (FILTERED)"
       fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, createdAt, reversedAmountPoisha]
@@ -74,7 +74,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REFUNDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.reservations
       purpose: "only with restore-on-reversal=true: decrement the original MERCHANT_PAYMENT counters by the refund delta when still in the same period; otherwise watermark only"
       fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, createdAt, refundedTotalPoisha]
@@ -84,7 +84,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.history
       purpose: "R2: append txn_history (90 days) for simulations"
       fieldsUsed: &history [txnId, txnType, status, channel, fromWalletId, fromWalletType, toWalletId, toWalletType, amountPoisha, deviceId, riskDecision, riskScore]
@@ -101,7 +101,7 @@ consumes:
       topic: wallet.events
       eventType: WALLET_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.wallet-events
       purpose: "wallet profile fp:{walletId} for usage, MSISDN blacklist (HMAC of msisdn), fraud profile attributes, reactivation time"
       fieldsUsed: [walletId, version, ownerType, walletType, msisdn, status, previousStatus, statusReasonCode, kycTier, categoryCode, createdAt, updatedAt]
@@ -112,7 +112,7 @@ consumes:
       topic: customer.events
       eventType: CUSTOMER_REGISTERED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.customer-events
       purpose: "risk grade and nidHash per wallet (NID blacklist, risk-grade tiers)"
       fieldsUsed: &customer [customerId, walletIds, riskGrade, nidHash]
@@ -132,7 +132,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: limits-risk-service.partner-events
       purpose: "partner wallet risk grade and PARTNER blacklist fingerprint HMAC(partnerId) (OPEN D-29)"
       fieldsUsed: [partnerId, walletId, riskGrade, version]

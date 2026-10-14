@@ -3,6 +3,8 @@
 
 You are implementing **treasury-service** of Bits Pay: trust accounts and trust-balance confirmations, e-money issuance / redemption with the EMY-009 hard control, trust rebalance (R2), manual journals, trust interest, float requests, liquidity monitoring and the e-money regulatory datasets. Back office only: APIs + Swagger, no UI. This folder is the whole world for this service.
 
+**Release scope (CR-TREASURY-1, SRS v1.2):** MVP = e-money issuance (with trust accounts / balance confirmations as its prerequisite) and agent float requests / approval — WP-1, 2, 3, 5, 8, 9. R1+ = redemption, BANK float return, manual journals, trust interest, liquidity monitoring, dashboards, snapshot and reports — WP-4, 6, 7 (trust rebalance R2). R1+ operations answer 501 in the MVP build.
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages, §7 the business rules).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins).

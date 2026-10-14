@@ -4,7 +4,7 @@
 |---|---|
 | Service | `disbursement-service` (`spring.application.name`) |
 | Number / owner | SVC-08 · Dev-2 (Track B) · single module |
-| Layer / release | Core · R2 (NOT-005 reminder registration and LED-008/REL-001 rules are R1-grade obligations of the same code) |
+| Layer / release | Core · **not in MVP — R1+** (SRS v1.2; CR-DISBURSEMENT-1) · R2 (NOT-005 reminder registration and LED-008/REL-001 rules are R1-grade obligations of the same code) |
 | contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8108 · management 9108 |
@@ -26,6 +26,8 @@ The same service lets Rahim schedule "Tk 2,000 to my mother Rahima on the 1st of
 
 ### 1.2 In scope
 
+**Out of MVP scope (SRS v1.2):** the whole service is **[R1+]** (delivered in R2). The MVP release (SRS v1.2, before R1) ships without disbursement, scheduled transfer and request money; admin's product switches `FEATURE.DISBURSEMENT`, `FEATURE.SCHEDULED_TRANSFER` and `FEATURE.REQUEST_MONEY` stay disabled in the MVP. Nothing below is delivered in the MVP.
+
 - Bulk batches (salary, allowance, G2P) via CSV upload (multipart) or JSON; file SHA-256 dedupe; streaming row parsing; row validation (MSISDN, amount, duplicate, wallet resolution by `lookup:batch`, status check, limit headroom by `evaluate:batch` dry run); validation report.
 - Optional pre-registration of unknown recipients (ONB-020 trigger) behind a feature flag.
 - Local maker-checker (kernel K5) with multi-level approval by amount, institution self-approval; funding check against the payer's ledger balance.
@@ -40,6 +42,7 @@ The same service lets Rahim schedule "Tk 2,000 to my mother Rahima on the 1st of
 
 | Deferred item | Replacement now |
 |---|---|
+| Whole service in the MVP release (SRS v1.2) | Out of MVP: disbursement, scheduled transfer and request money are R1+ (R2); `FEATURE.DISBURSEMENT` / `FEATURE.SCHEDULED_TRANSFER` / `FEATURE.REQUEST_MONEY` disabled (CR-DISBURSEMENT-1) |
 | Temporal / workflow engine | Postgres-backed resumable job (ADR-01) |
 | SFTP / host-to-host file intake, bank-funded batches | REST upload only; the payer institution wallet must already hold e-money (funded by treasury issuance) |
 | Automated recipient name match (UC-03 "optional name match") | Validation report shows `displayNameMasked` (from wallet lookup) next to `nameInFile` for a visual check |
@@ -68,6 +71,8 @@ The same service lets Rahim schedule "Tk 2,000 to my mother Rahima on the 1st of
 ---
 
 ## 2. SRS traceability
+
+Baseline: SRS v1.2 (14 Oct 2026). No row is delivered in the MVP release — the whole service is R1+ (R2) (CR-DISBURSEMENT-1).
 
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
@@ -2173,53 +2178,55 @@ Reminder registrations (OPEN D-11) — the engine renders the policy's templates
 
 ## 10. Work packages (build order for Claude Code)
 
-### WP-1 Skeleton and contracts
+Scope tag: every WP is **[R1+]** (whole service out of MVP, SRS v1.2; delivered in R2). CR-DISBURSEMENT-1 is scope tagging only, so there is no WP-CR-1.
+
+### [R1+] WP-1 Skeleton and contracts
 - **Goal:** runnable service with provided contracts served and consumed contracts stubbed.
 - **Scope:** Gradle standalone project (`com.bracits.bitspay.disbursement`), Flyway V1 (§4.1) incl. outbox / processed_event, `ActorContext` + `@RequiresActor`, problem+json mapper (kernel codes, own reasons and extensions), idempotency filter (`idempotency_record`), outbox writer + polling relay, refdata consumer skeleton, `contracts/provided/openapi.yaml` served (drift check), WireMock stubs from `stubs/`, fixtures wired, `Http<Svc>Client`s against WireMock, ArchUnit layering + money rules.
 - **Acceptance:** `idempotency_sameKeyDifferentBody_409`, `idempotency_replay_sameResponse`, `openapi_matchesProvidedContract`, `actor_missingHeaders_400`, `actor_wrongRole_403`, `flyway_fromEmpty_idempotent`, `schema_cannotReadOtherSchema`.
 - **Depends on:** —. **SRS:** LED-008, AUD-001.
 
-### WP-2 Batch intake and parsing
+### [R1+] WP-2 Batch intake and parsing
 - **Scope:** JSON + multipart intake, payer checks (BR-DS-01), FileStore (`local-fs` encrypted, `s3`), SHA-256 dedupe, streaming CSV parser (Taka / poisha columns), row persistence in batches of 5,000, DRAFT → VALIDATING, VALIDATE chunks, `batchRef` generator.
 - **Acceptance:** `csv_takaWithTwoDecimals_parsedExactly`, `csv_threeDecimals_rowInvalid`, `csv_missingHeader_validationFailed`, `csv_1MRows_ingestedUnder60s`, `upload_sameFileTwice_409DuplicateFile`, `upload_idempotentReplay_same202`, `payer_notInstitutionOwned_403`, `payer_debitBlocked_422`.
 - **Depends on:** WP-1. **SRS:** PAY-007, PRT-012.
 
-### WP-3 Validation pipeline and report
+### [R1+] WP-3 Validation pipeline and report
 - **Scope:** ValidationWorker (BR-DS-05..13), `lookup:batch`, `status:batchGet`, dry-run `evaluate:batch`, optional pre-registration with readiness wait, rows endpoint, report CSV.
 - **Acceptance:** S13 data: 5,000 rows with 8 invalid (bad MSISDN, unknown number, merchant wallet, blocked wallet, duplicate, zero amount, > max, 3 decimals) → `validation_s13_4992Valid8Invalid`; `validation_limitHeadroom_dryRun_rowInvalid`; `validation_walletServiceDown_backsOffAndResumes`; `validation_preRegister_onlyWhenFlagged`; `validation_preRegister_notReady_pendingDetail`; `validation_pendingKyc_creditOnlyWhenRefdataAllows`; `report_masksMsisdn_showsDisplayNameMasked`.
 - **Depends on:** WP-2. **SRS:** PAY-007, UC-03, ONB-020, LIM-002.
 
-### WP-4 Maker-checker and funding
+### [R1+] WP-4 Maker-checker and funding
 - **Scope:** submit, approvals (multi-level, expiry, institution checker), `approval.events`, `BATCH_SUBMITTED` / `BATCH_APPROVED`, funding check, `scheduledStartAt`, cancel, audit.
 - **Acceptance:** `approval_checkerEqualsMaker_422`, `approval_institutionCheckerDistinctUser_ok`, `approval_institutionCheckerWithoutUserId_422`, `approval_twoLevelsAbove1Crore`, `approval_expired_backToValidated`, `approve_insufficientFunding_pausedAnd422WithBatch`, `cancel_pendingApproval_cancelsApproval`, `approvalEvents_checkerRolesStaffOnly`.
 - **Depends on:** WP-3. **SRS:** PAY-007, BOM-005, BOM-009, UC-03.
 
-### WP-5 Execution engine
+### [R1+] WP-5 Execution engine
 - **Scope:** EXECUTE chunks, claim / lease / renew, throttle + adaptive back-off, BR-DS-30..41, reservation-release job, finaliser, pause / resume / auto-resume / retry-failed, product-switch pause.
 - **Acceptance:** `execute_s13_allPaidOnce_eventsOncePerRow`, `execute_crashAfterLedgerPost_rerunPaysNobodyTwice`, `execute_twoWorkersSameBatch_noRowTwice` (8 workers, 50k rows), `execute_insufficientFundsMidway_pausesAndResumeContinues`, `execute_riskLimitRow_failedWithLimitExceeded_andReleased`, `execute_evaluate409_newAttemptIds`, `execute_rowIdempotencyConflict_pausedOperator`, `execute_ledger503For10Min_pausedDependency_autoResumes`, `retryFailed_newAttemptCommandId_completionSeq2`, `cancel_skipsValidRows_releasesReservations`, `commandId_uuidv5_knownVectors`, `throttle_respectsRowsPerSecond`, `productDisabled_pausesBatch`.
 - **Depends on:** WP-4. **SRS:** PAY-007, PER-010, REL-001, LED-008, LIM-002.
 
-### WP-6 Scheduled and recurring transfers
+### [R1+] WP-6 Scheduled and recurring transfers
 - **Scope:** schedule CRUD, recurrence calculator (Asia/Dhaka, month end), materialisation + reminder registration / cancellation, executor via `HttpTransactionClient` (delegated headers), unknown-outcome resolver (same key ≤ 20 h, then GET), suspension, events, notifications.
 - **Acceptance:** `recurrence_monthly31_inFebruary_lastDay`, `recurrence_weekly_dhakaTimezone`, `executor_sameOccurrenceTwoPods_oneCall`, `executor_503ThenRetry_sameIdempotencyKey`, `executor_threeFailures_suspended`, `executor_unknown20h_resolvesByTxnRef`, `executor_unknownNoTxnRef_resolvesByClientReference`, `reminder_registeredOnMaterialise_cancelledOnExecute`, `executor_productDisabled_staysPending`.
 - **Depends on:** WP-1. **SRS:** PAY-010, NOT-005.
 
-### WP-7 Request money
+### [R1+] WP-7 Request money
 - **Scope:** create / list / accept / decline / cancel, expiry job, resolver for ACCEPTING, problem relay with `paymentRequest`, events, notifications, reminder registration, caps.
 - **Acceptance:** `request_accept_paysOnce_withPayerHeaders`, `request_concurrentAccept_one409`, `request_accept422_relayedWithTransactionAndPaymentRequest_backToPending`, `request_accept503_staysAccepting_sameKeyRetry`, `request_expiry_emitsDeclinedExpired_cancelsReminder`, `request_dailyCap_400`, `request_templateVariables_rawValues`.
 - **Depends on:** WP-1. **SRS:** PAY-008, NOT-005.
 
-### WP-8 Integration in the Compose stack (M4)
+### [R1+] WP-8 Integration in the Compose stack (M4)
 - **Scope:** switch to real wallet / ledger / limits-risk / transaction / admin in the Compose stack; walk S13 by hand (5,000 rows, 8 invalid; second run pays nobody twice) and the scheduled / request-money scenarios; verify tolerant clients against real responses; raise change requests for any drift.
 - **Acceptance:** S13 twice in a row (second run: 0 new transfers); reconciliation shows zero exceptions for the batch; reminders delivered once.
 - **Depends on:** WP-5, WP-6, WP-7. **SRS:** PAY-007, PAY-008, PAY-010.
 
-### WP-9 Hardening
+### [R1+] WP-9 Hardening
 - **Scope:** 1M-row run against WireMock clients locally (`perf/bulk-1m.sh` generator, not a k6 suite), chaos test (kill workers), PII log scan, `docs/TRACEABILITY.md`, alert-condition metrics.
 - **Acceptance:** 1M rows paid with WireMock clients without duplicates; chaos (kill workers every 5 min) → 0 duplicate posts, all rows final; PII log scan green.
 - **Depends on:** WP-8. **SRS:** PER-009, PER-010, REL-001.
 
-### WP-10 (optional, Should) Voucher cash-out — **BLOCKED**
+### [R1+] WP-10 (optional, Should) Voucher cash-out — **BLOCKED**
 - **Scope:** voucher issue (institution funds escrow), one-time code, redemption at agent with ID check, expiry refund.
 - **Status:** blocked until the deferred change request CCR-DS-08 (ledger voucher commands and an escrow account type) is approved. Do not start.
 - **SRS:** CIC-004.
@@ -2299,3 +2306,4 @@ Reminder registrations (OPEN D-11) — the engine renders the policy's templates
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-08 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit + GL CCRs |
+| 1.0.0 | 2026-10-14 | CR-DISBURSEMENT-1 | MVP scope tagging (SRS v1.2): whole service R1+ (R2), not in MVP; `FEATURE.DISBURSEMENT` / `SCHEDULED_TRANSFER` / `REQUEST_MONEY` stay disabled in MVP; every WP tagged [R1+]; §2 baseline SRS v1.2. Contract version unchanged |

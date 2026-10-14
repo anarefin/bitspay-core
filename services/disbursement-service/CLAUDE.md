@@ -3,6 +3,8 @@
 
 You are implementing **disbursement-service** (SVC-08) of Bits Pay: bulk disbursement batches, local maker-checker, scheduled transfers and request money. This folder is the whole world for this service.
 
+**Release scope:** the whole service is **[R1+]** (delivered in R2) — not in the MVP release (SRS v1.2, CR-DISBURSEMENT-1); `FEATURE.DISBURSEMENT`, `FEATURE.SCHEDULED_TRANSFER`, `FEATURE.REQUEST_MONEY` stay disabled in the MVP. Every WP in SPEC §10 is tagged [R1+].
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins).

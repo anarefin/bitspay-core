@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bits Pay MVP Flows</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --surface:#ffffff; --text:#1f2430; --muted:#5b6475; --border:#e3e6ec;
+    --accent:#1d4ed8; --accent-soft:#e8eefc;
+    --ok:#1e7f4f; --ok-soft:#e6f4ec; --warn:#a05a00; --warn-soft:#fff6e5; --err:#b42318; --err-soft:#fdecea;
+    --code-bg:#f3f4f7;
+    --rest:#1d6fb8; --kafka:#7a4bb3; --redis:#b42318; --db:#1e7f4f; --inproc:#5b6475;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1218; --surface:#171b23; --text:#e4e7ee; --muted:#9aa3b5; --border:#2a303c;
+      --accent:#7aa2ff; --accent-soft:#1c2740;
+      --ok:#5cc58f; --ok-soft:#14261c; --warn:#e0a54a; --warn-soft:#2a2112; --err:#ff8a7a; --err-soft:#2e1714;
+      --code-bg:#1f242e;
+      --rest:#6fb2ff; --kafka:#b893ff; --redis:#ff8a7a; --db:#5cc58f; --inproc:#9aa3b5;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1218; --surface:#171b23; --text:#e4e7ee; --muted:#9aa3b5; --border:#2a303c;
+    --accent:#7aa2ff; --accent-soft:#1c2740;
+    --ok:#5cc58f; --ok-soft:#14261c; --warn:#e0a54a; --warn-soft:#2a2112; --err:#ff8a7a; --err-soft:#2e1714;
+    --code-bg:#1f242e;
+    --rest:#6fb2ff; --kafka:#b893ff; --redis:#ff8a7a; --db:#5cc58f; --inproc:#9aa3b5;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+  a{color:var(--accent)}
+  .layout{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1320px;margin:0 auto}
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:24px 16px;border-right:1px solid var(--border);background:var(--surface)}
+  nav.toc h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 6px;border:0;padding:0}
+  nav.toc h2:first-child{margin-top:0}
+  nav.toc a{display:block;color:var(--text);text-decoration:none;padding:3px 8px;border-radius:6px;font-size:14px}
+  nav.toc a:hover{background:var(--accent-soft)}
+  main{padding:32px 40px 80px;min-width:0}
+  header.hero{background:var(--surface);border:1px solid var(--border);border-left:6px solid var(--accent);border-radius:12px;padding:24px 28px;margin-bottom:28px}
+  header.hero h1{margin:0 0 6px;font-size:28px;line-height:1.25}
+  header.hero p{margin:6px 0}
+  .meta{color:var(--muted);font-size:13px}
+  section{margin:48px 0;scroll-margin-top:16px}
+  h2{font-size:22px;border-bottom:2px solid var(--accent-soft);padding-bottom:6px;margin-top:0}
+  h3{font-size:16px;margin:22px 0 8px}
+  .uc-badges{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+  .badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);border:1px solid var(--border)}
+  .badge.mvp{background:var(--ok-soft);color:var(--ok)}
+  .badge.sup{background:var(--warn-soft);color:var(--warn)}
+  .callout{background:var(--accent-soft);border-left:4px solid var(--accent);padding:10px 14px;border-radius:8px;margin:12px 0}
+  .callout.warn{background:var(--warn-soft);border-color:var(--warn)}
+  .callout.err{background:var(--err-soft);border-color:var(--err)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px}
+  .card h3{margin-top:0}
+  .card ul{margin:4px 0;padding-left:18px}
+  .diagram{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;overflow-x:auto;margin:12px 0}
+  .diagram pre.mermaid{margin:0;min-width:640px;background:none;font-size:13px}
+  .tbl{overflow-x:auto;margin:10px 0;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{background:var(--code-bg);font-weight:600;white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  td.n{color:var(--muted);font-variant-numeric:tabular-nums;width:32px}
+  .ct{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+  .ct.rest{color:var(--rest)} .ct.kafka{color:var(--kafka)} .ct.redis{color:var(--redis)} .ct.db{color:var(--db)} .ct.in{color:var(--inproc)}
+  .svc{font-weight:600;white-space:nowrap}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
+  .pipeline{counter-reset:step;list-style:none;padding:0;margin:8px 0}
+  .pipeline li{counter-increment:step;position:relative;padding:6px 0 6px 40px;border-bottom:1px dashed var(--border)}
+  .pipeline li::before{content:counter(step);position:absolute;left:0;top:6px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--surface);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .theme-toggle{float:right;font:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer}
+  @media (max-width: 900px){
+    .layout{grid-template-columns:1fr}
+    nav.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--border)}
+    main{padding:20px 16px 60px}
+    header.hero{padding:18px 16px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <h2>Overview</h2>
+  <a href="#scope">MVP scope and services</a>
+  <a href="#pipeline">Shared payment pipeline</a>
+  <a href="#setup">Day-zero setup order</a>
+  <h2>MVP features</h2>
+  <a href="#uc-p2p">1. P2P send money</a>
+  <a href="#uc-merchant">2. Merchant payment</a>
+  <a href="#uc-refund">3. Merchant refund</a>
+  <a href="#uc-cashin">4. Agent cash-in</a>
+  <a href="#uc-cashout">5. Agent cash-out</a>
+  <a href="#uc-billpay">6. Bill payment</a>
+  <a href="#uc-recharge">7. Mobile recharge</a>
+  <h2>Supporting</h2>
+  <a href="#uc-treasury">8. E-money issuance and float</a>
+  <a href="#uc-onboarding">9. Onboarding and basic KYC</a>
+  <a href="#uc-reversal">10. Dispute and reversal</a>
+  <a href="#uc-gl">11. GL-R1a books</a>
+  <h2>Appendix</h2>
+  <a href="#codes">Code reference</a>
+  <a href="#sources">Source index</a>
+</nav>
+
+<main>
+<header class="hero">
+  <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  <h1>Bits Pay MVP: use-case flows, end to end</h1>
+  <p>This page traces each MVP use case from the first API call to the last booking. For every step it names the service, how the call is made (REST, Kafka, Redis or DB), the ledger command and legs, the events, the notifications and the GL accounts.</p>
+  <p class="meta">Built from <code>bitspay-core</code> service SPECs §3.4 (key flows), the CR log and the SRS v1.2 MVP release. The money examples reuse the SPEC personas (Rahim, Karim, Salma, Padma, Nirob Store). Amounts are in poisha (100 poisha = 1 Tk).</p>
+  <div class="legend" style="margin-top:10px">Call types:
+    <span class="ct rest">REST</span> sync HTTP
+    <span class="ct kafka">KAFKA</span> async event
+    <span class="ct redis">REDIS</span> cache / idempotency
+    <span class="ct db">DB</span> own Postgres
+    <span class="ct in">IN-PROC</span> inside the service
+  </div>
+</header>
+
+<!-- ============================================================ SCOPE -->
+<section id="scope">
+  <h2>MVP scope and the services involved</h2>
+  <p>The MVP has six customer-facing features and four supporting capabilities. Real off-us integrations (ekPay, aggregators, Bangla QR, telco APIs) come in R1, so bill payment and recharge use the in-process <code>SimulatedBillerClient</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>SVC</th><th>Service</th><th>Role in the MVP</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr><td>01</td><td class="svc">ledger-service</td><td>The only writer to TigerBeetle. Runs ledger commands 1–19, creates accounts, serves balances, and publishes <code>ledger.changes</code> (tb-cdc → RabbitMQ → cdc-bridge → Kafka)</td><td>All use cases</td></tr>
+      <tr><td>02</td><td class="svc">transaction-service</td><td>Payment orchestrator: P2P, cash-in/out, merchant pay and refund, float transfer, bill pay, recharge, quote, reversal executor</td><td>1–8, 10</td></tr>
+      <tr><td>03</td><td class="svc">wallet-service</td><td>Customers, KYC, wallets, and the <code>ws:{bucket}</code> status cache (wallet module). Agents, merchants, distributors, billers, the biller catalogue and QR (partner module)</td><td>All</td></tr>
+      <tr><td>05</td><td class="svc">limits-risk-service</td><td>Limits, reservations, blacklists, fraud rules on the hot path (<code>POST /v1/risk/evaluate</code>)</td><td>1–8, 9</td></tr>
+      <tr><td>06</td><td class="svc">pricing-service</td><td>Fee plans, VAT, MDR and commission, published on Kafka <code>fee.rules</code>. transaction-service prices locally (the campaign module is off)</td><td>1–8</td></tr>
+      <tr><td>07</td><td class="svc">treasury-service</td><td>Trust accounts, e-money issuance (EMY-009 hard control), agent float requests</td><td>8</td></tr>
+      <tr><td>09</td><td class="svc">support-service</td><td>Disputes, wrong-transfer, back-office reversals</td><td>10</td></tr>
+      <tr><td>11</td><td class="svc">compliance-service</td><td>KYC / partner screening only (AML features return 501)</td><td>9</td></tr>
+      <tr><td>15</td><td class="svc">admin-service</td><td>Refdata, params, <code>FEATURE.*</code> product switches, maker-checker approvals, audit, notifications (IN_APP + SMS from <code>txn.events</code>)</td><td>All</td></tr>
+      <tr><td>16</td><td class="svc">general-ledger-service</td><td>Slice GL-R1a: chart of accounts, posting rules, <code>ledger.changes</code> ingestion, day close, reports</td><td>11 (every money movement)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><strong>Not in the MVP:</strong> disbursement-service (bulk, scheduled transfers, request money), finance-ops-service (reconciliation and reporting), the pricing campaign module, commission settlement (command 13), AML case management, treasury redemption, and biller payouts (W-MVP-PAYOUT). There is no PIN, OTP or step-up (TX-MVP-AUTH), and no journal export: the GL is the book of record.</div>
+  <p class="meta">Product switches on in the MVP (BR-GOV-47): <code>P2P</code>, <code>CASH_IN</code>, <code>CASH_OUT</code>, <code>MERCHANT_PAYMENT</code>, <code>MERCHANT_REFUND</code>, <code>FLOAT_TRANSFER</code>, <code>REVERSAL</code>, <code>BILL_PAY</code>, <code>RECHARGE</code>. Off: <code>DISBURSEMENT</code>, <code>SCHEDULED_TRANSFER</code>, <code>REQUEST_MONEY</code>.</p>
+</section>
+
+<!-- ============================================================ PIPELINE -->
+<section id="pipeline">
+  <h2>Shared payment pipeline (transaction-service)</h2>
+  <p>Every money-moving payment (use cases 1–7, plus float transfer) runs the same fixed steps in this order. The per-feature sections below only call out where a feature differs.</p>
+  <ol class="pipeline">
+    <li><strong>Validate and gate.</strong> Check the request schema, bind the actor (<code>X-Actor-Wallet-Id</code> must be the debited wallet, or the agent for agent operations), and check the product switch <code>FEATURE.&lt;PRODUCT&gt;</code> is on. <span class="ct in">IN-PROC</span></li>
+    <li><strong>Claim idempotency.</strong> Run <code>EVAL idem_claim idem:{actorId}:{Idempotency-Key}</code>. NEW continues. HIT with the same hash replays or re-drives. HIT with a different hash returns <code>409 IDEMPOTENCY_CONFLICT</code>. <span class="ct redis">REDIS critical</span></li>
+    <li><strong>Check wallet status.</strong> Pipelined <code>HGET ws:{bucket}</code> for both wallets. The value is <code>version:status:tier:type:flags</code>, written by wallet-service. Both wallets need status A, and the type pair must be allowed. <span class="ct redis">REDIS cache</span></li>
+    <li><strong>Evaluate risk and reserve limits.</strong> <code>POST /v1/risk/evaluate</code> to limits-risk returns ALLOW, a reservation (id = txnId), <code>receiverMaxBalancePoisha</code> and usage. In the MVP, STEP_UP and HOLD are terminal declines. <span class="ct rest">REST</span></li>
+    <li><strong>Price.</strong> Done locally from plans received on <code>fee.rules</code> (<code>PRICING_PLAN_UPSERTED</code>). Produces the fee, VAT, fee bearer, commission, AIT and commission source. <span class="ct in">IN-PROC</span></li>
+    <li><strong>Persist the intent.</strong> <code>INSERT txn_intent</code> with status INITIATED. <span class="ct db">DB</span></li>
+    <li><strong>Post to the ledger.</strong> <code>POST /v1/ledger/commands/post-*</code> with <code>commandId = txnId</code>. The ledger returns OK, EXISTS or REJECTED (final). <span class="ct rest">REST</span></li>
+    <li><strong>Record the outcome.</strong> In one DB transaction: <code>UPDATE status COMPLETED|FAILED WHERE status = INITIATED</code> and an outbox row. Debezium then publishes it to <code>txn.events</code>. <span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></li>
+  </ol>
+  <div class="grid2">
+    <div class="card">
+      <h3>Headers (GLOBAL-CONVENTIONS K3)</h3>
+      <ul>
+        <li><code>X-Actor-Type</code>: CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, STAFF, SYSTEM or SERVICE</li>
+        <li><code>X-Actor-Id</code>, <code>X-Actor-Wallet-Id</code>, <code>X-Actor-User-Id</code>, <code>X-Actor-Roles</code> (staff)</li>
+        <li><code>X-Channel</code> (APP, API, USSD…), <code>X-Device-Id</code></li>
+        <li><code>Idempotency-Key</code> is required on every money-moving POST</li>
+      </ul>
+      <p class="meta"><strong>TX-MVP-AUTH:</strong> no PIN, OTP or step-up. The gateway or channel sets trusted <code>X-Actor-*</code> headers, and customers call the REST API directly (SRS A-43). CR-TRANSACTION-2 (fixed PIN) was rejected.</p>
+    </div>
+    <div class="card">
+      <h3>After the outcome commits</h3>
+      <ul>
+        <li><code>txn.events</code>: <code>TRANSACTION_COMPLETED</code>, <code>TRANSACTION_FAILED</code>, <code>TRANSACTION_REVERSED</code>, <code>TRANSACTION_REFUNDED</code></li>
+        <li>Consumers: limits-risk (counters, reservation commit), admin-service notification (rule engine → IN_APP + SMS), support, pricing</li>
+        <li>The ledger CDC publishes <code>ledger.changes</code> → general-ledger-service (books) and treasury (float positions, liquidity alerts)</li>
+        <li>Crash after the ledger post: the sweeper (every 5 s, intents older than 30 s) asks <code>GET /v1/ledger/commands/{txnId}</code> and completes or fails the intent</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Ledger leg layout (ledger SPEC §7.3)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Leg</th><th>What</th><th>Transfer code</th><th>Credit to</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Principal</td><td>1001–1018 (per product)</td><td>Beneficiary wallet</td></tr>
+        <tr><td>1</td><td>Fee</td><td>2001 FEE</td><td>FEE_INCOME (200)</td></tr>
+        <tr><td>2</td><td>VAT on fee</td><td>2002 VAT</td><td>VAT_PAYABLE (210)</td></tr>
+        <tr><td>3</td><td>Commission, net of AIT</td><td>2003 COMMISSION</td><td>Beneficiary agent (from FEE_INCOME or COMMISSION_PAYABLE)</td></tr>
+        <tr><td>4</td><td>AIT on commission</td><td>2004 AIT</td><td>AIT_PAYABLE (230)</td></tr>
+        <tr><td>5–8</td><td>Max-balance bounds (technical, net 0)</td><td>9001–9004</td><td>BOUNDS_CONTROL / BOUNDS_OPERATOR, never on <code>ledger.changes</code></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ============================================================ SETUP -->
+<section id="setup">
+  <h2>Day-zero setup order</h2>
+  <p>A fresh environment must be set up in this order before a customer can transact. Each step is covered in a section below.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Step</th><th>Service</th><th>Section</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Deploy GL before the first business transfer (greenfield), and load CoA seed v0 (59 accounts) and the rule set</td><td class="svc">general-ledger-service</td><td><a href="#uc-gl">11</a></td></tr>
+      <tr><td class="n">2</td><td>Seed refdata, params, <code>FEATURE.*</code> switches and notification templates</td><td class="svc">admin-service</td><td>—</td></tr>
+      <tr><td class="n">3</td><td>Publish pricing plans on <code>fee.rules</code>, and seed limits</td><td class="svc">pricing, limits-risk</td><td><a href="#codes">Appendix</a></td></tr>
+      <tr><td class="n">4</td><td>Onboard partners: distributor, agents, merchants, billers (BILLER_STD chain). Each gets a ledger account and a <code>ws:</code> entry, and billers are written to the <code>biller:*</code> catalogue cache</td><td class="svc">wallet-service (partner)</td><td><a href="#uc-onboarding">9</a></td></tr>
+      <tr><td class="n">5</td><td>Create trust accounts, confirm trust balances, then issue e-money to the distributor</td><td class="svc">treasury-service</td><td><a href="#uc-treasury">8</a></td></tr>
+      <tr><td class="n">6</td><td>Float top-up from distributor to agent</td><td class="svc">treasury → transaction</td><td><a href="#uc-treasury">8</a></td></tr>
+      <tr><td class="n">7</td><td>Onboard a customer and approve basic KYC (single step)</td><td class="svc">wallet, compliance, limits-risk</td><td><a href="#uc-onboarding">9</a></td></tr>
+      <tr><td class="n">8</td><td>Customer cash-in at the agent, after which payments can start</td><td class="svc">transaction-service</td><td><a href="#uc-cashin">4</a></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ 1 P2P -->
+<section id="uc-p2p">
+  <h2>1. P2P send money</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">PRODUCT P2P · prefix PP</span><span class="badge">ledger cmd 1 post-p2p · code 1001</span><span class="badge">flow TX F1</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>CUSTOMER</strong> (Rahim), via APP or API</li>
+      <li><code>POST /v1/payments/p2p</code> (optional <code>POST /v1/payments/quote</code> first)</li>
+      <li>Preconditions: both wallets are customer wallets (type C) with status A, and the sender has funds</li>
+    </ul></div>
+    <div class="card"><h3>Pricing</h3><ul>
+      <li>Plan <code>PLN-P2P-STD</code> v3, payer-borne</li>
+      <li>Example: 500 Tk → fee 5 Tk + VAT 0.75 Tk, so the sender is debited 505.75 Tk</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant RC as Redis critical
+  participant RW as Redis cache
+  participant R as limits-risk-service
+  participant DB as Postgres txn
+  participant L as ledger-service
+  participant K as Kafka
+  C->>T: POST /v1/payments/p2p (Idempotency-Key, to Karim, 50000)
+  T->>T: validate, actor wallet = from, FEATURE.P2P on
+  T->>RC: idem_claim → NEW
+  T->>RW: HGET ws for both wallets → A, type C
+  T->>R: POST /v1/risk/evaluate (P2P, 50000)
+  R-->>T: ALLOW, reservation, receiverMaxBalance
+  T->>T: price PLN-P2P-STD → fee 500, VAT 75
+  T->>DB: INSERT intent INITIATED
+  T->>L: post-p2p (commandId = txnId)
+  L-->>T: OK, transferIds[3]
+  T->>DB: COMPLETED + outbox TRANSACTION_COMPLETED
+  T-->>C: 200 COMPLETED, totalDebit 50575
+  K-->>R: txn.events → commit counters
+  K-->>K: admin notification → R-P2P-SENT, R-P2P-RECEIVED
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–2</td><td class="svc">App → transaction</td><td><span class="ct rest">REST</span></td><td>Validate, bind the actor, check the product switch</td></tr>
+      <tr><td class="n">3</td><td class="svc">transaction → Redis critical</td><td><span class="ct redis">REDIS</span></td><td>Claim the idempotency key (7-day look-back in DB as a backstop)</td></tr>
+      <tr><td class="n">4</td><td class="svc">transaction → Redis cache</td><td><span class="ct redis">REDIS</span></td><td>Wallet status for sender and receiver</td></tr>
+      <tr><td class="n">5–6</td><td class="svc">transaction → limits-risk</td><td><span class="ct rest">REST</span></td><td>Limits, velocity, blacklist and fraud rules, and the limit reservation</td></tr>
+      <tr><td class="n">7–8</td><td class="svc">transaction</td><td><span class="ct in">IN-PROC</span> <span class="ct db">DB</span></td><td>Price locally and insert the intent</td></tr>
+      <tr><td class="n">9–10</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Linked chain: principal, fee, VAT, plus the receiver max-balance bounds</td></tr>
+      <tr><td class="n">11–12</td><td class="svc">transaction</td><td><span class="ct db">DB</span></td><td>Outcome and outbox in one transaction, then the response</td></tr>
+      <tr><td class="n">13–14</td><td class="svc">Kafka consumers</td><td><span class="ct kafka">KAFKA</span></td><td>limits-risk commits counters, and admin-service sends SMS/in-app to sender and receiver</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 100 Rahim → 100 Karim, 1001</li>
+      <li>Leg 1: Rahim → FEE_INCOME 200, 2001</li>
+      <li>Leg 2: Rahim → VAT_PAYABLE 210, 2002</li>
+      <li>GL: Dr 2101 / Cr 2101 (principal), fee → <strong>4101</strong>, VAT → <strong>2201</strong></li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Risk DECLINE → 422 and the reservation is released, with no ledger call</li>
+      <li>Ledger REJECTED <code>INSUFFICIENT_FUNDS</code> / <code>MAX_BALANCE_EXCEEDED</code> → FAILED + <code>TRANSACTION_FAILED</code> → 422</li>
+      <li>Ledger timeout → 503 with status INITIATED. A same-key retry re-drives within 20 s (TX F9)</li>
+      <li>Pod crash after the post → the sweeper completes the intent (TX F8)</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 2 MERCHANT -->
+<section id="uc-merchant">
+  <h2>2. Merchant payment (on-us QR)</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">MERCHANT_PAYMENT · prefix MP</span><span class="badge">ledger cmd 4 · code 1004</span><span class="badge">flow TX F4</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>CUSTOMER</strong>, who scans the merchant's QR</li>
+      <li><code>POST /v1/payments/merchant</code> (merchantWalletId, amount, merchantReference, <code>qrPayloadId</code>)</li>
+      <li>Preconditions: merchant wallet type M with status A. On-us only (BR-TX-104), with no Bangla QR off-us in the MVP</li>
+      <li>The QR is issued by wallet-service (partner module)</li>
+    </ul></div>
+    <div class="card"><h3>Pricing</h3><ul>
+      <li>Plan <code>PLN-MERCHANT-STD</code>: MDR 150 bps, <strong>PAYEE</strong>-borne</li>
+      <li>Example: 350 Tk → fee 5.25 + VAT 0.79 taken from the merchant. The customer pays 350 Tk and the merchant nets 343.96 Tk</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant RW as Redis cache
+  participant R as limits-risk-service
+  participant L as ledger-service
+  participant K as Kafka
+  C->>T: POST /v1/payments/merchant (Nirob Store, 35000, qrPayloadId)
+  T->>T: validate, FEATURE.MERCHANT_PAYMENT, idem claim
+  T->>RW: ws Rahim C A, Nirob M A, categoryCode 3101
+  T->>R: evaluate MERCHANT_PAYMENT
+  R-->>T: ALLOW
+  T->>T: PLN-MERCHANT-STD → fee 525, VAT 79, bearer PAYEE
+  T->>T: INSERT intent INITIATED
+  T->>L: post-merchant-payment (feeBearer PAYEE)
+  L-->>T: OK
+  T->>T: COMPLETED + outbox
+  T-->>C: 200 COMPLETED, totalDebit 35000
+  K-->>K: notification R-MERCHANT-CUST, R-MERCHANT-MER
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–3</td><td class="svc">App → transaction → Redis</td><td><span class="ct rest">REST</span> <span class="ct redis">REDIS</span></td><td>Pipeline steps 1–3, with the merchant category read from the status cache</td></tr>
+      <tr><td class="n">4–5</td><td class="svc">transaction → limits-risk</td><td><span class="ct rest">REST</span></td><td>Customer send limits and merchant receive rules</td></tr>
+      <tr><td class="n">6–9</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>MDR is debited from the merchant side because the fee bearer is PAYEE</td></tr>
+      <tr><td class="n">10–12</td><td class="svc">transaction → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td>Outcome, then notifications to the customer and the merchant</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 100 → 130, 1004</li>
+      <li>Legs 1–2: 130 merchant → FEE_INCOME / VAT_PAYABLE</li>
+      <li>GL: Dr 2101 / Cr 2104, MDR → <strong>4104</strong>, VAT → 2201</li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Same as P2P: risk decline, ledger rejection, timeout re-drive, sweeper</li>
+      <li>Non-ACTIVE or unknown QR → 4xx before any reservation</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 3 REFUND -->
+<section id="uc-refund">
+  <h2>3. Merchant refund (full or partial)</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">MERCHANT_REFUND · prefix MR</span><span class="badge">ledger cmd 5 · code 1005</span><span class="badge">flow TX F5</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li><strong>Direct:</strong> MERCHANT calls <code>POST /v1/payments/merchant-refund</code> (originalTxnRef MP…, amount, reasonCode)</li>
+      <li><strong>Maker-checker</strong> (merchant sub-type requires it, or the maker is STAFF): <code>POST /v1/merchant-refund-requests</code>, then <code>POST /v1/approvals/{id}:approve</code> by a different user</li>
+      <li>Preconditions: the original is a MERCHANT_PAYMENT that is COMPLETED or PARTIALLY_REFUNDED, within the refund window, and with remaining ≥ amount</li>
+    </ul></div>
+    <div class="card"><h3>Pricing</h3><ul>
+      <li>Plan <code>PLN-REFUND-NONE</code>: no fee</li>
+      <li>The MDR from the original is not given back by the refund in the MVP seed</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant M as Nirob Store or STAFF
+  participant T as transaction-service
+  participant DB as Postgres txn
+  participant R as limits-risk-service
+  participant L as ledger-service
+  alt maker-checker required
+    M->>T: POST /v1/merchant-refund-requests
+    T->>T: validate, approval PENDING, APPROVAL_REQUESTED
+    M->>T: POST /v1/approvals/{id}:approve (checker ≠ maker)
+    T->>T: execute with key apr-{approvalId}
+  else direct
+    M->>T: POST /v1/payments/merchant-refund (MP..., 40000)
+  end
+  T->>DB: read original, check window and remaining
+  T->>T: idem claim, ws Nirob M A, Rahim C A
+  T->>R: evaluate MERCHANT_REFUND
+  T->>DB: lock original FOR UPDATE, refund_pending += amount, INSERT MR INITIATED
+  T->>L: post-merchant-refund (Nirob → Rahim)
+  L-->>T: OK
+  T->>DB: refund COMPLETED, original PARTIALLY_REFUNDED or REFUNDED, outbox
+  T-->>M: 200 COMPLETED
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–4</td><td class="svc">Merchant/Staff → transaction</td><td><span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Optional approval request; its approval runs the refund with the maker as initiator</td></tr>
+      <tr><td class="n">6–8</td><td class="svc">transaction → DB / Redis / risk</td><td><span class="ct db">DB</span> <span class="ct redis">REDIS</span> <span class="ct rest">REST</span></td><td>Read-only checks, then risk evaluation</td></tr>
+      <tr><td class="n">9</td><td class="svc">transaction</td><td><span class="ct db">DB</span></td><td>Locked re-check against concurrent refunds (BR-TX-15)</td></tr>
+      <tr><td class="n">10–11</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>130 merchant → 100 customer</td></tr>
+      <tr><td class="n">12–13</td><td class="svc">transaction → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td><code>TRANSACTION_COMPLETED</code> (refund) and <code>TRANSACTION_REFUNDED</code> (original), audit <code>REFUND_COMPLETED</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 130 → 100, 1005</li>
+      <li>GL: Dr 2104 / Cr 2101. Any refund fee would go to 4105 (none in the seed)</li>
+      <li>Notifications: <code>R-REFUND</code> (customer) and <code>R-REFUND-MER</code></li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Concurrent refund wins → <code>422 REFUND_EXCEEDS_ORIGINAL</code> (remainingPoisha). Nothing is persisted and the reservation is released</li>
+      <li>Reversal pending on the original → <code>409 STATE_CONFLICT</code></li>
+      <li>Merchant lacks balance → ledger <code>INSUFFICIENT_FUNDS</code> → 422</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 4 CASH-IN -->
+<section id="uc-cashin">
+  <h2>4. Agent cash-in</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">CASH_IN · prefix CI</span><span class="badge">ledger cmd 2 · code 1002</span><span class="badge">flow TX F2</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>AGENT</strong> (Salma), via the partner app. The customer hands over cash</li>
+      <li><code>POST /v1/payments/cash-in</code> (agentWalletId, customerWalletId, amount)</li>
+      <li>Preconditions: the agent (type A) holds enough float (<a href="#uc-treasury">8</a>), and the customer wallet is A and has room under max balance</li>
+    </ul></div>
+    <div class="card"><h3>Pricing</h3><ul>
+      <li>Plan <code>PLN-CASHIN-STD</code>: fee 0, agent commission 40 bps, AIT 10 %</li>
+      <li>Commission source <code>COMMISSION_PAYABLE</code> (operator-funded), beneficiary PAYER (the agent)</li>
+      <li>Example: 1,000 Tk → commission 4 Tk (agent nets 3.60, AIT 0.40)</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Salma agent app
+  participant T as transaction-service
+  participant RW as Redis cache
+  participant R as limits-risk-service
+  participant L as ledger-service
+  participant K as Kafka
+  A->>T: POST /v1/payments/cash-in (Salma → Rahim, 100000)
+  T->>T: validate, FEATURE.CASH_IN, idem claim
+  T->>RW: ws Salma A debit ok, Rahim C credit ok
+  T->>R: evaluate CASH_IN
+  R-->>T: ALLOW, receiverMaxBalance
+  T->>T: PLN-CASHIN-STD → commission 400, AIT 40, source COMMISSION_PAYABLE
+  T->>T: INSERT intent INITIATED
+  T->>L: post-cash-in
+  Note over L: leg 0 principal 1002, leg 3 COMMISSION_PAYABLE → Salma 360, leg 4 → AIT_PAYABLE 40
+  L-->>T: OK
+  T->>T: COMPLETED + outbox
+  T-->>A: 200 COMPLETED
+  K-->>K: notification R-CASHIN-AGENT, R-CASHIN-CUST
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–3</td><td class="svc">Agent app → transaction → Redis</td><td><span class="ct rest">REST</span> <span class="ct redis">REDIS</span></td><td>The actor wallet must be the agent wallet. Type pair A → C</td></tr>
+      <tr><td class="n">4–5</td><td class="svc">transaction → limits-risk</td><td><span class="ct rest">REST</span></td><td>Customer receive limits and agent limits</td></tr>
+      <tr><td class="n">6–10</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Principal plus in-line commission and AIT legs</td></tr>
+      <tr><td class="n">11–13</td><td class="svc">transaction → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td>Outcome, SMS to the customer, in-app to the agent. treasury updates the agent float position from <code>ledger.changes</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 110 agent → 100 customer, 1002</li>
+      <li>Leg 3: COMMISSION_PAYABLE 220 → 110 agent, 2003. Leg 4: 220 → AIT_PAYABLE 230, 2004</li>
+      <li>GL: Dr 2102 / Cr 2101, gross commission → <strong>5101</strong> expense, AIT → <strong>2202</strong></li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Agent short of float → ledger <code>INSUFFICIENT_FUNDS</code> → 422. The agent requests a top-up (<a href="#uc-treasury">8</a>)</li>
+      <li>Customer over max balance → <code>MAX_BALANCE_EXCEEDED</code></li>
+      <li>A low agent float can raise <code>LIQUIDITY_THRESHOLD_BREACHED</code> in treasury</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 5 CASH-OUT -->
+<section id="uc-cashout">
+  <h2>5. Agent cash-out</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">CASH_OUT · prefix CO</span><span class="badge">ledger cmd 3 · code 1003</span><span class="badge">flow TX F3</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>CUSTOMER</strong> (Karim), via APP, USSD or API. The agent hands out cash</li>
+      <li>Optional <code>POST /v1/payments/quote</code> (no Idempotency-Key, TX F10) for the confirmation screen</li>
+      <li><code>POST /v1/payments/cash-out</code> (customerWalletId, agentWalletId, amount)</li>
+      <li>No OTP or step-up in the MVP (A-43)</li>
+    </ul></div>
+    <div class="card"><h3>Pricing</h3><ul>
+      <li>Plan <code>PLN-CASHOUT-STD</code> v2: fee 150 bps, payer-borne</li>
+      <li>Commission 40 % of the fee, source <code>FEE_INCOME</code>, beneficiary PAYEE (the agent)</li>
+      <li>Example: 500 Tk → fee 7.50 + VAT 1.12. The agent gets a 3 Tk commission (2.70 net + 0.30 AIT)</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant K as Karim app or USSD
+  participant T as transaction-service
+  participant R as limits-risk-service
+  participant L as ledger-service
+  K->>T: POST /v1/payments/quote (CASH_OUT, 50000)
+  T->>R: GET /v1/limits/wallets/{Karim}/usage
+  T-->>K: 200 Quote fee 750, VAT 112, total 50862
+  K->>T: POST /v1/payments/cash-out (Karim → Salma, 50000)
+  T->>T: validate, idem claim, ws Karim C, Salma A
+  T->>R: evaluate CASH_OUT
+  R-->>T: ALLOW, monthly count 2
+  T->>T: fee 750, VAT 112, commission 300, AIT 30, source FEE_INCOME
+  T->>T: INSERT intent INITIATED
+  T->>L: post-cash-out
+  alt REJECTED INSUFFICIENT_FUNDS
+    L-->>T: REJECTED
+    T->>T: FAILED + outbox TRANSACTION_FAILED
+    T-->>K: 422 INSUFFICIENT_FUNDS
+  else OK
+    L-->>T: OK
+    T->>T: COMPLETED + outbox
+    T-->>K: 200 COMPLETED
+  end
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–3</td><td class="svc">App → transaction → limits-risk</td><td><span class="ct rest">REST</span></td><td>The quote reads usage (300 ms, no retry). If unreadable, the fee is an upper bound</td></tr>
+      <tr><td class="n">4–7</td><td class="svc">transaction → Redis / risk</td><td><span class="ct redis">REDIS</span> <span class="ct rest">REST</span></td><td>Pipeline steps 1–4. Type pair C → A</td></tr>
+      <tr><td class="n">8–10</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Principal, fee, VAT, commission from FEE_INCOME to the agent, AIT</td></tr>
+      <tr><td class="n">11+</td><td class="svc">transaction → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td>Outcome, with notifications <code>R-CASHOUT-CUST</code> and <code>R-CASHOUT-AGENT</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 100 → 110, 1003. Legs 1–2: customer → 200 / 210</li>
+      <li>Leg 3: FEE_INCOME 200 → agent 110, 2003. Leg 4: 200 → 230, 2004</li>
+      <li>GL: Dr 2101 / Cr 2102, fee → <strong>4103</strong>, VAT → 2201, commission → 5101, AIT → 2202</li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Customer short of funds → 422 with a FAILED transaction (shown in the diagram)</li>
+      <li>Agent wallet over max balance → <code>MAX_BALANCE_EXCEEDED</code></li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 6 BILL PAY -->
+<section id="uc-billpay">
+  <h2>6. Bill payment (simulated biller)</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">BILL_PAY · prefix BP</span><span class="badge">ledger cmd 18 post-bill-payment · code 1017</span><span class="badge">flow TX F-BP</span><span class="badge">CR-TRANSACTION-1</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>CUSTOMER</strong></li>
+      <li>Step 1: <code>POST /v1/bills:enquire</code> (billerId, billReference) → due amount and enquiryRef</li>
+      <li>Step 2: <code>POST /v1/payments/bill-payment</code> (Idempotency-Key, amount, enquiryRef)</li>
+      <li>Preconditions: the biller is ACTIVE in the <code>biller:*</code> Redis catalogue (written by wallet-service, data contract <code>biller-catalogue-cache</code> v1), and the biller wallet (type B, account 150) has status A</li>
+      <li>Seed billers: DESCO, DPDC, TITAS, WASA, BTCL-INT, SCHOOL-DEMO</li>
+    </ul></div>
+    <div class="card"><h3>Pricing and limits</h3><ul>
+      <li>Plan <code>PLN-BILL-STD</code>: fixed 5 Tk + 0.75 VAT, payer-borne (D-45: one plan per txnType)</li>
+      <li>Limits: 10 Tk–50,000 Tk per transaction, 100,000 Tk and 20 per day</li>
+      <li>No biller commission and no per-biller fee (TX-MVP-5)</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant BC as Redis biller and ws keys
+  participant SB as SimulatedBillerClient
+  participant R as limits-risk-service
+  participant DB as Postgres txn
+  participant L as ledger-service
+  C->>T: POST /v1/bills:enquire (DESCO, 1234567890)
+  T->>BC: GET biller DESCO → ACTIVE, ENQUIRY, pattern
+  T->>SB: enquire → due 125000, enquiryRef SIM-ENQ
+  T-->>C: 200 BillEnquiryResult
+  C->>T: POST /v1/payments/bill-payment (125000, enquiryRef)
+  T->>T: validate, FEATURE.BILL_PAY, catalogue and enquiry match, idem claim
+  T->>BC: ws Rahim C A, DESCO wallet B A
+  T->>R: evaluate BILL_PAY
+  R-->>T: ALLOW
+  T->>T: PLN-BILL-STD → fee 500, VAT 75
+  T->>DB: INSERT BILL_PAY INITIATED
+  T->>L: post-bill-payment (cmd 18, 100 → 150)
+  L-->>T: OK
+  T->>SB: confirm (txnRef, biller, reference, amount)
+  alt CONFIRMED
+    SB-->>T: receipt SIM-BP-txnRef
+    T->>DB: COMPLETED + provider fields + outbox
+    T-->>C: 200 COMPLETED + providerReceipt
+  else REJECTED (reference ends 0000)
+    SB-->>T: REJECTED
+    T->>DB: INSERT REVERSAL intent RV, SYSTEM_ERROR
+    T->>L: post-reversal (reverse fee and commission)
+    L-->>T: OK, mirrored legs 1013
+    T->>DB: RV COMPLETED, BP FAILED PROVIDER_REJECTED
+    T-->>C: 409 STATE_CONFLICT PROVIDER_REJECTED
+  end
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–4</td><td class="svc">App → transaction → Redis → simulator</td><td><span class="ct rest">REST</span> <span class="ct redis">REDIS</span> <span class="ct in">IN-PROC</span></td><td>Enquiry checks the catalogue entry and reference pattern. No cache-miss fallback to wallet-service (TX-MVP-3)</td></tr>
+      <tr><td class="n">5–11</td><td class="svc">transaction → Redis / risk / DB</td><td><span class="ct redis">REDIS</span> <span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Pipeline steps 1–6. The receiver is the biller's B wallet</td></tr>
+      <tr><td class="n">12–13</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Command 18: principal 1017 plus fee and VAT</td></tr>
+      <tr><td class="n">14</td><td class="svc">transaction → SimulatedBillerClient</td><td><span class="ct in">IN-PROC</span></td><td>Provider confirmation is deterministic per txnRef (BR-TX-102)</td></tr>
+      <tr><td class="n">15–17</td><td class="svc">transaction → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td><code>TRANSACTION_COMPLETED</code> with billerId, billReference, providerReceipt → <code>R-BILLPAY-CUST</code> (<code>BILL_PAYMENT_SUCCESS</code>)</td></tr>
+      <tr><td class="n">18–23</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Automatic compensation. Events: <code>TRANSACTION_COMPLETED</code> (RV) and <code>TRANSACTION_FAILED</code> (BP) → <code>R-BILLPAY-FAILED</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 100 → 150 biller, 1017. Legs 1–2: fee and VAT</li>
+      <li>GL: Dr 2101 / Cr <strong>2106</strong> (rule W-150), fee → <strong>4108</strong> (F-FEE-BP), VAT → 2201</li>
+      <li>Biller B wallets just accumulate; there is no payout (W-MVP-PAYOUT)</li>
+    </ul></div>
+    <div class="card"><h3>Failure, edge paths and MVP rules</h3><ul>
+      <li><code>bitspay.billers.mode=SIMULATED</code> only. EKPAY and AGGREGATOR fail at start-up (TX-MVP-1)</li>
+      <li>No PENDING state (TX-MVP-2)</li>
+      <li>Ledger refuses the compensation → <code>txn_anomaly</code> for ops (TX-MVP-7)</li>
+      <li>Amount differs from the enquiry → <code>400 BILL_AMOUNT_MISMATCH</code> (TX-MVP-8)</li>
+      <li>Crash between post and confirm → the sweeper runs confirm before completing or compensating. COMPLETED is never written without a confirmation</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 7 RECHARGE -->
+<section id="uc-recharge">
+  <h2>7. Mobile recharge (simulated operator)</h2>
+  <div class="uc-badges"><span class="badge mvp">MVP feature</span><span class="badge">RECHARGE · prefix RC</span><span class="badge">ledger cmd 19 post-recharge · code 1018</span><span class="badge">flow TX F-RC</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Actor: <strong>CUSTOMER</strong></li>
+      <li><code>POST /v1/payments/recharge</code> (msisdn, PREPAID or POSTPAID, amount, optional operatorBillerId)</li>
+      <li>The operator is derived from the MSISDN prefix via <code>biller:mno-prefix:{prefix}</code>. If an operatorBillerId is sent, it must match</li>
+      <li>Operators are BILLER partners with subtype MNO and wallet type B</li>
+    </ul></div>
+    <div class="card"><h3>Pricing and limits</h3><ul>
+      <li>Plan <code>PLN-RECHARGE-NONE</code>: fee 0, bearer OPERATOR</li>
+      <li>Limits: 10 Tk–1,000 Tk per transaction, 5,000 Tk and 20 per day</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Rahim app
+  participant T as transaction-service
+  participant BC as Redis biller and ws keys
+  participant SB as SimulatedBillerClient
+  participant R as limits-risk-service
+  participant L as ledger-service
+  C->>T: POST /v1/payments/recharge (01712345678, PREPAID, 10000)
+  T->>BC: GET biller:mno-prefix:017 → GP
+  T->>BC: GET biller GP → ACTIVE, MNO, 1000..100000
+  T->>T: FEATURE.RECHARGE, amount in range, idem claim
+  T->>BC: ws Rahim C A, GP B A
+  T->>R: evaluate RECHARGE
+  R-->>T: ALLOW
+  T->>T: PLN-RECHARGE-NONE → fee 0
+  T->>T: INSERT RECHARGE INITIATED
+  T->>L: post-recharge (cmd 19, 100 → 150)
+  L-->>T: OK
+  T->>SB: confirm → CONFIRMED, SIM-RC-txnRef
+  T->>T: COMPLETED + outbox (billerId, msisdn, receipt)
+  T-->>C: 200 COMPLETED
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–4</td><td class="svc">App → transaction → Redis</td><td><span class="ct rest">REST</span> <span class="ct redis">REDIS</span></td><td>Derive the operator from the prefix, check plan type and amount range</td></tr>
+      <tr><td class="n">5–9</td><td class="svc">transaction → Redis / risk / DB</td><td><span class="ct redis">REDIS</span> <span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Pipeline steps 3–6</td></tr>
+      <tr><td class="n">10–11</td><td class="svc">transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Command 19, principal only (zero fee)</td></tr>
+      <tr><td class="n">12–14</td><td class="svc">transaction → simulator → Kafka</td><td><span class="ct in">IN-PROC</span> <span class="ct kafka">KAFKA</span></td><td>Confirm, then the outcome. Notification <code>R-RECHARGE-CUST</code> (<code>RECHARGE_SUCCESS</code>)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Leg 0: 100 → 150 operator, 1018</li>
+      <li>GL: Dr 2101 / Cr <strong>2106</strong>. A fee would go to <strong>4109</strong> (F-FEE-RC); it is zero in the seed</li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>An MSISDN ending in <code>0000</code> → simulator REJECTED → automatic <code>post-reversal</code> (same as bill pay) → 409 <code>PROVIDER_REJECTED</code>, notification <code>R-RECHARGE-FAILED</code></li>
+      <li>Unknown prefix or inactive operator → 4xx before risk</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 8 TREASURY -->
+<section id="uc-treasury">
+  <h2>8. Treasury: e-money issuance and agent float</h2>
+  <div class="uc-badges"><span class="badge sup">MVP supporting</span><span class="badge">ledger cmd 9 post-emoney-issue · code 1008</span><span class="badge">ledger cmd 6 post-float-transfer · code 1006</span><span class="badge">treasury F1, F2 · TX F6</span></div>
+  <p>E-money enters the system only through issuance against confirmed trust-bank money. It flows down the chain: trust account → distributor → agent → customer (through cash-in).</p>
+
+  <h3>8a. E-money issuance (finance maker-checker and hard control)</h3>
+  <div class="card"><ul>
+    <li>Prerequisites: a trust account (<code>POST /v1/treasury/trust-accounts</code>, which creates ledger account 300) and a balance confirmation (<code>/v1/treasury/trust-balance-confirmations</code>)</li>
+    <li>Actors: finance maker, finance checker (STAFF)</li>
+    <li>Hard control EMY-009: <em>mirror + amount ≤ latest confirmed trust balance + tolerance</em>, run under a row lock on the trust account</li>
+  </ul></div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant FM as Finance maker
+  participant FC as Finance checker
+  participant TR as treasury-service
+  participant W as wallet-service
+  participant L as ledger-service
+  participant K as Kafka
+  FM->>TR: POST /v1/treasury/emoney-issuances (Idempotency-Key)
+  TR->>W: GET /v1/wallets/{distributorWallet}
+  W-->>TR: walletType D, status A
+  TR->>L: GET balance (advisory preview)
+  TR->>TR: PENDING_APPROVAL + APPROVAL_REQUESTED + audit
+  TR-->>FM: 201 EmoneyIssuance (controlPreview)
+  FC->>TR: POST /v1/approvals/{id}:approve
+  TR->>TR: lock trust_account FOR UPDATE, POSTING
+  TR->>W: re-validate destination wallet
+  TR->>L: GET trust mirror balance
+  TR->>TR: hard control check
+  alt control passes
+    TR->>L: post-emoney-issue (commandId = issuanceId)
+    L-->>TR: OK
+    TR->>K: treasury.events EMONEY_ISSUED, EMONEY_ISSUED_PARTNER
+  else control fails
+    TR->>TR: CONTROL_FAILED + HARD_CONTROL_FAILED notifications
+  else ledger timeout
+    TR->>TR: POSTING_UNKNOWN → PostingResolverJob (F1b)
+  end
+  TR-->>FC: 200 ApprovalDecisionResult
+  </pre></div>
+
+  <h3>8b. Agent float top-up from the parent distributor</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant S as Salma AGENT
+  participant D as Padma DISTRIBUTOR
+  participant TR as treasury-service
+  participant TX as transaction-service
+  participant R as limits-risk-service
+  participant L as ledger-service
+  S->>TR: POST /v1/float-requests (TOP_UP, PARENT, amount)
+  TR->>TR: projection and pair checks, REQUESTED, FLOAT_REQUEST_RECEIVED → Padma
+  D->>TR: POST /v1/float-requests/{id}:approve
+  TR->>TR: APPROVED → EXECUTING
+  TR->>TX: POST /v1/payments/float-transfer (forwarded DISTRIBUTOR headers, key = request id)
+  TX->>TX: idem, ws D A and A A, partner_link parent check
+  TX->>R: evaluate FLOAT_TRANSFER
+  TX->>L: post-float-transfer (120 → 110)
+  L-->>TX: OK
+  TX-->>TR: 200 COMPLETED FT...
+  TR->>TR: COMPLETED, FLOAT_REQUEST_DECIDED → Salma
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Step</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">8a 1–6</td><td class="svc">maker → treasury → wallet / ledger</td><td><span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Validate the destination distributor wallet and create the approval</td></tr>
+      <tr><td class="n">8a 7–16</td><td class="svc">checker → treasury → ledger</td><td><span class="ct rest">REST</span> <span class="ct kafka">KAFKA</span></td><td>Locked hard control, then command 9 from TRUST_SETTLEMENT 300 to distributor 120</td></tr>
+      <tr><td class="n">8b 1–4</td><td class="svc">agent / distributor → treasury</td><td><span class="ct rest">REST</span></td><td>Float request and parent approval. A RETURN goes the other way, agent → parent</td></tr>
+      <tr><td class="n">8b 5–11</td><td class="svc">treasury → transaction → ledger</td><td><span class="ct rest">REST</span></td><td>Shared pipeline with <code>PLN-FLOAT-NONE</code>. A 503 stays EXECUTING and retries every 30 s × attempt. After 20 attempts the request goes STUCK</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Issuance: 300 trust → 120 distributor, 1008. GL: Dr <strong>1101-nn</strong> (trust bank asset) / Cr <strong>2103</strong></li>
+      <li>Float: 120 → 110, 1006. GL: Dr 2103 / Cr 2102</li>
+      <li>Notifications: <code>R-FLOAT-SENT</code>, <code>R-FLOAT-RECEIVED</code></li>
+    </ul></div>
+    <div class="card"><h3>MVP notes</h3><ul>
+      <li>Treasury MVP is issuance and float only. Redemption returns 501</li>
+      <li>treasury consumes <code>ledger.changes</code> for float positions and raises <code>LIQUIDITY_THRESHOLD_BREACHED</code> / <code>FLOAT_LOW_BALANCE</code></li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 9 ONBOARDING -->
+<section id="uc-onboarding">
+  <h2>9. Customer onboarding and basic KYC (single step)</h2>
+  <div class="uc-badges"><span class="badge sup">MVP supporting</span><span class="badge">wallet F1 · BR-W-25</span><span class="badge">CR-WALLET-2 · W-MVP-ONB</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li>Assisted onboarding by an agent (Salma, <code>X-Actor-Type: AGENT</code>) or back-office staff</li>
+      <li>KYC decided by a single <code>OPS_MAKER</code> with <code>bitspay.wallet.kyc.decision-mode=SINGLE_STEP</code>. There is no checker in the MVP; maker-checker returns in R1</li>
+      <li>Seeded customers (<code>bitspay.wallet.seed.customers.enabled</code>) are allowed only outside prod</li>
+    </ul></div>
+    <div class="card"><h3>Result</h3><ul>
+      <li>Customer REGISTERED → wallet P (tier 0) → after KYC approval: tier 2, risk LOW, wallet <strong>A</strong></li>
+      <li>Status cache <code>ws:{bucket}</code> becomes e.g. <code>8813:A:2:C:0:0</code>, so the customer can now transact</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Partner app (Salma AGENT)
+  participant W as wallet-service
+  participant L as ledger-service
+  participant R as limits-risk-service
+  participant K as Kafka
+  participant CO as compliance-service
+  participant S as Staff OPS_MAKER
+  C->>W: POST /v1/customers (msisdn, consents)
+  W->>L: POST /v1/ledger/accounts (accountId = walletId, CUSTOMER_WALLET 100)
+  L-->>W: 200 OK
+  W->>K: CUSTOMER_REGISTERED, WALLET_UPSERTED (P, tier 0)
+  W-->>C: 201 customerId, walletId, status P
+  C->>W: POST kyc-submissions (targetTier 2), fields, documents
+  C->>W: POST /v1/kyc-submissions/{id}:submit
+  W->>R: GET /v1/blacklist/check (NID hash, MSISDN hash)
+  W->>K: KYC_SUBMITTED
+  K->>CO: screen
+  CO->>K: case.events SCREENING_COMPLETED CLEAR
+  K->>W: submission → PENDING_REVIEW
+  S->>W: POST :decide APPROVE tier 2 (SINGLE_STEP)
+  W->>W: tier 2, risk LOW, wallet P → A, Lua CAS on ws key
+  W-->>S: 200 applied
+  W->>K: KYC_APPROVED, KYC_TIER_CHANGED, WALLET_UPSERTED
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–5</td><td class="svc">app → wallet → ledger</td><td><span class="ct rest">REST</span> <span class="ct kafka">KAFKA</span></td><td>Customer and wallet created. The ledger account id equals the wallet id</td></tr>
+      <tr><td class="n">6–9</td><td class="svc">app → wallet → limits-risk</td><td><span class="ct rest">REST</span> <span class="ct kafka">KAFKA</span></td><td>KYC submission and blacklist check (hashed identifiers)</td></tr>
+      <tr><td class="n">10–12</td><td class="svc">compliance via Kafka</td><td><span class="ct kafka">KAFKA</span></td><td>Screening. Only CLEAR moves the submission to review</td></tr>
+      <tr><td class="n">13–16</td><td class="svc">staff → wallet</td><td><span class="ct rest">REST</span> <span class="ct redis">REDIS</span> <span class="ct kafka">KAFKA</span></td><td>Single-step decision returns 200 (the R1 maker-checker returns 202). The ws key is updated after commit by CAS. Notifications <code>R-KYC-SUBMITTED</code>, <code>R-KYC-APPROVED</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Partners and billers (same service, partner module)</h3><ul>
+      <li>Agents, merchants and distributors are onboarded through partner approval chains. Each gets a ledger account (110 / 130 / 120) and a ws entry</li>
+      <li>Billers and MNOs: <code>BILLER_STD</code> chain (wallet F10, CR-WALLET-1). This creates account type 150 (owner type 6) and writes the <code>biller:*</code> and <code>biller:mno-prefix:*</code> catalogue cache that bill pay and recharge read</li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths</h3><ul>
+      <li>Blacklist hit or screening not CLEAR → the submission is not reviewable and the wallet stays P</li>
+      <li>REJECT decision → <code>R-KYC-REJECTED</code></li>
+      <li>GL is unaffected until money moves (the new account has a zero balance)</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 10 REVERSAL -->
+<section id="uc-reversal">
+  <h2>10. Support dispute and reversal (wrong transfer)</h2>
+  <div class="uc-badges"><span class="badge sup">MVP supporting</span><span class="badge">REVERSAL · prefix RV</span><span class="badge">ledger cmd 14 create-hold · cmd 7 post-reversal · code 1013</span><span class="badge">support F2, F4 · TX F7</span></div>
+  <div class="grid2">
+    <div class="card"><h3>Actor and entry</h3><ul>
+      <li><code>SUP_MAKER</code> opens <code>POST /v1/support/disputes</code> (txnRef, WRONG_TRANSFER, placeHold)</li>
+      <li>Records recipient consent, then calls <code>:resolve UPHELD</code></li>
+      <li><code>SUP_CHECKER</code> approves <code>POST /v1/approvals/{id}:approve</code>. Back-office reversals keep maker-checker; only onboarding is single-step</li>
+      <li>Reversible products: commands 1–6, 8, 12, 18, 19. BILL_PAY and RECHARGE are included (BR-S-38)</li>
+    </ul></div>
+    <div class="card"><h3>What the reversal does</h3><ul>
+      <li>Voids the support hold first (leg 0), then mirrors the original legs 0–4 with code 1013</li>
+      <li>No wallet-status gate, no risk call, no pricing, no max-balance constraint</li>
+      <li>The provider is not told about reversals of bill pay or recharge (TX-MVP-6)</li>
+    </ul></div>
+  </div>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as SUP_MAKER
+  participant C as SUP_CHECKER
+  participant S as support-service
+  participant T as transaction-service
+  participant L as ledger-service
+  participant W as wallet-service
+  A->>S: POST /v1/support/disputes (PP..., WRONG_TRANSFER, placeHold)
+  S->>T: GET /v1/transactions/{txnRef}
+  T-->>S: COMPLETED, Rahim → recipient, 50000
+  S->>L: GET recipient balance
+  S->>L: create-hold (hold:disputeId:1, WRONG_TRANSFER_HOLD)
+  S->>W: POST /v1/wallets/{id}/flags (set 8)
+  S-->>A: 201 AWAITING_CONSENT, FUNDS_HELD_NOTICE
+  A->>S: POST consents (RECIPIENT_CONSENT)
+  A->>S: POST :resolve UPHELD
+  S-->>A: 202 reversal PENDING_APPROVAL
+  C->>S: POST /v1/approvals/{id}:approve
+  S->>T: POST /v1/internal/reversals (actor SERVICE, releaseHoldCommandId)
+  T->>T: lock original, reversal_pending, INSERT RV INITIATED
+  T->>L: post-reversal (void hold, mirror legs 1013)
+  L-->>T: OK
+  T->>T: RV COMPLETED, original REVERSED, outbox
+  T-->>S: 200 RV... COMPLETED
+  S->>W: clear flag 8
+  S->>S: dispute RESOLVED_UPHELD
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–7</td><td class="svc">support → transaction / ledger / wallet</td><td><span class="ct rest">REST</span></td><td>Read the original, place a hold on the recipient's funds, set the wallet flag</td></tr>
+      <tr><td class="n">8–11</td><td class="svc">staff → support</td><td><span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Consent, resolve, and the checker's approval</td></tr>
+      <tr><td class="n">12–17</td><td class="svc">support → transaction → ledger</td><td><span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>Reversal executor. Events <code>TRANSACTION_COMPLETED</code> (RV) and <code>TRANSACTION_REVERSED</code> (original) → <code>R-REVERSAL-FROM</code>, <code>R-REVERSAL-TO</code></td></tr>
+      <tr><td class="n">18–19</td><td class="svc">support → wallet</td><td><span class="ct rest">REST</span></td><td>Clear the flag and close the dispute</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Ledger and GL</h3><ul>
+      <li>Hold: pending transfer recipient → HOLD_CONTROL 420 (code 1014), voided by the reversal</li>
+      <li>Mirror legs (1013) undo principal, fee, VAT and commission when the flags say so</li>
+      <li>GL: wallet liabilities swap back. Reversed fees → <strong>4190</strong> (contra-income), reversed commission and AIT → <strong>5190</strong></li>
+    </ul></div>
+    <div class="card"><h3>Failure and edge paths (support F4)</h3><ul>
+      <li>Timeout → stay EXECUTING, retry with the same key (backoff 10 s up to 1 h)</li>
+      <li><code>422 INSUFFICIENT_FUNDS</code> → PENDING_FUNDS, hold kept. Staff <code>:retry</code> or the daily auto-retry opens a new attempt key</li>
+      <li>Lost response → completed from the <code>TRANSACTION_REVERSED</code> event</li>
+      <li>Ledger <code>ALREADY_REVERSED</code> / <code>NOT_REVERSIBLE</code> → refused</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ 11 GL -->
+<section id="uc-gl">
+  <h2>11. GL-R1a: books, day close and reports</h2>
+  <div class="uc-badges"><span class="badge sup">MVP supporting</span><span class="badge">general-ledger-service (SVC-16)</span><span class="badge">CR-GENERALLEDGER-2 · FO-MVP-CERT</span></div>
+  <p>Every ledger movement above reaches the GL asynchronously. The GL never moves money; it books what the ledger posted.</p>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant L as ledger-service TigerBeetle
+  participant CDC as tb-cdc, RabbitMQ, cdc-bridge
+  participant K as Kafka ledger.changes
+  participant GL as general-ledger-service
+  participant DB as Postgres GL
+  participant U as Finance staff
+  L->>CDC: transfer posted
+  CDC->>K: LEDGER_TRANSFER_POSTED
+  GL->>K: seek(partition, next_offset), batch up to 2000
+  GL->>GL: drop pending and void legs, classify accounts by rule set
+  alt account unknown
+    GL->>L: GET /v1/ledger/accounts/{id}/balance (type lookup)
+    GL->>DB: else defer leg, after 1 h book to 1999 + CRITICAL
+  end
+  GL->>DB: summary upserts + offset update in one transaction (exactly once)
+  Note over GL: after cutoff and grace, all partitions past cutoff
+  GL->>DB: derive LEDGER_DAY journal, daily balances, checks GL-1..GL-7
+  GL->>K: gl.events GL_DAY_CLOSED (certification PENDING)
+  U->>GL: GET /v1/gl/reports/trial-balance, balance-sheet, profit-and-loss, account-ledger
+  GL-->>U: JSON or CSV (open days via overlay)
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>From → To</th><th>Type</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1–3</td><td class="svc">ledger → CDC → Kafka → GL</td><td><span class="ct kafka">KAFKA</span></td><td>Each business leg (codes below 9000) is published. GL keeps its own offsets in DB</td></tr>
+      <tr><td class="n">4–7</td><td class="svc">GL</td><td><span class="ct in">IN-PROC</span> <span class="ct rest">REST</span> <span class="ct db">DB</span></td><td>One debit and one credit line per leg, mapped by posting rule. Unmapped legs → suspense 1999 (CRITICAL exception)</td></tr>
+      <tr><td class="n">8–9</td><td class="svc">GL → Kafka</td><td><span class="ct db">DB</span> <span class="ct kafka">KAFKA</span></td><td>Day close. If GL-1, GL-2 or GL-4 fails → FAILED with a retry every 5 min. If blocked 90 min after cutoff → <code>GL_DAY_CLOSE_BLOCKED</code> notification</td></tr>
+      <tr><td class="n">10–11</td><td class="svc">staff → GL</td><td><span class="ct rest">REST</span></td><td>Trial balance, balance sheet, P&amp;L (by account or product), account statement</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>MVP mapping per feature</h3><ul>
+      <li>CoA seed v0: 59 accounts. MVP additions: 2106 (biller liability), 4108 (bill-pay fee), 4109 (recharge fee)</li>
+      <li>Rules W-150, F-FEE-BP, F-FEE-RC. The rule-set regeneration for type 150 and commands 18/19 (WP-CR-2) blocks the MVP</li>
+      <li>Full mapping: see the <a href="#codes">code reference</a></li>
+    </ul></div>
+    <div class="card"><h3>MVP notes</h3><ul>
+      <li><code>certification.required=true</code>, but finance-ops is R1, so MVP days close and stay certification <strong>PENDING</strong>. They are back-certified with <code>GL_TIEOUT</code> at R1 (GL-Q11, FO-MVP-CERT)</li>
+      <li>No manual journals, opening balances, or month/year close in the MVP (slice GL-R1b)</li>
+      <li>No journal export: reports are the only output</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ CODES -->
+<section id="codes">
+  <h2>Appendix: code reference</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Use case</th><th>Product / prefix</th><th>Endpoint</th><th>Ledger cmd</th><th>Principal</th><th>Accounts</th><th>Pricing plan</th><th>GL principal</th><th>GL fee</th></tr></thead>
+    <tbody>
+      <tr><td>P2P</td><td>P2P / PP</td><td><code>/v1/payments/p2p</code></td><td>1</td><td>1001</td><td>100 → 100</td><td>PLN-P2P-STD</td><td>2101 → 2101</td><td>4101</td></tr>
+      <tr><td>Cash-in</td><td>CASH_IN / CI</td><td><code>/v1/payments/cash-in</code></td><td>2</td><td>1002</td><td>110 → 100</td><td>PLN-CASHIN-STD</td><td>2102 → 2101</td><td>— (comm. 5101)</td></tr>
+      <tr><td>Cash-out</td><td>CASH_OUT / CO</td><td><code>/v1/payments/cash-out</code></td><td>3</td><td>1003</td><td>100 → 110</td><td>PLN-CASHOUT-STD</td><td>2101 → 2102</td><td>4103</td></tr>
+      <tr><td>Merchant payment</td><td>MERCHANT_PAYMENT / MP</td><td><code>/v1/payments/merchant</code></td><td>4</td><td>1004</td><td>100 → 130</td><td>PLN-MERCHANT-STD</td><td>2101 → 2104</td><td>4104</td></tr>
+      <tr><td>Merchant refund</td><td>MERCHANT_REFUND / MR</td><td><code>/v1/payments/merchant-refund</code></td><td>5</td><td>1005</td><td>130 → 100</td><td>PLN-REFUND-NONE</td><td>2104 → 2101</td><td>4105</td></tr>
+      <tr><td>Float transfer</td><td>FLOAT_TRANSFER / FT</td><td><code>/v1/payments/float-transfer</code></td><td>6</td><td>1006</td><td>120 → 110</td><td>PLN-FLOAT-NONE</td><td>2103 → 2102</td><td>4106</td></tr>
+      <tr><td>Reversal</td><td>REVERSAL / RV</td><td><code>/v1/internal/reversals</code></td><td>7</td><td>1013</td><td>mirror</td><td>—</td><td>mirror</td><td>4190 / 5190</td></tr>
+      <tr><td>E-money issue</td><td>(treasury)</td><td><code>/v1/treasury/emoney-issuances</code></td><td>9</td><td>1008</td><td>300 → 120</td><td>—</td><td>1101-nn → 2103</td><td>—</td></tr>
+      <tr><td>Support hold</td><td>(support)</td><td><code>/v1/support/disputes</code></td><td>14</td><td>1014</td><td>wallet → 420 (pending)</td><td>—</td><td>2901 if posted</td><td>—</td></tr>
+      <tr><td>Bill payment</td><td>BILL_PAY / BP</td><td><code>/v1/payments/bill-payment</code></td><td>18</td><td>1017</td><td>100 → 150</td><td>PLN-BILL-STD</td><td>2101 → 2106</td><td>4108</td></tr>
+      <tr><td>Recharge</td><td>RECHARGE / RC</td><td><code>/v1/payments/recharge</code></td><td>19</td><td>1018</td><td>100 → 150</td><td>PLN-RECHARGE-NONE</td><td>2101 → 2106</td><td>4109</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="card"><h3>Ledger account types</h3><ul>
+      <li>100 CUSTOMER · 110 AGENT · 120 DISTRIBUTOR · 130 MERCHANT · 140 INSTITUTION · 150 BILLER</li>
+      <li>200 FEE_INCOME · 210 VAT_PAYABLE · 220 COMMISSION_PAYABLE · 230 AIT_PAYABLE · 240 CAMPAIGN_FUNDING</li>
+      <li>300 TRUST_SETTLEMENT · 400 SUSPENSE · 410 ADJUSTMENT_CLEARING · 420 HOLD_CONTROL · 900/910 bounds (technical)</li>
+    </ul></div>
+    <div class="card"><h3>GL mapping for system accounts</h3><ul>
+      <li>VAT_PAYABLE 210 → 2201 · AIT_PAYABLE 230 → 2202 · HOLD_CONTROL 420 → 2901</li>
+      <li>SUSPENSE 400 → 1901 · ADJUSTMENT_CLEARING 410 → 1902 · unmapped → 1999</li>
+      <li>In-line commission (2003 + 2004) → 5101 agent commission expense</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============================================================ SOURCES -->
+<section id="sources">
+  <h2>Appendix: source index</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Topic</th><th>File (relative to bitspay-core)</th></tr></thead>
+    <tbody>
+      <tr><td>MVP scope, service map</td><td><code>docs/global/SYSTEM-CONTEXT.md</code>, <code>docs/SRS/Bits_Pay_SRS_v1.2_Draft.docx</code></td></tr>
+      <tr><td>Headers, events, idempotency</td><td><code>docs/global/GLOBAL-CONVENTIONS.md</code> (K3, K4)</td></tr>
+      <tr><td>Payment flows F1–F10, F-BP, F-RC; TX-MVP-*</td><td><code>services/transaction-service/docs/SPEC.md</code> §3.4, §5.1.14–16, §7.12, §13</td></tr>
+      <tr><td>Onboarding F1, biller F10, BR-W-25</td><td><code>services/wallet-service/docs/SPEC.md</code>, <code>changes/CR-WALLET-1.md</code>, <code>CR-WALLET-2.md</code></td></tr>
+      <tr><td>Issuance F1/F1b, float F2</td><td><code>services/treasury-service/docs/SPEC.md</code> §3.4</td></tr>
+      <tr><td>Dispute F2, reversal executor F4</td><td><code>services/support-service/docs/SPEC.md</code> §3.4</td></tr>
+      <tr><td>Account, transfer and command codes; leg templates</td><td><code>services/ledger-service/docs/contracts/provided/codes.yaml</code>, <code>SPEC.md</code> §7.3</td></tr>
+      <tr><td>Ingestion, day close, CoA, rules</td><td><code>services/general-ledger-service/docs/SPEC.md</code> §1.2, §3.4, CoA seed</td></tr>
+      <tr><td>Notification rules, product switches</td><td><code>services/admin-service/docs/SPEC.md</code> (BR-GOV-47, BR-NOT-16)</td></tr>
+      <tr><td>Limits, plans</td><td><code>services/limits-risk-service/docs/SPEC.md</code>, <code>services/pricing-service/docs/SPEC.md</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+</main>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const root = document.documentElement;
+  const sources = new Map();
+  document.querySelectorAll("pre.mermaid").forEach((el, i) => sources.set(i, el.textContent));
+  function isDark(){
+    const t = root.getAttribute("data-theme");
+    if (t) return t === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  async function render(){
+    mermaid.initialize({ startOnLoad:false, theme: isDark() ? "dark" : "default", securityLevel:"strict",
+      sequence:{ useMaxWidth:false, wrap:true, width:170, mirrorActors:false } });
+    const nodes = document.querySelectorAll("pre.mermaid");
+    nodes.forEach((el, i) => { el.removeAttribute("data-processed"); el.textContent = sources.get(i); });
+    await mermaid.run({ nodes });
+  }
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    root.setAttribute("data-theme", isDark() ? "light" : "dark");
+    render();
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (!root.getAttribute("data-theme")) render();
+  });
+  render();
+</script>
+</body>
+</html>

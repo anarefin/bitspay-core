@@ -5,7 +5,7 @@ You are implementing **ledger-service** (SVC-01) of Bits Pay: the ONLY service t
 
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages, §7 the business rules, §5 the provided contracts).
-2. `docs/contracts/contract.yaml` — what this service provides (17 commands + reads, `ledger.changes`, transfer-id data contract) and consumes (only the inbound topic `audit.events`).
+2. `docs/contracts/contract.yaml` — what this service provides (19 commands + reads, incl. MVP bill payment 18 and recharge 19 to BILLER_WALLET 150; `ledger.changes`, transfer-id data contract) and consumes (only the inbound topic `audit.events`).
 3. `docs/contracts/provided/*` — binding API (`openapi.yaml`), event schema (`events/ledger.changes/`), codes (`codes.yaml`), data contracts (`data/`).
 4. `docs/contracts/consumed/*` — snapshot of admin-service's `audit.events` schema (read-only).
 5. `../../docs/global/GLOBAL-CONVENTIONS.md` — kernel rules (headers, errors, envelope, outbox, money, testing).

@@ -49,6 +49,20 @@
     "owner": "transaction-service"
   },
   {
+    "prefix": "BP",
+    "meaning": "Bill payment (MVP)",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "RC",
+    "meaning": "Mobile recharge (MVP)",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
     "prefix": "WC",
     "kind": "ledger",
     "meaning": "closure payout (ledger command 17, post-closure-payout)",
@@ -87,6 +101,14 @@
     "kind": "business",
     "meaning": "partnerCode of an INSTITUTION (not a txnRef)",
     "format": "I{8-digit sequence}{Luhn digit}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "B",
+    "kind": "business",
+    "meaning": "partnerCode of a BILLER (not a txnRef; the short billerCode such as DESCO is separate)",
+    "format": "B{8-digit sequence}{Luhn digit}",
     "length": 10,
     "owner": "wallet-service"
   },

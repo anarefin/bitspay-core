@@ -4,7 +4,7 @@
 |---|---|
 | Service | `compliance-service` (`spring.application.name`) |
 | Number / owner | SVC-11 · Dev-5 (Track B) · single module |
-| Layer / release | Back office (async consumer) · R1 (AML-008, AML-010, FRD-012 = R2) |
+| Layer / release | Back office (async consumer) · MVP (basic KYC case and screening clearance for customers and partners, incl. BILLER partners) · R1 (AML monitoring, alerts and fraud cases, freezes / liens / instructions, CTR, STR and regulatory reporting, MIS) · R2 (AML-008, AML-010, FRD-012) |
 | contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8111 · management 9111 |
@@ -42,6 +42,8 @@ compliance-service is Bits Pay's in-house AML/CFT and fraud-investigation back o
 - AML MIS and fraud dashboard data; staff notifications; approvals; audit.
 - R2: customer fraud reports, periodic review scheduling, external AML export/import files, retention purge.
 
+**Release split (CR-COMPLIANCE-1, SRS v1.2).** **MVP:** basic KYC case and screening clearance — lists by file upload and re-screening, the matching engine, onboarding / profile-change / ad-hoc screening of customers (`KYC_SUBMITTED`) and partners (`PARTNER_UPSERTED`, every partner type including `BILLER` with sub-types `UTILITY`, `EDUCATION`, `GOVT_FEE`, `INTERNET_TV`, `MNO`; BR-11-75), PEP / high-risk EDD, and the SCREENING / EDD case handling and four-eyes decisions that release or reject onboarding. **R1+:** AML transaction monitoring (`txn.events` ingestion, scenarios), `risk.alerts` and fraud / AML alert cases, freezes, liens, regulatory instructions and the sanctions auto-freeze executor, CTR, STR and regulatory reporting, AML / fraud MIS; R2 items as listed above. R1+ operations stay in the contract and answer 501 in the MVP build.
+
 ### 1.3 Out of scope / deferred
 
 | Deferred item | Replacement now |
@@ -56,6 +58,7 @@ compliance-service is Bits Pay's in-house AML/CFT and fraud-investigation back o
 | Adverse-media list source | Treated as part of the INTERNAL watchlist (OPEN D-48) |
 | Retention purge (R2) | Data kept; purge job built in WP-10 with the legal-hold check |
 | Helm, CI, E2E suites, k6, observability stack | Manual scenario walk-through on the Compose stack; metrics exposed |
+| AML monitoring, alert / fraud cases, freezes and liens, regulatory instructions, CTR, STR and regulatory reporting, MIS — R1+ (CR-COMPLIANCE-1) | MVP build answers 501 for these operations and does not consume `txn.events` or `risk.alerts`; a CONFIRMED sanctions match at onboarding holds activation through the SCREENING case (no auto-freeze executor until WP-8) |
 
 ### 1.4 This service must NEVER
 
@@ -76,11 +79,13 @@ Single module. Internal packages under `com.bracits.bitspay.compliance`: `lists`
 
 ## 2. SRS traceability
 
+Baseline: SRS v1.2 (14 Oct 2026). "· MVP" marks rows the MVP release delivers; unmarked rows are R1+ (CR-COMPLIANCE-1).
+
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
-| AML-001 | Screening vs UN, BFIU, OFAC, EU, UK HMT, internal; at onboarding and on list update | BR-11-01..02, BR-11-10..12; list APIs §5.1.4–§5.1.11; WP-4, WP-5 (remittance deferred) |
-| AML-002 | Fuzzy matching with Bangla/English transliteration, thresholds, review | BR-11-03..09; `POST /v1/screening/test-match`, settings, transliteration APIs; WP-3 |
-| AML-003 | PEP/IP identification, EDD with senior approval | BR-11-20..22; `EddDecision` 2 levels; WP-5 |
+| AML-001 | Screening vs UN, BFIU, OFAC, EU, UK HMT, internal; at onboarding and on list update | BR-11-01..02, BR-11-10..12; list APIs §5.1.4–§5.1.11; WP-4, WP-5 (remittance deferred) · MVP |
+| AML-002 | Fuzzy matching with Bangla/English transliteration, thresholds, review | BR-11-03..09; `POST /v1/screening/test-match`, settings, transliteration APIs; WP-3 · MVP |
+| AML-003 | PEP/IP identification, EDD with senior approval | BR-11-20..22; `EddDecision` 2 levels; WP-5 · MVP |
 | AML-004 | Configurable monitoring scenarios | BR-11-25..27; scenario APIs; WP-6 (geography reserved; non-orchestrator credits OPEN D-25) |
 | AML-005 | CTR extraction per BFIU thresholds | BR-11-50..51; CTR APIs; WP-9 |
 | AML-006 | AML alert & case management, four-eyes, audit | BR-11-30..36; case APIs; `audit.events`; WP-7 |
@@ -93,15 +98,15 @@ Single module. Internal packages under `com.bracits.bitspay.compliance`: `lists`
 | FRD-010 | Fraud dashboards (FP rate, confirmed value, loss ratio, recovery) | `/v1/mis/fraud/summary`; BR-11-56; WP-9 |
 | FRD-011 | Fraud events, decisions, actions logged & auditable | `audit.events`, `case_event` history; WP-7 (SIEM deferred) |
 | FRD-012 | Customer "report fraud" | `POST /v1/fraud-reports`; WP-10 (R2) |
-| ONB-008 | Screen every applicant before activation; hold potential matches | BR-11-10, BR-11-13; `SCREENING_COMPLETED` / `SCREENING_DECIDED`; WP-5 |
-| ONB-011 | EDD for High-risk customers | BR-11-21 (OPEN D-19); WP-5 |
-| PON-004 | Partner + key persons screened at onboarding and on list updates | BR-11-11, BR-11-12 (legal name, display name, key persons from `partner.events`); WP-5 |
-| PON-005 | Risk-based due diligence for partners | EDD case for partner PEP hits (partner risk-grade EDD stays with the partner module); WP-5 |
+| ONB-008 | Screen every applicant before activation; hold potential matches | BR-11-10, BR-11-13; `SCREENING_COMPLETED` / `SCREENING_DECIDED`; WP-5 · MVP |
+| ONB-011 | EDD for High-risk customers | BR-11-21 (OPEN D-19); WP-5 · MVP |
+| PON-004 | Partner + key persons screened at onboarding and on list updates | BR-11-11, BR-11-12 (legal name, display name, key persons from `partner.events`); BR-11-75 BILLER partners (BIL-011, BIL-012); WP-5, WP-CR-1 · MVP |
+| PON-005 | Risk-based due diligence for partners | EDD case for partner PEP hits (partner risk-grade EDD stays with the partner module); WP-5 · MVP |
 | PON-009 | Suspend partner on AML/fraud action | `SUSPEND_PARTNER` action; BR-11-14, BR-11-48; WP-8 |
 | CIC-010 | CICO anti-fraud (post-transaction) | AML-SC-08; WP-6 |
-| BOM-004 / BOM-005 | Maker-checker, checker ≠ maker, multi-level | `approval_request`, §7.10 matrix; WP-1 |
+| BOM-004 / BOM-005 | Maker-checker, checker ≠ maker, multi-level | `approval_request`, §7.10 matrix; WP-1 · MVP |
 | RR-06 / RR-07 | STR/SAR and CTR to BFIU via goAML | XML exports; WP-9 |
-| REF-05 | No tipping-off | §1.4 rule 5; BR-11-46; DoD test |
+| REF-05 | No tipping-off | §1.4 rule 5; BR-11-46; DoD test · MVP |
 | ARC-002 | Legal holds before deletion | BR-11-58 (R2) |
 
 ## 3. Architecture
@@ -4022,27 +4027,27 @@ Mirror of `contracts/contract.yaml → consumes`. Payload subsets below are copi
 
 | Producer | Artefact | Pinned | Fields used | Why |
 |---|---|---|---|---|
-| ledger-service | `POST /v1/ledger/commands/create-hold` | v1 / 1.0.0 | commandId, accountId, amountPoisha, reasonCode → commandId, result, rejectionCode, detail, transferIds, postedAt | LIEN |
-| ledger-service | `POST /v1/ledger/commands/release-hold` | v1 / 1.0.0 | commandId, holdCommandId → commandId, result, rejectionCode, postedAt | lift of a LIEN |
-| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.0.0 | found, result, rejectionCode | resolve unknown outcome after 24 h |
-| ledger-service | `GET /v1/ledger/accounts/{id}/balance` | v1 / 1.0.0 | availableBalancePoisha, closed | lien sizing |
-| ledger-service | `GET /v1/ledger/holds` | v1 / 1.0.0 | items[] (holdCommandId, amountPoisha, reasonCode, createdBy, createdAt), totalHeldPoisha | case view |
-| wallet-service | `POST /v1/wallets/{walletId}/status-changes` | v1 / 1.0.0 | targetStatus, reasonCode, reference, comment → changeRequestId, walletId, outcome, approvalId, walletStatus, walletVersion | apply / lift freezes |
-| wallet-service | `POST /v1/wallets/{walletId}/flags` | v1 / 1.0.0 | set, clear, reasonCode → flags | AML_WATCH, HAS_OPEN_LIEN |
-| wallet-service | `GET /v1/wallets/{walletId}` | v1 / 1.0.0 | 12 fields | enrichment, projection miss |
-| wallet-service | `GET /v1/customers/{customerId}` | v1 / 1.0.0 | 23 fields | STR party, EDD (OPEN D-20) |
-| wallet-service (partner) | `POST /v1/partners/{partnerId}/status-changes` | v1 / 1.0.0 | targetStatus, reasonCode, comment → partnerId, status, version | SUSPEND_PARTNER |
-| limits-risk-service | `POST /v1/blacklist/entries` | v1 / 1.0.0 | type, valueHash, valueMasked, reasonCode, expiresAt, comment, source, reference → entryId, status, approvalId, valueMasked; problem `entryId` | PROPOSE_BLACKLIST |
-| admin-service | `GET /v1/refdata/{type}` | v1 / 1.0.0 | items[] (type, code, parentCode, nameEn, nameBn, attributes, version, active), nextCursor | bootstrap |
-| admin-service | `GET /v1/retention/legal-holds` | v1 / 1.0.0 | items[] (holdId, category, subjectType, subjectId, status, placedAt) | R2 purge |
-| wallet-service | `customer.events` (7 types) | v1 / 1.0.0 | §6.13 | subjects, onboarding screening |
-| wallet-service | `partner.events PARTNER_UPSERTED` | v1 / 1.0.0 | §6.14 | partner + key-person screening |
-| wallet-service | `wallet.events WALLET_UPSERTED` | v1 / 1.0.0 | §6.15 | wallet projection |
-| transaction-service | `txn.events TRANSACTION_COMPLETED`, `TRANSACTION_REVERSED` | v1 / 1.0.0 | §6.16 | monitoring, CTR |
-| limits-risk-service | `risk.alerts RISK_ALERT_RAISED` | v1 / 1.0.0 | §6.17 | FRAUD alerts |
-| limits-risk-service | `blacklist.events BLACKLIST_ENTRY_UPSERTED` | v1 / 1.0.0 | §6.18 | blacklist matches |
-| admin-service | `refdata.events REFDATA_UPSERTED` | v1 / 1.0.0 | §6.19 | GEO, CUTOFF.EOD, RETENTION.AML_CASE |
-| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` | v1 / 1.0.0 | `*` | §6.20 |
+| ledger-service | `POST /v1/ledger/commands/create-hold` | v1 / 1.1.0 | commandId, accountId, amountPoisha, reasonCode → commandId, result, rejectionCode, detail, transferIds, postedAt | LIEN |
+| ledger-service | `POST /v1/ledger/commands/release-hold` | v1 / 1.1.0 | commandId, holdCommandId → commandId, result, rejectionCode, postedAt | lift of a LIEN |
+| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.1.0 | found, result, rejectionCode | resolve unknown outcome after 24 h |
+| ledger-service | `GET /v1/ledger/accounts/{id}/balance` | v1 / 1.1.0 | availableBalancePoisha, closed | lien sizing |
+| ledger-service | `GET /v1/ledger/holds` | v1 / 1.1.0 | items[] (holdCommandId, amountPoisha, reasonCode, createdBy, createdAt), totalHeldPoisha | case view |
+| wallet-service | `POST /v1/wallets/{walletId}/status-changes` | v1 / 1.1.0 | targetStatus, reasonCode, reference, comment → changeRequestId, walletId, outcome, approvalId, walletStatus, walletVersion | apply / lift freezes |
+| wallet-service | `POST /v1/wallets/{walletId}/flags` | v1 / 1.1.0 | set, clear, reasonCode → flags | AML_WATCH, HAS_OPEN_LIEN |
+| wallet-service | `GET /v1/wallets/{walletId}` | v1 / 1.1.0 | 12 fields | enrichment, projection miss |
+| wallet-service | `GET /v1/customers/{customerId}` | v1 / 1.1.0 | 23 fields | STR party, EDD (OPEN D-20) |
+| wallet-service (partner) | `POST /v1/partners/{partnerId}/status-changes` | v1 / 1.1.0 | targetStatus, reasonCode, comment → partnerId, status, version | SUSPEND_PARTNER |
+| limits-risk-service | `POST /v1/blacklist/entries` | v1 / 1.1.0 | type, valueHash, valueMasked, reasonCode, expiresAt, comment, source, reference → entryId, status, approvalId, valueMasked; problem `entryId` | PROPOSE_BLACKLIST |
+| admin-service | `GET /v1/refdata/{type}` | v1 / 1.1.0 | items[] (type, code, parentCode, nameEn, nameBn, attributes, version, active), nextCursor | bootstrap |
+| admin-service | `GET /v1/retention/legal-holds` | v1 / 1.1.0 | items[] (holdId, category, subjectType, subjectId, status, placedAt) | R2 purge |
+| wallet-service | `customer.events` (7 types) | v1 / 1.1.0 | §6.13 | subjects, onboarding screening |
+| wallet-service | `partner.events PARTNER_UPSERTED` | v1 / 1.1.0 | §6.14 | partner + key-person screening |
+| wallet-service | `wallet.events WALLET_UPSERTED` | v1 / 1.1.0 | §6.15 | wallet projection |
+| transaction-service | `txn.events TRANSACTION_COMPLETED`, `TRANSACTION_REVERSED` | v1 / 1.1.0 | §6.16 | monitoring, CTR |
+| limits-risk-service | `risk.alerts RISK_ALERT_RAISED` | v1 / 1.1.0 | §6.17 | FRAUD alerts |
+| limits-risk-service | `blacklist.events BLACKLIST_ENTRY_UPSERTED` | v1 / 1.1.0 | §6.18 | blacklist matches |
+| admin-service | `refdata.events REFDATA_UPSERTED` | v1 / 1.1.0 | §6.19 | GEO, CUTOFF.EOD, RETENTION.AML_CASE |
+| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` | v1 / 1.1.0 | `*` | §6.20 |
 
 **Outbound headers (all calls, kernel K3.2):** `X-Actor-Type: SERVICE` (`SYSTEM` for scheduled jobs), `X-Actor-Id: compliance-service`, `X-Channel` = the inbound request's channel (`BACKOFFICE` for staff-triggered effects), `SYSTEM` for jobs, sweepers and consumers, `X-Correlation-Id` propagated. The only forwarded actor context is the acting officer's `X-Actor-Roles` and `X-Actor-User-Id` on `GET /v1/customers/{customerId}` (§6.9). Each dependency is called through one concrete `client.Http<Svc>Client` (base URL `bitspay.clients.<svc>.base-url`; WireMock in tests and profile `local`); circuit breaker per dependency (Resilience4j, 50 % failure rate over 20 calls, 30 s open).
 
@@ -4241,7 +4246,7 @@ Effects: `KYC_SUBMITTED` → upsert subject + name keys, onboarding screening (B
 | Field | Type | Req | Null | Constraints / enum |
 |---|---|---|---|---|
 | `partnerId` | uuid | Y | N | = key |
-| `partnerType` | enum{AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION} | Y | N | |
+| `partnerType` | enum{AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, BILLER} | Y | N | BILLER since wallet 1.1.0 (BR-11-75) |
 | `status` | enum{PENDING_SCREENING, PENDING_APPROVAL, ACTIVE, SUSPENDED, PENDING_TERMINATION, TERMINATED, REJECTED} | Y | N | screening trigger = `PENDING_SCREENING` |
 | `displayName` | string | Y | N | 1..25 upper-case |
 | `legalName` | string | Y | N | |
@@ -4257,7 +4262,7 @@ Effects: `KYC_SUBMITTED` → upsert subject + name keys, onboarding screening (B
 | `keyPersons[].dob` | date | Y | Y | |
 | `version` | int64 | Y | N | strictly increasing per partner |
 
-Effects: apply only if `version` > `subject.source_version` (compacted replays ignored); upsert PARTNER subject (`name_en` = legalName, `name_alt` = displayName, ORGANISATION) and PERSON subjects (id = `personId`, `parent_subject_id` = partnerId); key persons no longer listed are detached (kept for history). Screening per BR-11-11 when `status ∈ screening.partner-screen-statuses` (`PENDING_SCREENING`) and `version` > `last_screened_version`. Fixture: `fixtures/events/partner.events.PARTNER_UPSERTED.jsonl` (pending screening with two key persons; rescreen with same names, version+1).
+Effects: apply only if `version` > `subject.source_version` (compacted replays ignored); upsert PARTNER subject (`name_en` = legalName, `name_alt` = displayName, ORGANISATION) and PERSON subjects (id = `personId`, `parent_subject_id` = partnerId); key persons no longer listed are detached (kept for history). Screening per BR-11-11 when `status ∈ screening.partner-screen-statuses` (`PENDING_SCREENING`) and `version` > `last_screened_version`. Fixture: `fixtures/events/partner.events.PARTNER_UPSERTED.jsonl` (pending screening with two key persons; rescreen with same names, version+1). `partnerType` is read as a tolerant reader: `BILLER` (and any later value) is stored as-is and screened like any other partner (BR-11-75); the optional `biller` object is not read.
 
 ### 6.15 wallet-service — `wallet.events WALLET_UPSERTED` (group `compliance-service`, compacted)
 
@@ -4265,9 +4270,9 @@ Effects: apply only if `version` > `subject.source_version` (compacted replays i
 |---|---|---|---|---|
 | `walletId` | uuid | Y | N | = key |
 | `version` | int64 | Y | N | apply only if > stored |
-| `ownerType` | enum{CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION} | Y | N | |
+| `ownerType` | enum{CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, BILLER} | Y | N | BILLER since wallet 1.1.0 |
 | `ownerId` | uuid | Y | N | customerId / partnerId |
-| `walletType` | enum{C, A, D, M, I} | Y | N | |
+| `walletType` | enum{C, A, D, M, I, B} | Y | N | B since wallet 1.1.0 |
 | `msisdn` | string | Y | N | hashed + masked on receipt |
 | `status` | enum{P, A, D, X, C, F, Q, Z} | Y | N | |
 | `previousStatus` | enum (same codes) | Y | Y | |
@@ -4278,7 +4283,7 @@ Effects: apply only if `version` > `subject.source_version` (compacted replays i
 | `displayName` | string | Y | N | |
 | `createdAt` | timestamp | Y | N | |
 
-Effects: upsert `wallet_projection` when `version` is newer; `reactivated_at` per BR-11-71. **Never** used to confirm a freeze or lift (ADR-04). Fixtures: `wallet.events.WALLET_UPSERTED.jsonl` (active, AML_FREEZE add on an F wallet, reactivation D→A REACTIVATION, first activation D→A KYC_APPROVED).
+Effects: upsert `wallet_projection` when `version` is newer; `reactivated_at` per BR-11-71. `ownerType BILLER` / `walletType B` (biller settlement wallets) are stored as-is (BR-11-75). **Never** used to confirm a freeze or lift (ADR-04). Fixtures: `wallet.events.WALLET_UPSERTED.jsonl` (active, AML_FREEZE add on an F wallet, reactivation D→A REACTIVATION, first activation D→A KYC_APPROVED).
 
 ### 6.16 transaction-service — `txn.events` (group `compliance-service.txn-ingest`)
 
@@ -4600,6 +4605,7 @@ SAR: `<report_code>SAR</report_code>` and, instead of `<transaction>`, `<activit
 - **BR-11-71 Reactivation date.** `wallet_projection.reactivated_at` is set only when an event has `previousStatus = D` ∧ `status = A` ∧ `statusReasonCode ∈ {REACTIVATION, CUSTOMER_REQUEST, DORMANCY}`; `D → A` with `KYC_APPROVED` is a first activation (AML-SC-07 ignores it).
 - **BR-11-72 Idempotency and concurrency.** Consumers: inbox per kernel K4.3 except `txn.events` (ADR-02). Approvals: optimistic `version` on `approval_request` and the decided entity; 100 concurrent approves → one effect. Freezes: one active per `(wallet, type, reason, reference)` (unique index); the executor claims rows with `FOR UPDATE SKIP LOCKED`. Notification `requestId` = UUIDv5 of the dedupe key.
 - **BR-11-73 Identifiers.** Case/alert/STR/fraud-report numbers come from `doc_sequence` per year (`SELECT … FOR UPDATE`), zero-padded: `CASE-2026-000123`, `ALT-2026-00001234`, `STR-2026-000045`, `FR-2026-000017`.
+- **BR-11-75 Partner types (MVP, CR-COMPLIANCE-1).** Partner screening and EDD do not branch on `partnerType`: `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION` and `BILLER` (sub-types `UTILITY`, `EDUCATION`, `GOVT_FEE`, `INTERNET_TV`, `MNO`, not read) follow BR-11-11..13 and BR-11-20..22 identically; `subject.partner_type`, `wallet_projection.owner_type` and `wallet_type` are stored as received text, and an unknown `partnerType`, `ownerType` or `walletType` value is never a deserialisation failure or a DLQ reason. A BILLER partner with no key persons is screened on `legalName` and `displayName` only.
 - **BR-11-74 Evidence and files.** Evidence (≤ `evidence.max-bytes`) is encrypted at rest (FieldCipher envelope over the object), SHA-256 of the plaintext stored and verified on download (`EVIDENCE_INTEGRITY_FAILED`). Every download writes `audit.events`.
 
 ## 8. Configuration
@@ -4691,27 +4697,29 @@ Alert conditions (documented for later dashboards): screening p95 > 2 s; `txn.ev
 
 Each WP ends with `./gradlew check` green, OpenAPI drift check green, `docs/PROGRESS.md` updated; no other service is needed (WireMock stubs + fixtures).
 
-**WP-1 Skeleton & contracts.** Gradle project from the build template; profiles `api`/`worker`/`local`/`dev`/`hybrid`; `ActorContext`, `@RequiresActor`, problem+json with provider reasons/extensions, Idempotency-Key filter (`idempotency_record`), outbox writer + polling relay fallback, inbox, approval engine (§5.3 matrix, `ApprovalHandler` per entityType, `approval.events`, expiry job), audit writer; Flyway V1/V2; every §5.1 operation served (501 until implemented) matching `contracts/provided/openapi.yaml`; stubs and fixtures wired. Acceptance: `approval_checkerEqualsMaker_returns422`, `approval_twoLevels_requiresDistinctCheckers`, `approval_levelRoles_publishedPerLevel`, `outbox_envelopeMatchesKernel`, provider contract tests compile, ArchUnit, schema-isolation test. SRS BOM-004, BOM-005.
+**[MVP] WP-1 Skeleton & contracts.** Gradle project from the build template; profiles `api`/`worker`/`local`/`dev`/`hybrid`; `ActorContext`, `@RequiresActor`, problem+json with provider reasons/extensions, Idempotency-Key filter (`idempotency_record`), outbox writer + polling relay fallback, inbox, approval engine (§5.3 matrix, `ApprovalHandler` per entityType, `approval.events`, expiry job), audit writer; Flyway V1/V2; every §5.1 operation served (501 until implemented) matching `contracts/provided/openapi.yaml`; stubs and fixtures wired. Acceptance: `approval_checkerEqualsMaker_returns422`, `approval_twoLevels_requiresDistinctCheckers`, `approval_levelRoles_publishedPerLevel`, `outbox_envelopeMatchesKernel`, provider contract tests compile, ArchUnit, schema-isolation test. SRS BOM-004, BOM-005.
 
-**WP-2 Projections & consumers.** `customer.events`, `partner.events`, `wallet.events`, `blacklist.events`, `refdata.events` consumers → `subject`, `subject_name_key`, `wallet_projection`, `internal_blacklist`, `refdata_item`; refdata bootstrap; DLQ. Acceptance: `customerRegistered_twice_singleSubject`, `walletUpserted_olderVersion_ignored`, `walletReactivated_setsReactivatedAt`, `walletFirstActivation_noReactivatedAt`, `partnerUpserted_keyPersonsBecomePersonSubjects`, `nameKeys_excludeCommonTokens`, `msisdn_neverStoredClear`, `cutoffEod_appliedToBusinessDate`. SRS AML-001, ONB-008 (data).
+**[MVP] WP-2 Projections & consumers.** `customer.events`, `partner.events`, `wallet.events`, `blacklist.events`, `refdata.events` consumers → `subject`, `subject_name_key`, `wallet_projection`, `internal_blacklist`, `refdata_item`; refdata bootstrap; DLQ. Acceptance: `customerRegistered_twice_singleSubject`, `walletUpserted_olderVersion_ignored`, `walletReactivated_setsReactivatedAt`, `walletFirstActivation_noReactivatedAt`, `partnerUpserted_keyPersonsBecomePersonSubjects`, `nameKeys_excludeCommonTokens`, `msisdn_neverStoredClear`, `cutoffEod_appliedToBusinessDate`. SRS AML-001, ONB-008 (data).
 
-**WP-3 Matching engine.** Normaliser, transliterator (DB table + dictionary), phonetic key, Jaro-Winkler, token-set, scorer, classifier; settings and transliteration change sets; `test-match`. Acceptance: golden M1–M12; jqwik `score_isSymmetricAndBounded`; `transliterate_rahim_bangla` = `rohim`; `phonetic_mohammadVariants_equal`. SRS AML-002.
+**[MVP] WP-3 Matching engine.** Normaliser, transliterator (DB table + dictionary), phonetic key, Jaro-Winkler, token-set, scorer, classifier; settings and transliteration change sets; `test-match`. Acceptance: golden M1–M12; jqwik `score_isSymmetricAndBounded`; `transliterate_rahim_bangla` = `rohim`; `phonetic_mohammadVariants_equal`. SRS AML-002.
 
-**WP-4 Lists & re-screening.** Six parsers with sample files in `src/test/resources/lists/`; versioning/diff; activation; index reload; DELTA and FULL jobs. Acceptance: `unXml_parsesAliasesDobAndDocuments`, `upload_sameFileTwice_409`, `activate_triggersDeltaRescreen_onlyHitsEmitEvents`, `fullRescreen_resumesAfterWorkerKill`, `index_reload_allPodsWithin60s`. SRS AML-001, PON-004.
+**[MVP] WP-4 Lists & re-screening.** Six parsers with sample files in `src/test/resources/lists/`; versioning/diff; activation; index reload; DELTA and FULL jobs. Acceptance: `unXml_parsesAliasesDobAndDocuments`, `upload_sameFileTwice_409`, `activate_triggersDeltaRescreen_onlyHitsEmitEvents`, `fullRescreen_resumesAfterWorkerKill`, `index_reload_allPodsWithin60s`. SRS AML-001, PON-004.
 
-**WP-5 Screening workflow & EDD.** Customer onboarding, partner screening (legal + display name + key persons, version rule), profile-change and ad-hoc screening, ID and blacklist CONFIRMED, FP suppression, review queue, dispositions, decisions, `SCREENING_COMPLETED/DECIDED` with `trigger`, `eddRequired`, `sourceEventId`, `sourceVersion`; EDD cases with two levels; sanctions auto-freeze trigger (executor stub until WP-8). Acceptance: `kycSubmitted_clearCustomer_emitsCompletedClear`, `kycSubmitted_banglaNameHit_emitsPotentialMatch`, `kycSubmitted_deliveredTwice_oneScreening`, `kycSubmitted_highRisk_clearWithEddRequired`, `partnerPending_screensNamesAndKeyPersons_onePartnerEvent`, `partnerRescreen_sameNames_newVersion_emitsAgain`, `partnerReplay_sameVersion_noEvent`, `rescreen_clear_notPublished`, `screeningDecision_clear_suppressesSameEntryNextTime`, `eddDecision_requiresCamlcoLevel2`, `blacklistActive_nidSubject_confirmedBlacklistMatch`. SRS ONB-008, ONB-011, AML-002, AML-003, PON-004, PON-005.
+**[MVP] WP-5 Screening workflow & EDD.** Customer onboarding, partner screening (legal + display name + key persons, version rule), profile-change and ad-hoc screening, ID and blacklist CONFIRMED, FP suppression, review queue, dispositions, decisions, `SCREENING_COMPLETED/DECIDED` with `trigger`, `eddRequired`, `sourceEventId`, `sourceVersion`; EDD cases with two levels; sanctions auto-freeze trigger (executor stub until WP-8). Acceptance: `kycSubmitted_clearCustomer_emitsCompletedClear`, `kycSubmitted_banglaNameHit_emitsPotentialMatch`, `kycSubmitted_deliveredTwice_oneScreening`, `kycSubmitted_highRisk_clearWithEddRequired`, `partnerPending_screensNamesAndKeyPersons_onePartnerEvent`, `partnerRescreen_sameNames_newVersion_emitsAgain`, `partnerReplay_sameVersion_noEvent`, `rescreen_clear_notPublished`, `screeningDecision_clear_suppressesSameEntryNextTime`, `eddDecision_requiresCamlcoLevel2`, `blacklistActive_nidSubject_confirmedBlacklistMatch`. SRS ONB-008, ONB-011, AML-002, AML-003, PON-004, PON-005. MVP note: the sanctions auto-freeze executor stays a stub (case CRITICAL, `SANCTIONS_AUTO_FREEZE` to CAMLCO) until WP-8 (R1+).
 
-**WP-6 Monitoring ingestion & scenarios.** Batched `txn.events` consumer (ADR-02), partition job, scenario framework (stage 1/2), ten active scenarios, dedupe/suppression, scenario change sets, manual runs. Acceptance: `ingest_replayedBatch_noDoubleRollup`, `ingest_reversed_marksOriginal`, per scenario `scenario_SC0x_firesOnFixture` / `…_doesNotFireBelowThreshold`, `scenarioRun_sameWindowTwice_singleRun`, `sc04_incomeBandKeys_matchCustomerEnum`; ingestion ≥ 5k events/s per pod (local measurement only as smoke). SRS AML-004, CIC-010.
+**[R1+] WP-6 Monitoring ingestion & scenarios.** Batched `txn.events` consumer (ADR-02), partition job, scenario framework (stage 1/2), ten active scenarios, dedupe/suppression, scenario change sets, manual runs. Acceptance: `ingest_replayedBatch_noDoubleRollup`, `ingest_reversed_marksOriginal`, per scenario `scenario_SC0x_firesOnFixture` / `…_doesNotFireBelowThreshold`, `scenarioRun_sameWindowTwice_singleRun`, `sc04_incomeBandKeys_matchCustomerEnum`; ingestion ≥ 5k events/s per pod (local measurement only as smoke). SRS AML-004, CIC-010.
 
-**WP-7 Alerts & case management.** `risk.alerts` → alerts; grouping; case APIs (assign, start, escalate, notes, evidence via S3, dispositions, proposals, close/reopen, recoveries); SLA job; staff notifications (`CASE_ASSIGNED`, `CASE_SLA_WARNING`, `CASE_SLA_BREACHED`, `CASE_UNASSIGNED`); `CASE_OPENED/CLOSED`; history. Acceptance: `riskAlert_groupsIntoOpenFraudCase`, `riskAlert_blacklistHitTo_subjectIsCounterparty`, `caseDecision_proposerCannotApprove`, `caseClose_suspiciousWithoutStr_rejected`, `sla_breach_escalatesAndNotifiesRole`, `unassigned_after2h_notifiesRoleOnce`, `evidence_sha256Verified_downloadAudited`, `notifications_variablesMatchTemplates`. SRS FRD-008, AML-006, FRD-011.
+**[MVP] WP-7 Alerts & case management.** `risk.alerts` → alerts; grouping; case APIs (assign, start, escalate, notes, evidence via S3, dispositions, proposals, close/reopen, recoveries); SLA job; staff notifications (`CASE_ASSIGNED`, `CASE_SLA_WARNING`, `CASE_SLA_BREACHED`, `CASE_UNASSIGNED`); `CASE_OPENED/CLOSED`; history. Acceptance: `riskAlert_groupsIntoOpenFraudCase`, `riskAlert_blacklistHitTo_subjectIsCounterparty`, `caseDecision_proposerCannotApprove`, `caseClose_suspiciousWithoutStr_rejected`, `sla_breach_escalatesAndNotifiesRole`, `unassigned_after2h_notifiesRoleOnce`, `evidence_sha256Verified_downloadAudited`, `notifications_variablesMatchTemplates`. SRS FRD-008, AML-006, FRD-011. MVP part: case APIs, SLA, staff notifications and `CASE_OPENED/CLOSED` for the SCREENING and EDD cases opened by WP-5 (the basic KYC case); the `risk.alerts` consumer, alert grouping, FRAUD / AML-alert cases, actions and recoveries are R1+.
 
-**WP-8 Actions, freezes, instructions.** Ledger / wallet / partner / limits-risk `Http<Svc>Client`s (WireMock-tested); freeze engine (BR-11-40..48); lien attempts; lift by (reason, reference); flags; blacklist proposals; reversal recommendations; partner suspension; regulatory instructions; auto-freeze review; `FREEZE_APPLIED/LIFTED`, `REVERSAL_RECOMMENDED`, `FREEZE_FAILED`, `SANCTIONS_AUTO_FREEZE`, `WALLET_RESTRICTED_NOTICE` (opt-in). Acceptance: `freeze_fullBlock_appliedOnHttp200Applied`, `freeze_noop_treatedAsApplied`, `freeze_202_failsAndAlerts`, `lien_insufficientAvailable_holdsAvailableAndDebitBlocks`, `lien_rejectedThenRetry_usesAttempt2CommandId`, `lien_timeout_retriesSameCommandId`, `release_usesPostedHoldCommandId`, `lift_sendsSameReasonAndReference`, `lift_sharedRestriction_noWalletCall`, `instruction_threeTargets_oneFails_partiallyExecuted`, `sanctionsConfirmed_autoFreezesAllSubjectWallets_andSuspendsPartner`, `reversalRecommended_onePerTxnRef`, `blacklistProposal_409_actionDone`, `regulatoryNotice_onlyWhenFlagOn`. SRS AML-009, FRD-008, PON-009.
+**[R1+] WP-8 Actions, freezes, instructions.** Ledger / wallet / partner / limits-risk `Http<Svc>Client`s (WireMock-tested); freeze engine (BR-11-40..48); lien attempts; lift by (reason, reference); flags; blacklist proposals; reversal recommendations; partner suspension; regulatory instructions; auto-freeze review; `FREEZE_APPLIED/LIFTED`, `REVERSAL_RECOMMENDED`, `FREEZE_FAILED`, `SANCTIONS_AUTO_FREEZE`, `WALLET_RESTRICTED_NOTICE` (opt-in). Acceptance: `freeze_fullBlock_appliedOnHttp200Applied`, `freeze_noop_treatedAsApplied`, `freeze_202_failsAndAlerts`, `lien_insufficientAvailable_holdsAvailableAndDebitBlocks`, `lien_rejectedThenRetry_usesAttempt2CommandId`, `lien_timeout_retriesSameCommandId`, `release_usesPostedHoldCommandId`, `lift_sendsSameReasonAndReference`, `lift_sharedRestriction_noWalletCall`, `instruction_threeTargets_oneFails_partiallyExecuted`, `sanctionsConfirmed_autoFreezesAllSubjectWallets_andSuspendsPartner`, `reversalRecommended_onePerTxnRef`, `blacklistProposal_409_actionDone`, `regulatoryNotice_onlyWhenFlagOn`. SRS AML-009, FRD-008, PON-009.
 
-**WP-9 CTR, STR (goAML) and MIS.** CTR daily job + monthly report (XML/CSV); STR draft / edit / validate / submit / export / mark-submitted; goAML writer + optional XSD; code map; AML MIS and fraud dashboard + CSV. Acceptance: `ctr_dailyJob_idempotent`, `ctr_thresholdSum_vs_either`, `str_xml_matchesGoldenFile` (`src/test/resources/goaml/str-golden.xml`), `str_amountFormatting_noFloat`, `str_validate_missingIdNumber_blocksSubmit`, `str_idNumber_encryptedNeverReturned`, `mis_fraud_falsePositiveRateBps_correct`, `download_str_audited`. SRS AML-005, AML-007, AML-011, FRD-010.
+**[R1+] WP-9 CTR, STR (goAML) and MIS.** CTR daily job + monthly report (XML/CSV); STR draft / edit / validate / submit / export / mark-submitted; goAML writer + optional XSD; code map; AML MIS and fraud dashboard + CSV. Acceptance: `ctr_dailyJob_idempotent`, `ctr_thresholdSum_vs_either`, `str_xml_matchesGoldenFile` (`src/test/resources/goaml/str-golden.xml`), `str_amountFormatting_noFloat`, `str_validate_missingIdNumber_blocksSubmit`, `str_idNumber_encryptedNeverReturned`, `mis_fraud_falsePositiveRateBps_correct`, `download_str_audited`. SRS AML-005, AML-007, AML-011, FRD-010.
 
-**WP-10 R2 features.** Customer fraud reports, re-grade recommendation, review schedule, AML export/import, purge with legal-hold check. Acceptance: `fraudReport_unauthorised_createsHighAlert`, `fraudReportStatus_hidesInvestigationDetails`, `suspiciousDecision_emitsRiskRegradeRecommended`, `reviewSchedule_dueHighRisk_opensPeriodicCase`, `externalAlertsImport_createsAlerts`, `purge_skipsWhenLegalHoldActive`. SRS FRD-012, AML-008, AML-010, ARC-002.
+**[R1+] WP-10 R2 features.** Customer fraud reports, re-grade recommendation, review schedule, AML export/import, purge with legal-hold check. Acceptance: `fraudReport_unauthorised_createsHighAlert`, `fraudReportStatus_hidesInvestigationDetails`, `suspiciousDecision_emitsRiskRegradeRecommended`, `reviewSchedule_dueHighRisk_opensPeriodicCase`, `externalAlertsImport_createsAlerts`, `purge_skipsWhenLegalHoldActive`. SRS FRD-012, AML-008, AML-010, ARC-002.
 
-**WP-11 Compose integration.** Switch stubs to the real services in the Compose stack; walk by hand: partner screening; customer screening CLEAR and hold; structuring → case → freeze + lien → STR XML; lift. Acceptance: the walk-through checklist in `docs/PROGRESS.md` passes; wallet-service holds a POTENTIAL_MATCH customer and activates after `SCREENING_DECIDED CLEAR`.
+**[MVP] WP-11 Compose integration.** Switch stubs to the real services in the Compose stack; walk by hand: partner screening; customer screening CLEAR and hold; structuring → case → freeze + lien → STR XML; lift. Acceptance: the walk-through checklist in `docs/PROGRESS.md` passes; wallet-service holds a POTENTIAL_MATCH customer and activates after `SCREENING_DECIDED CLEAR`. MVP part: partner screening (incl. one BILLER) and customer screening CLEAR and hold; the structuring → freeze + lien → STR → lift steps follow in R1+.
+
+**[MVP] WP-CR-1 BILLER partners in screening (CR-COMPLIANCE-1).** Make the `partner.events` / `wallet.events` projections and the `GET /v1/wallets/{walletId}` client tolerant of `partnerType BILLER`, `ownerType BILLER` and `walletType B` (no Java enum that rejects unknown values; stored as text); BILLER partners in `PENDING_SCREENING` screened per BR-11-11 / BR-11-75, including the no-key-person case. Acceptance: `partnerUpserted_billerPendingScreening_onePartnerScreeningEvent`, `partnerUpserted_billerAllSubTypes_screenedIdentically`, `partnerUpserted_billerNoKeyPersons_screensNamesOnly`, `walletUpserted_billerOwnerTypeB_projectedNotDlq`, `partnerUpserted_unknownPartnerType_storedNotDlq` (events built in-test until the BILLER fixture arrives with the wallet-service re-pin). Depends on: WP-5. SRS PON-004, ONB-008, BIL-011, BIL-012.
 
 ## 11. Test plan
 
@@ -4726,6 +4734,7 @@ Each WP ends with `./gradlew check` green, OpenAPI drift check green, `docs/PROG
 | Concurrency (≥ 100 threads) | `approval_100ConcurrentApprovals_singleApplies`, `freeze_100ConcurrentExecutorClaims_singleWalletCall`, `ingest_parallelPartitions_noDuplicateAmlTxn`, `rescreenChunks_100Workers_eachChunkOnce`, `docSequence_100Threads_uniqueCaseNos` |
 | Security / PII | `log_noClearNidOrMsisdn`, `audit_beforeAfter_noNarrativeNoClearPii`, `fraudReport_otherCustomersReport_forbidden`, `evidenceDownload_requiresRole`, `notifications_staffOnlyExceptOptInNotice` |
 | Golden files | `screening-golden.json`, `goaml/str-golden.xml`, one real-format sample per parser |
+| BILLER partners (WP-CR-1) | `partnerUpserted_billerPendingScreening_onePartnerScreeningEvent`, `partnerUpserted_billerAllSubTypes_screenedIdentically`, `partnerUpserted_billerNoKeyPersons_screensNamesOnly`, `walletUpserted_billerOwnerTypeB_projectedNotDlq`, `partnerUpserted_unknownPartnerType_storedNotDlq` |
 | Manual (Compose) | WP-11 walk-through |
 
 ## 12. Definition of done (additions to kernel K10)
@@ -4752,7 +4761,7 @@ Each WP ends with `./gradlew check` green, OpenAPI drift check green, `docs/PROG
 | OPEN D-32 | Reason-code seeds | Risk regrade group `AML_CASE_SUSPICIOUS`, `FRAUD_CONFIRMED`, `PERIODIC_REVIEW`; blacklist proposals use `FRAUD_CONFIRMED`, `AML_SUSPICION`, `SANCTIONS`; flags `AML_WATCH`, `AML_LIEN` | §5.3, BR-11-40, §6.7, §6.11 |
 | OPEN D-48 | "Adverse" list source | part of the INTERNAL watchlist (GENERIC_CSV) | §1.3, `matchListCode INTERNAL` |
 
-**Deferred (with interim behaviour).** goAML upload (manual file); list subscriptions (manual upload); remittance screening and AML-SC-10 (reserved); NID reveal (officer typing); SIEM (log marker); retention purge (R2, WP-10).
+**Deferred (with interim behaviour).** MVP release (CR-COMPLIANCE-1): AML monitoring, alert / fraud cases, freezes, liens, instructions, sanctions auto-freeze executor, CTR, STR, regulatory reporting and MIS are R1+ (501 in the MVP build; `txn.events` / `risk.alerts` not consumed; a CONFIRMED sanctions hit at onboarding holds activation via the SCREENING case); goAML upload (manual file); list subscriptions (manual upload); remittance screening and AML-SC-10 (reserved); NID reveal (officer typing); SIEM (log marker); retention purge (R2, WP-10).
 
 **Assumptions.**
 1. Provisional matcher thresholds/weights, scenario parameters, CTR threshold/aggregation, SLA hours, review intervals, goAML code lists and `rentity_id` await CAMLCO/BFIU confirmation; all are data.
@@ -4775,3 +4784,4 @@ Each WP ends with `./gradlew check` green, OpenAPI drift check green, `docs/PROG
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-11 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit (§4.9) |
+| 1.0.0 | 2026-10-14 | CR-COMPLIANCE-1 | Kind A (no contract change): MVP scope tagging against SRS v1.2 — basic KYC case and screening clearance for customers and partners (incl. BILLER) are MVP; AML monitoring, STR and regulatory reporting R1+; §2 baseline SRS v1.2 with MVP markers; §10 WPs tagged [MVP] / [R1+]; BR-11-75 and WP-CR-1 (BILLER partner type tolerated in projections and screening) |

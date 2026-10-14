@@ -1,7 +1,7 @@
 service: ledger-service
 number: "01"
 modules: []
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 kernel: "1.0"
 owner: Dev-1
 
@@ -9,7 +9,7 @@ provides:
   apis:
     - openapi: provided/openapi.yaml
       major: 1
-      # 29 operations: 17 commands (one literal path per command name), 3 account operations,
+      # 31 operations: 19 commands (one literal path per command name), 3 account operations,
       # 5 reads, system balance sheet, and 4 internal operations (x-audience: internal).
   events:
     - topic: ledger.changes
@@ -40,7 +40,7 @@ consumes:
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       purpose: "audit trail of account lifecycle, holds, reversals, back-office and bulk commands, closure payouts and integrity mismatches (via outbox)"
       auditActions: [LEDGER_ACCOUNT_CREATED, LEDGER_ACCOUNT_CLOSED, LEDGER_HOLD_CREATED, LEDGER_HOLD_RELEASED,

@@ -1,7 +1,7 @@
 service: transaction-service
 number: "02"
 modules: []
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 kernel: "1.0"
 owner: Dev-2
 
@@ -33,7 +33,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-p2p"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 of the payment pipeline for P2P (command type 1); also re-drive and approval-free retries with the identical body"
       fieldsUsed: &ledgerPaymentFields
         - "req.commandId"
@@ -65,7 +65,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-cash-in"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 for CASH_IN (command type 2)"
       fieldsUsed: *ledgerPaymentFields
       codesUsed:
@@ -76,7 +76,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-cash-out"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 for CASH_OUT (command type 3)"
       fieldsUsed: *ledgerPaymentFields
       codesUsed:
@@ -87,7 +87,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-merchant-payment"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 for MERCHANT_PAYMENT (command type 4)"
       fieldsUsed: *ledgerPaymentFields
       codesUsed:
@@ -98,7 +98,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-merchant-refund"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 for MERCHANT_REFUND (command type 5)"
       fieldsUsed: *ledgerPaymentFields
       codesUsed:
@@ -109,7 +109,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-float-transfer"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 7 for FLOAT_TRANSFER (command type 6)"
       fieldsUsed: *ledgerPaymentFields
       codesUsed:
@@ -117,11 +117,34 @@ consumes:
         - {set: rejectionCode, values: "*"}
         - {set: rejectionDetailToken, values: [NOT_REVERSIBLE, ACCOUNT_TYPE_MISMATCH, id_already_failed]}
       resilience: {connectTimeoutMs: 100, timeoutMs: 500, retries: 0, circuitBreaker: ledger, bulkhead: 512, onFailure: "503 with transaction INITIATED"}
+    # CR-TRANSACTION-1 (MVP): commands 18 / 19, introduced by ledger-service contractVersion 1.1.0
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-bill-payment"
+      major: 1
+      pinnedContractVersion: 1.1.0
+      purpose: "step 7 for BILL_PAY (command type 18, customer 100 -> biller 150); also re-drive with the identical body"
+      fieldsUsed: *ledgerPaymentFields
+      codesUsed:
+        - {set: commandResult, values: "*"}
+        - {set: rejectionCode, values: "*"}
+        - {set: rejectionDetailToken, values: [NOT_REVERSIBLE, ACCOUNT_TYPE_MISMATCH, id_already_failed]}
+      resilience: {connectTimeoutMs: 100, timeoutMs: 500, retries: 0, circuitBreaker: ledger, bulkhead: 512, onFailure: "503 with transaction INITIATED; the provider is never called before the ledger outcome is known"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-recharge"
+      major: 1
+      pinnedContractVersion: 1.1.0
+      purpose: "step 7 for RECHARGE (command type 19, customer 100 -> operator biller 150); also re-drive with the identical body"
+      fieldsUsed: *ledgerPaymentFields
+      codesUsed:
+        - {set: commandResult, values: "*"}
+        - {set: rejectionCode, values: "*"}
+        - {set: rejectionDetailToken, values: [NOT_REVERSIBLE, ACCOUNT_TYPE_MISMATCH, id_already_failed]}
+      resilience: {connectTimeoutMs: 100, timeoutMs: 500, retries: 0, circuitBreaker: ledger, bulkhead: 512, onFailure: "503 with transaction INITIATED; the provider is never called before the ledger outcome is known"}
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-reversal"
       major: 1
-      pinnedContractVersion: 1.0.0
-      purpose: "execute a support-approved reversal (command type 7); commandId = reversal txnId"
+      pinnedContractVersion: 1.1.0
+      purpose: "execute a support-approved reversal (command type 7); commandId = reversal txnId. Also the automatic compensation of a BILL_PAY / RECHARGE (commands 18 / 19, reversible since ledger 1.1.0) refused by the simulated provider (CR-TRANSACTION-1)"
       fieldsUsed:
         - "req.commandId"
         - "req.txnRef"
@@ -144,7 +167,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/commands/{commandId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "recovery sweeper and late-post verifier: resolve the outcome of an INITIATED intent or re-check a sweeper FAILED row"
       fieldsUsed:
         - "path.commandId"
@@ -162,7 +185,7 @@ consumes:
     - producer: limits-risk-service
       operation: "POST /v1/risk/evaluate"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "step 4: limits + fraud decision and reservation (reservation id = txnId) for every payment type except REVERSAL"
       fieldsUsed:
         - "req.txnId"
@@ -201,7 +224,7 @@ consumes:
     - producer: limits-risk-service
       operation: "POST /v1/limits/reservations/{txnId}:release"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "release a reservation when risk may have reserved but no intent row was committed (503 at steps 4-6, idempotency takeover)"
       fieldsUsed:
         - "path.txnId"
@@ -215,7 +238,7 @@ consumes:
     - producer: limits-risk-service
       operation: "GET /v1/limits/wallets/{walletId}/usage"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "quote only: sender's monthly count for the quoted txnType (SEND item) -> usage.senderMonthlyCountForTxnType (OPEN D-17)"
       fieldsUsed:
         - "path.walletId"
@@ -230,7 +253,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/{walletId}/status"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "fallback when the Redis wallet status cache misses (payments, quote, beneficiary create)"
       fieldsUsed:
         - "path.walletId"
@@ -250,7 +273,7 @@ consumes:
     - producer: pricing-service
       operation: "GET /v1/pricing/plans"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "bootstrap of the in-memory pricing snapshot at start-up and on POST /v1/internal/admin/pricing:reload; pages until nextCursor is null"
       fieldsUsed:
         - "query.status"
@@ -266,7 +289,7 @@ consumes:
       topic: fee.rules
       eventType: PRICING_PLAN_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: "transaction-service.feerules-${HOSTNAME}"
       groupKind: per-instance
       purpose: "in-memory pricing snapshot (PlanJson); every pod reads from earliest, no reliance on committed offsets; null-value tombstone (key = planId) removes the plan"
@@ -290,7 +313,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: transaction-service.partner
       purpose: "partner_link projection for float hierarchy (direct parent/child, status) and refund maker-checker sub-type"
       fieldsUsed:
@@ -309,7 +332,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: transaction-service.refdata
       purpose: "PURPOSE_CODE and REASON_CODE projections; SYSTEM_PARAM FEATURE.* product switches and WALLET.ALLOW_INBOUND_BEFORE_KYC; version-guarded, latest wins"
       fieldsUsed:
@@ -327,28 +350,28 @@ consumes:
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [MerchantRefund]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [MerchantRefund]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [MerchantRefund]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       exception: "Customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT and FLOAT_TRANSFER are not written to audit.events; their tamper-evident trail is txn.events chained by admin-service governance (OPEN D-05). Reversals, refund outcomes/requests/decisions, float hierarchy overrides, beneficiary changes and anomaly resolutions are audited."
       actions: [TRANSACTION_REVERSED, REVERSAL_FAILED, REFUND_COMPLETED, REFUND_FAILED, REFUND_REQUESTED, REFUND_APPROVED, REFUND_REJECTED, REFUND_EXPIRED, FLOAT_HIERARCHY_OVERRIDE, BENEFICIARY_CREATED, BENEFICIARY_UPDATED, BENEFICIARY_DELETED, ANOMALY_RESOLVED]
@@ -357,21 +380,28 @@ consumes:
     - producer: wallet-service
       id: wallet-status-cache
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "read ws:{bucket} (pipelined HGET for both parties); write the negative cache wsn:{walletId} after a status-API 404"
       fieldsUsed: ["bucket", "key", "field", "value.version", "value.statusCode", "value.kycTier", "value.walletTypeCode", "value.categoryCode", "value.flags", "negativeCache"]
     - producer: pricing-service
       id: pricing-algorithm
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "transaction-service implements the evaluation algorithm identically (steps 0-8, HALF_EVEN, long/BigDecimal); every step is used"
       fieldsUsed: ["*"]
     - producer: pricing-service
       id: pricing-golden-vectors
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "test resource copied byte-for-byte; every tier CATALOGUE vector is mandatory (test pricing_goldenVectors_all); extensionVectors informative only"
       fieldsUsed: ["schemaVersion", "catalogueVersion", "rounding", "outputFields", "vectors[]"]
+    # CR-TRANSACTION-1 (MVP): internal biller catalogue, written by wallet-service (partner module) on the Redis cache cluster
+    - producer: wallet-service
+      id: biller-catalogue-cache
+      version: 1
+      pinnedContractVersion: 1.1.0
+      purpose: "pipeline step 1 of BILL_PAY / RECHARGE, bill enquiry and BILL_PAY / RECHARGE quotes: read biller:{billerId} (biller profile incl. the settlement walletId = ledger toAccountId) and biller:mno-prefix:{prefix} (MSISDN prefix -> operator billerId); read-only. Miss with biller:meta state READY -> 404 BILLER_NOT_FOUND (400 MSISDN_INVALID for a prefix); miss before READY, unparsable value or Redis cache unavailable -> 503 (the GET /v1/billers/{billerId} fallback is deferred, SPEC §13 OPEN TX-MVP-3)"
+      fieldsUsed: ["biller:{billerId}", "biller:mno-prefix:{prefix}", "biller:meta.state", "schema", "billerId", "billerCode", "subType", "category", "walletId", "referencePattern", "amountMode", "fixedAmountPoisha", "minAmountPoisha", "maxAmountPoisha", "status", "msisdnPrefixes", "rechargeTypes"]
 
   codes:
     - {producer: wallet-service, set: walletStatus, values: "*"}
@@ -382,4 +412,4 @@ consumes:
   refdata:
     - {type: PURPOSE_CODE, codes: ["*"]}
     - {type: REASON_CODE, codes: [WRONG_TRANSFER, DISPUTE_UPHELD, SYSTEM_ERROR, FRAUD_CONFIRMED, CUSTOMER_RETURN, DUPLICATE_PAYMENT, ORDER_CANCELLED, PRICE_ADJUSTMENT, OTHER]}
-    - {type: SYSTEM_PARAM, codes: ["FEATURE.P2P", "FEATURE.CASH_IN", "FEATURE.CASH_OUT", "FEATURE.MERCHANT_PAYMENT", "FEATURE.MERCHANT_REFUND", "FEATURE.FLOAT_TRANSFER", "FEATURE.REVERSAL", "WALLET.ALLOW_INBOUND_BEFORE_KYC"]}
+    - {type: SYSTEM_PARAM, codes: ["FEATURE.P2P", "FEATURE.CASH_IN", "FEATURE.CASH_OUT", "FEATURE.MERCHANT_PAYMENT", "FEATURE.MERCHANT_REFUND", "FEATURE.FLOAT_TRANSFER", "FEATURE.REVERSAL", "FEATURE.BILL_PAY", "FEATURE.RECHARGE", "WALLET.ALLOW_INBOUND_BEFORE_KYC"]}

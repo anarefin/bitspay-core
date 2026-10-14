@@ -4,8 +4,8 @@
 |---|---|
 | Service | `admin-service` (`spring.application.name`) |
 | Number / owner | SVC-15 · Dev-8 (modules: `governance` → Dev-8, lead; `notification` → Dev-8) |
-| Layer / release | Back office (layer 5, asynchronous consumers) · R1 (+ R2: retention execution inputs, notification fallback, quiet hours, frequency caps) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Back office (layer 5, asynchronous consumers) · **MVP** (governance: refdata, params, product switches, approvals, audit; notification: rules, templates, inbox, LOG channels) · R1 (staff RBAC administration, access review, activity monitoring, reminders) (+ R2: retention execution inputs, notification fallback, quiet hours, frequency caps) |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-ADMIN-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8115 · management 9115 |
 | Schema / role | `svc_admin` (login role `svc_admin`) |
@@ -51,6 +51,8 @@ Neither module moves money. admin-service **owns the schemas of the three inboun
 - Reminder engine (advance, due, overdue) driven by `notification.requests` `reminder{}` or `POST /v1/reminders`.
 - Notification log API (support console, SRS NOT-008), delivery summary report (RPT-005, OPEN D-37), partition retention report.
 
+**MVP vs R1+ (SRS v1.2, CR-ADMIN-1).** The MVP release needs admin governance (reference data, params and calendar, product switches, maker-checker approvals and inbox, audit chain) and notifications for the six MVP features (P2P, merchant payment and refund, cash-in / cash-out, bill payment, mobile recharge) plus float, reversal, wallet and KYC messages. The MVP product switches are `FEATURE.P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE` enabled; every other product disabled (§5.4.2). New payer receipts `BILL_PAYMENT_SUCCESS` / `BILL_PAYMENT_FAILED` and `RECHARGE_SUCCESS` / `RECHARGE_FAILED` (BR-NOT-16). R1+: staff RBAC administration beyond seeds, access review and dormancy, activity monitoring, reminders (the `BILL_DUE` policy stays disabled), disbursement / campaign / commission-settlement rules (their products are disabled), and everything already marked R2. §10 tags each WP.
+
 ### 1.3 Out of scope / deferred
 
 | Deferred item | Replacement now |
@@ -66,7 +68,7 @@ Neither module moves money. admin-service **owns the schemas of the three inboun
 | Real SMS / push / email / IVR providers, chatbot | `ChannelProvider` SPI; `LogChannelProvider` is the sole implementation; DLR endpoint `/v1/internal/providers/{providerCode}/dlr` is the future webhook |
 | Push tokens / e-mail addresses | Contact columns exist and stay null; PUSH/EMAIL deliveries become `SUPPRESSED(NO_ADDRESS)` |
 | Security notifications (new device, PIN change, failed login) | Templates seeded, rules disabled until the edge/auth layer exists |
-| Bill-due reminders | Policy `BILL_DUE` seeded disabled |
+| Bill-due reminders | Policy `BILL_DUE` seeded disabled (R1+; MVP bill payment has no due-date feed) |
 | Marketing campaign orchestration | Owned by pricing-service (campaign); admin-service only delivers `notification.requests` |
 | Rule-driven notifications from `treasury.events`, `support.events`, `case.events`, `recon.events`, `gl.events` | Subscribed, no R1 rules; those producers send `notification.requests` themselves |
 | Delivery-status event feed | Not published; `GET /v1/notifications/logs` and the delivery summary report serve it |
@@ -104,52 +106,57 @@ Governance alerts to staff still go through `notification.requests` (written to 
 
 ## 2. SRS traceability
 
+Baseline: **SRS v1.2 (14 Oct 2026)**. "· MVP" in the last column marks rows the MVP release delivers; every other row is R1+.
+
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
 | ADM-001 | User management, roles, data scope, maker-checker | `/v1/staff/users*`, `/v1/staff/users/{id}/roles`, `/scopes`; BR-GOV-01..06; WP-5 |
 | ADM-002 | Fine-grained RBAC, SoD toxic combinations | permission = function:action; `sod_rule`; BR-GOV-07..10; WP-5 |
 | ADM-003 | Access review, dormant auto-disable | `GET /v1/staff/access-review`; `DormantStaffJob` BR-GOV-11; WP-6 |
 | ADM-004 | Rules-engine administration without code | Permissions `LIMIT_RULE:*`, `FEE_PLAN:*`, `RISK_RULE:*` + inbox (rules owned by their services); WP-5 |
-| ADM-005 | Product config, service enable/disable per licence | `product_switch` → `SYSTEM_PARAM FEATURE.<PRODUCT>`; BR-GOV-32; WP-4 |
+| ADM-005 | Product config, service enable/disable per licence | `product_switch` → `SYSTEM_PARAM FEATURE.<PRODUCT>`; BR-GOV-32; WP-4 · MVP |
 | ADM-006 | CMS content (R2, S) | Deferred |
-| ADM-007 | Geography master with versioning | refdata `GEO` + `refdata_item_version`; BR-GOV-30; WP-3 |
-| AUD-001 | Tamper-evident trail of user/config/financial/admin actions | `audit.events` + `txn.events` chained (OPEN D-05); §7.3; WP-7 |
-| AUD-002 | Audit record fields | `AUDIT_RECORDED` schema (§5.2.3) stored verbatim after redaction + `recordedAt` UTC and Dhaka local |
-| AUD-003 | Immutable, tamper-detectable | Hash chain, seals, anchors, trigger, verification job/API, offline CLI; §7.3; WP-7, WP-8 |
-| AUD-004 | Searchable/exportable by auditors; access audited | `GET /v1/audit/records`, `POST /v1/audit/exports`; BR-GOV-12; WP-8 |
+| ADM-007 | Geography master with versioning | refdata `GEO` + `refdata_item_version`; BR-GOV-30; WP-3 · MVP |
+| AUD-001 | Tamper-evident trail of user/config/financial/admin actions | `audit.events` + `txn.events` chained (OPEN D-05); §7.3; WP-7 · MVP |
+| AUD-002 | Audit record fields | `AUDIT_RECORDED` schema (§5.2.3) stored verbatim after redaction + `recordedAt` UTC and Dhaka local · MVP |
+| AUD-003 | Immutable, tamper-detectable | Hash chain, seals, anchors, trigger, verification job/API, offline CLI; §7.3; WP-7, WP-8 · MVP |
+| AUD-004 | Searchable/exportable by auditors; access audited | `GET /v1/audit/records`, `POST /v1/audit/exports`; BR-GOV-12; WP-8 · MVP |
 | AUD-005 | Retention per ARC; SIEM forwarding | Retention registry; `AuditForwarder` SPI (partial) |
 | AUD-006 | PAM/DAM capture | Ingest-ready; deferred |
 | BOM-001 | Role-based menus | Effective-permission API (partial) |
-| BOM-004 | Maker-checker on sensitive activities | Shared engine (kernel K5); inbox; WP-2, WP-9 |
-| BOM-005 | Maker ≠ checker, multi-level, pending-queue ageing/expiry | BR-GOV-02..05, BR-GOV-23; WP-2, WP-9 |
+| BOM-004 | Maker-checker on sensitive activities | Shared engine (kernel K5); inbox; WP-2, WP-9 · MVP |
+| BOM-005 | Maker ≠ checker, multi-level, pending-queue ageing/expiry | BR-GOV-02..05, BR-GOV-23; WP-2, WP-9 · MVP |
 | BOM-008 | Back-office user activity monitoring + alerts | `monitoring_rule` engine BR-GOV-40..46; WP-10 |
 | BOM-009 | Bulk operations with approval (R2, S) | Bulk refdata import and role assignment with one approval; bulk notifications from `notification.requests` (partial) |
-| BOM-010 | Params, calendar, holidays, cut-offs, EOD schedule with maker-checker | `/v1/params`, `/v1/calendar/*`, HOLIDAY refdata; WP-4 |
+| BOM-010 | Params, calendar, holidays, cut-offs, EOD schedule with maker-checker | `/v1/params`, `/v1/calendar/*`, HOLIDAY refdata; WP-4 · MVP |
 | BOM-011 | Network/VPN/MFA | Deferred (infrastructure) |
 | ARC-001 | Configurable retention per category | `retention_policy` → `RETENTION.<CATEGORY>`; notification partitions; WP-4, WP-20 |
 | ARC-002 | Lifecycle states + legal hold | `legal_hold`, `GET /v1/retention/legal-holds`; BR-GOV-36; WP-4 |
 | ARC-005 | Deletion with approval and certificates | Inputs only (policy + holds); executed by the archiver (R2) |
 | ARC-006 | Lifecycle events auditable | Archiver emits `audit.events`; governance chains them |
-| DAT-002 | Bangla names | `nameBn` validation; WP-3 |
+| DAT-002 | Bangla names | `nameBn` validation; WP-3 · MVP |
 | DAT-003 | Data dictionary | `GET /v1/refdata/dictionary` (partial) |
-| DAT-004 | Central reference data with versioning | Refdata (BR-GOV-30..33) |
+| DAT-004 | Central reference data with versioning | Refdata (BR-GOV-30..33) · MVP |
 | DAT-005 | Reference sync with delta and conflicts | CSV import → diff → approval (partial) |
 | SEC-005 | RBAC least privilege + SoD | as ADM-002 |
-| C-01 | Unapproved services disabled | `FEATURE.*` seeds disabled for unlicensed products; BR-GOV-32 |
-| NOT-001 | Multi-channel (SMS, in-app, push, email, IVR, chatbot) | IN_APP built; others via SPI + `LogChannelProvider`; chatbot deferred; WP-15, WP-16 |
-| NOT-002 | Event-triggered notifications | Seed rules §7.12; `notification.requests`; WP-14, WP-17 |
-| NOT-003 | BN/EN templates, variables, versioning, maker-checker, SMS length/Unicode | Templates, renderer, `SmsSegmentCalculator`; BR-NOT-10..15; WP-11 |
-| NOT-004 | Role-based controls; mandatory vs optional | `x-actors` roles; template category; preference guard; WP-11, WP-13 |
+| C-01 | Unapproved services disabled | `FEATURE.*` seeds disabled for products outside the MVP (§5.4.2); BR-GOV-32, BR-GOV-47 · MVP |
+| NOT-001 | Multi-channel (SMS, in-app, push, email, IVR, chatbot) | IN_APP built; others via SPI + `LogChannelProvider`; chatbot deferred; WP-15, WP-16 · MVP |
+| NOT-002 | Event-triggered notifications | Seed rules §7.12; `notification.requests`; WP-14, WP-17 · MVP |
+| NOT-003 | BN/EN templates, variables, versioning, maker-checker, SMS length/Unicode | Templates, renderer, `SmsSegmentCalculator`; BR-NOT-10..15; WP-11 · MVP |
+| NOT-004 | Role-based controls; mandatory vs optional | `x-actors` roles; template category; preference guard; WP-11, WP-13 · MVP |
 | NOT-005 | Reminder engine | `notif_reminder_*`, `ReminderScheduler`; BR-NOT-25/26, BR-NOT-50..51 (OPEN D-11); WP-18 |
 | NOT-006 | Channel fallback and priority (R2, S) | `notif_channel_policy` BR-NOT-36; WP-19 |
-| NOT-007 | Delivery status, DLR, retry | Delivery state machine BR-NOT-30..35; WP-16 |
-| NOT-008 | Logs retained, viewable in support console | `GET /v1/notifications/logs`, `GET /v1/notifications/{notificationId}`; WP-20 |
+| NOT-007 | Delivery status, DLR, retry | Delivery state machine BR-NOT-30..35; WP-16 · MVP |
+| NOT-008 | Logs retained, viewable in support console | `GET /v1/notifications/logs`, `GET /v1/notifications/{notificationId}`; WP-20 · MVP |
 | NOT-009 | Quiet hours and frequency capping (R2, S) | BR-NOT-40/41; WP-19 |
-| NOT-010 | Sender ID/masking, provider routing, multi-provider failover | `notif_provider`, `notif_provider_route`, `ProviderRouter`; WP-16 |
+| NOT-010 | Sender ID/masking, provider routing, multi-provider failover | `notif_provider`, `notif_provider_route`, `ProviderRouter`; WP-16 · MVP |
 | RPT-005 | Notification-delivery report | `GET /v1/notifications/reports/delivery-summary` (OPEN D-37); WP-20 |
-| PAY-012 / MER-004 | SMS to agents and merchants for every payment | `R-CASHIN-AGENT`, `R-CASHOUT-AGENT`, `R-MERCHANT-MER` on IN_APP + SMS (OPEN D-40) |
-| REF-05 | No tipping-off | Wallet rule conditions; no `case.events` rules (OPEN D-06) |
-| SRS §8.1 | Notification entity (template, channel, recipient, content hash, status, DLR) | `notif_notification`, `notif_delivery` |
+| PAY-012 / MER-004 | SMS to agents and merchants for every payment | `R-CASHIN-AGENT`, `R-CASHOUT-AGENT`, `R-MERCHANT-MER` on IN_APP + SMS (OPEN D-40) · MVP |
+| REF-05 | No tipping-off | Wallet rule conditions; no `case.events` rules (OPEN D-06) · MVP |
+| SRS §8.1 | Notification entity (template, channel, recipient, content hash, status, DLR) | `notif_notification`, `notif_delivery` · MVP |
+| BIL-011 | Internal biller catalogue, simulated bill settlement (MVP) | `FEATURE.BILL_PAY` enabled (BR-GOV-47); `BILL_PAYMENT_SUCCESS` / `BILL_PAYMENT_FAILED` receipts, rules R-BILLPAY-* (BR-NOT-16); WP-CR-1 · MVP |
+| BIL-012 | Mobile recharge via the operator catalogue (MVP) | `FEATURE.RECHARGE` enabled (BR-GOV-47); `RECHARGE_SUCCESS` / `RECHARGE_FAILED` receipts, rules R-RECHARGE-* (BR-NOT-16); WP-CR-1 · MVP |
+| UC-16 / UC-17 | Bill payment / mobile recharge use cases | Payer receipts as BIL-011 / BIL-012 · MVP |
 | PER-001/002 | Scale horizontally | Partition-parallel consumers, batch inserts, day/month partitions |
 | PER-008 | Audit search ≤ 3 s | Indexes + 31-day bound; WP-8 |
 
@@ -497,7 +504,7 @@ stateDiagram-v2
   [*] --> OPEN: first record of partition p on Dhaka day D
   OPEN --> OPEN: append (seq + 1)
   OPEN --> CLOSED_UNSEALED: first record of D+1 arrives (roll-over) or midnight passes
-  CLOSED_UNSEALED --> SEALED: ChainSealJob 00:10 D+1
+  CLOSED_UNSEALED --> SEALED: ChainSealJob at 00.10 on D+1
   SEALED --> ANCHORED: anchor(D) computed and exported
   ANCHORED --> ARCHIVED: R2 archiver after FULL verification, no legal hold
 ```
@@ -2420,7 +2427,7 @@ Order: event `checkerRoles[]` → `(service, module, entityType)` → `(service,
 | compliance-service | * | * | CAMLCO |
 | finance-ops-service | reconciliation | * | FIN_CHECKER |
 | finance-ops-service | reporting | * | FIN_CHECKER, CAMLCO |
-| **general-ledger-service** | * | * | **FIN_CHECKER** (its 11 entity types `GlAccount`, `PostingRuleSet`, `GlManualJournal`, `GlJournalReversal`, `GlOpeningBalance`, `GlDayForceClose`, `GlDayRestatement`, `GlPeriodClose`, `GlPeriodReopen`, `GlYearClose`, `GlExport` route here) |
+| **general-ledger-service** | * | * | **FIN_CHECKER** (its 10 entity types `GlAccount`, `PostingRuleSet`, `GlManualJournal`, `GlJournalReversal`, `GlOpeningBalance`, `GlDayForceClose`, `GlDayRestatement`, `GlPeriodClose`, `GlPeriodReopen`, `GlYearClose` route here) |
 | admin-service | notification | * | OPS_CHECKER |
 | admin-service | governance | * | ADMIN |
 | admin-service | governance | RefDataItem, RefDataImport | OPS_CHECKER, ADMIN |
@@ -2514,9 +2521,33 @@ Templates declared by other services are **not** listed here: admin-service seed
 | 〃 | 〃 | `txnType` | TEXT | Y | txnType code |
 | 〃 | 〃 | `txnRef` | TEXT | Y | |
 | 〃 | 〃 | `time` | DATETIME | Y | ← `completedAt` |
-| `TXN_FAILED` [T] | R-TXN-FAILED · TRANSACTION_FAILED `channel ne SYSTEM` · FROM_WALLET · IN_APP | `amountPoisha` | MONEY | Y | |
+| `TXN_FAILED` [T] | R-TXN-FAILED · TRANSACTION_FAILED `channel ne SYSTEM` ∧ `txnType nin [BILL_PAY, RECHARGE]` · FROM_WALLET · IN_APP | `amountPoisha` | MONEY | Y | |
 | 〃 | 〃 | `txnType` | TEXT | Y | |
 | 〃 | 〃 | `failureCode` | TEXT | Y | failureCode; the template maps it to a localised reason |
+| 〃 | 〃 | `txnRef` | TEXT | Y | |
+| 〃 | 〃 | `time` | DATETIME | Y | ← `createdAt` |
+| `BILL_PAYMENT_SUCCESS` [T] | R-BILLPAY-CUST · COMPLETED `BILL_PAY` · FROM_WALLET · IN_APP, SMS (MVP) | `amountPoisha` | MONEY | Y | |
+| 〃 | 〃 | `feePoisha` | MONEY | N | ← `sum(feePoisha, vatPoisha)` when `feeBearer = PAYER` |
+| 〃 | 〃 | `billerName` | TEXT | Y | ← `contact(toWalletId).name` (biller settlement wallet, type B) |
+| 〃 | 〃 | `billReference` | TEXT | Y | ← `billReference` |
+| 〃 | 〃 | `providerReceipt` | TEXT | N | ← `providerReceipt` (`SIM-BP-<txnRef>` in the MVP) |
+| 〃 | 〃 | `txnRef` | TEXT | Y | |
+| 〃 | 〃 | `time` | DATETIME | Y | ← `completedAt` |
+| `BILL_PAYMENT_FAILED` [T] | R-BILLPAY-FAILED · TRANSACTION_FAILED `txnType = BILL_PAY` ∧ `channel ne SYSTEM` · FROM_WALLET · IN_APP (MVP) | `amountPoisha` | MONEY | Y | |
+| 〃 | 〃 | `billReference` | TEXT | N | ← `billReference` |
+| 〃 | 〃 | `failureCode` | TEXT | Y | failureCode (incl. `PROVIDER_REJECTED`); the template maps it to a localised reason |
+| 〃 | 〃 | `txnRef` | TEXT | Y | |
+| 〃 | 〃 | `time` | DATETIME | Y | ← `createdAt` |
+| `RECHARGE_SUCCESS` [T] | R-RECHARGE-CUST · COMPLETED `RECHARGE` · FROM_WALLET · IN_APP, SMS (MVP) | `amountPoisha` | MONEY | Y | |
+| 〃 | 〃 | `feePoisha` | MONEY | N | ← `sum(feePoisha, vatPoisha)` when `feeBearer = PAYER` (seed plan `PLN-RECHARGE-NONE`: none) |
+| 〃 | 〃 | `msisdn` | MSISDN | Y | ← `msisdn` (recharged number) |
+| 〃 | 〃 | `operatorName` | TEXT | N | ← `contact(toWalletId).name` (MNO biller wallet) |
+| 〃 | 〃 | `providerReceipt` | TEXT | N | ← `providerReceipt` (`SIM-RC-<txnRef>` in the MVP) |
+| 〃 | 〃 | `txnRef` | TEXT | Y | |
+| 〃 | 〃 | `time` | DATETIME | Y | ← `completedAt` |
+| `RECHARGE_FAILED` [T] | R-RECHARGE-FAILED · TRANSACTION_FAILED `txnType = RECHARGE` ∧ `channel ne SYSTEM` · FROM_WALLET · IN_APP (MVP) | `amountPoisha` | MONEY | Y | |
+| 〃 | 〃 | `msisdn` | MSISDN | N | ← `msisdn` |
+| 〃 | 〃 | `failureCode` | TEXT | Y | failureCode (incl. `PROVIDER_REJECTED`); the template maps it to a localised reason |
 | 〃 | 〃 | `txnRef` | TEXT | Y | |
 | 〃 | 〃 | `time` | DATETIME | Y | ← `createdAt` |
 | `WALLET_BLOCKED` [S] | R-WALLET-BLOCKED · `wallet.events` `status in [F,X,C]` ∧ `neqPath previousStatus` ∧ `statusReasonCode nin [PARTNER_SUSPENDED, PARTNER_TERMINATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER]` (OPEN D-06) · DATA_WALLET · IN_APP, SMS | `msisdn` | MSISDN | Y | ← `contact(walletId).msisdn` |
@@ -2633,7 +2664,7 @@ Reserved `SYSTEM_PARAM` namespaces and seeds (readers declare their own codes in
 
 | Code / namespace | Attributes | Seed |
 |---|---|---|
-| `FEATURE.<PRODUCT>` | `{valueType: FEATURE, enabled, channels: array<X-Channel>, licenceRef: string\|null}`; a non-empty `FEATURE.P2P.channels` must include `SYSTEM` | `channels: []`, `licenceRef: null` for every item; enabled `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`; disabled until licensed `DISBURSEMENT`, `SCHEDULED_TRANSFER`, `REQUEST_MONEY`, `CAMPAIGN`; disabled (C-01) `ADD_MONEY`, `WALLET_TO_BANK`, `BILL_PAY`, `RECHARGE`, `REMITTANCE`, `CARD`, `OFF_US_QR`; any other indexed product code disabled |
+| `FEATURE.<PRODUCT>` | `{valueType: FEATURE, enabled, channels: array<X-Channel>, licenceRef: string\|null}`; a non-empty `FEATURE.P2P.channels` must include `SYSTEM` | `channels: []`, `licenceRef: null` for every item; MVP seed (BR-GOV-47): enabled `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE`; disabled (R1+) `DISBURSEMENT`, `SCHEDULED_TRANSFER`, `REQUEST_MONEY`, `CAMPAIGN`, `ADD_MONEY`, `WALLET_TO_BANK`, `REMITTANCE`, `CARD`, `OFF_US_QR`; any other indexed product code disabled |
 | `CUTOFF.EOD` | `{valueType: TIME, value}` — new business date starts at this Asia/Dhaka time | `"00:00"` |
 | `CUTOFF.EOD_GRACE_MINUTES` | `{valueType: INT}` | `15` |
 | `CUTOFF.SETTLEMENT_BANK` | `{valueType: TIME}` | `"15:00"` (no rule yet, OPEN D-49) |
@@ -2712,7 +2743,7 @@ Group `admin-service.notification-txn`. Ordering per sender wallet; dedupe by de
 
 | Field | Type | Req | Null | Constraints / enum |
 |---|---|---|---|---|
-| `txnType` | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` |
+| `txnType` | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE` (the last two from transaction-service 1.1.0, MVP) |
 | `txnRef` | string | Y | N | 18 chars, opaque to admin-service |
 | `fromWalletId` / `toWalletId` | uuid | Y | N | |
 | `amountPoisha` | int64 (poisha) | Y | N | > 0; REVERSAL row: principal reversed |
@@ -2723,9 +2754,12 @@ Group `admin-service.notification-txn`. Ordering per sender wallet; dedupe by de
 | `merchantReference` | string | Y | Y | MERCHANT_PAYMENT only |
 | `reasonCode` | string | Y | Y | REVERSAL / MERCHANT_REFUND reason |
 | `originalTxnRef` | string | Y | Y | set on REVERSAL and MERCHANT_REFUND rows |
+| `billReference` | string | N | Y | BILL_PAY only (additive optional, transaction-service 1.1.0) |
+| `msisdn` | string | N | Y | RECHARGE only (recharged number; additive optional) |
+| `providerReceipt` | string | N | Y | BILL_PAY / RECHARGE only (additive optional) |
 | `completedAt` | timestamp | Y | N | |
 
-`TRANSACTION_FAILED` subset: `txnType`, `txnRef`, `channel` (enum X-Channel values, Y, N), `fromWalletId`, `amountPoisha`, `failureCode` (enum, Y, Y — non-null on FAILED: `WALLET_NOT_TRANSACTABLE`, `LIMIT_EXCEEDED`, `RISK_BLOCKED`, `RISK_HELD_FOR_REVIEW`, `RISK_STEP_UP_REQUIRED`, `SERVICE_DISABLED`, `INSUFFICIENT_FUNDS`, `MAX_BALANCE_EXCEEDED`, `LEDGER_ORIGINAL_NOT_FOUND`, `LEDGER_ALREADY_REVERSED`, `LEDGER_HOLD_NOT_FOUND`, `LEDGER_INVALID_AMOUNT`, `LEDGER_OTHER`, `LEDGER_NOT_POSTED`), `createdAt` (timestamp, Y, N). Unknown `failureCode` values render the generic reason text.
+`TRANSACTION_FAILED` subset: `txnType`, `txnRef`, `channel` (enum X-Channel values, Y, N), `fromWalletId`, `amountPoisha`, `failureCode` (enum, Y, Y — non-null on FAILED: `WALLET_NOT_TRANSACTABLE`, `LIMIT_EXCEEDED`, `RISK_BLOCKED`, `RISK_HELD_FOR_REVIEW`, `RISK_STEP_UP_REQUIRED`, `SERVICE_DISABLED`, `INSUFFICIENT_FUNDS`, `MAX_BALANCE_EXCEEDED`, `LEDGER_ORIGINAL_NOT_FOUND`, `LEDGER_ALREADY_REVERSED`, `LEDGER_HOLD_NOT_FOUND`, `LEDGER_INVALID_AMOUNT`, `LEDGER_OTHER`, `LEDGER_NOT_POSTED`), `createdAt` (timestamp, Y, N); for BILL_PAY / RECHARGE also the additive optional `billReference`, `msisdn` (string, N, Y) and `failureCode` `PROVIDER_REJECTED` (transaction-service 1.1.0). Unknown `failureCode` values render the generic reason text.
 
 Fixtures: `fixtures/events/txn.events.TRANSACTION_COMPLETED.jsonl` (P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL), `txn.events.TRANSACTION_FAILED.jsonl` (APP and SYSTEM channel).
 
@@ -2924,6 +2958,7 @@ Seed rules: `BULK_EXPORT` (THRESHOLD_COUNT, `.*_EXPORT(ED)?$`, 3600 s, 5, HIGH);
 
 - **BR-GOV-30** Each approved change sets `item_version + 1` and writes `refdata_item_version` (CURRENT; previous CURRENT → SUPERSEDED with `effective_to`). `effectiveFrom > now` → SCHEDULED, promoted and published by `EffectiveDatedPublishJob` (every minute); else published immediately. `REFDATA_UPSERTED.data.version = item_version`. Validation: code matches the type regex; `parentCode` exists and is active, and for GEO its level is exactly one above; `nameBn` contains ≥ 1 Bengali-block character (U+0980–U+09FF) or equals `nameEn` for codes flagged `latinOnly` (DAT-002); attributes validate against the type's schema.
 - **BR-GOV-31** Deactivation = `active: false` published; codes are never reused for another meaning and never deleted; never a tombstone.
+- **BR-GOV-47** MVP product-switch seed (CR-ADMIN-1, SRS v1.2 C-01 / ADM-005): enabled `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE`; disabled `DISBURSEMENT`, `SCHEDULED_TRANSFER`, `REQUEST_MONEY`, `CAMPAIGN`, `ADD_MONEY`, `WALLET_TO_BANK`, `REMITTANCE`, `CARD`, `OFF_US_QR` and any other indexed code. The seed is applied only when the `product_switch` row does not exist (BR-SEED-06); an environment already seeded with `BILL_PAY` / `RECHARGE` disabled is switched by a normal 2-level product-switch approval (licence reference `MVP-PILOT`, B-24).
 - **BR-GOV-32** Product switch → `SYSTEM_PARAM FEATURE.<PRODUCT>` `{valueType FEATURE, enabled, channels, licenceRef}`. Enabling = 2 levels + `licenceRef`; disabling = 1 level and always allowed (fast kill). A non-empty `channels` for `P2P` must include `SYSTEM` (service-initiated scheduled transfers). Owners apply kernel K3.7.
 - **BR-GOV-33** Republish emits the current state of every item of the type with the **same** version (readers dedupe by `(type, code, version)`).
 - **BR-GOV-34** Business day: weekday ∉ `CALENDAR.WEEKEND_DAYS` (`FRI,SAT`) and no ACTIVE HOLIDAY with `bankHoliday = true`; `nextBusinessDay` scans ≤ 30 days.
@@ -3004,6 +3039,7 @@ Seed rules: `BULK_EXPORT` (THRESHOLD_COUNT, `.*_EXPORT(ED)?$`, 3600 s, 5, HIGH);
   4. Worst case at submit: render each variable at its `maxLength` sample (money `9,99,99,999.99`, msisdnMask 11 chars, names 30 chars Bangla in both languages) → must be ≤ `maxSegmentsBn` / `maxSegmentsEn` (3 / 2) else `SMS_TOO_LONG`.
 - **BR-NOT-14** Template version machine §3.5; checker ≠ maker; checker role `OPS_CHECKER` (`ADMIN` also for MARKETING). Rendering uses the version ACTIVE at processing time; the notification stores `template_version`. Both `bn` and `en` required for every allowed channel (`MISSING_LANGUAGE`).
 - **BR-NOT-15** Category → mandatory and TTL: §5.3.1.
+- **BR-NOT-16** Bill payment and recharge receipts (MVP, CR-ADMIN-1; SRS BIL-011, BIL-012, UC-16, UC-17). `TRANSACTION_COMPLETED` `txnType = BILL_PAY` → `BILL_PAYMENT_SUCCESS` to the payer (FROM_WALLET; IN_APP, SMS); `txnType = RECHARGE` → `RECHARGE_SUCCESS` to the payer (IN_APP, SMS). The biller / MNO wallet (TO_WALLET, type B) gets **no** message (no rule; billers have no inbox use in the MVP). `TRANSACTION_FAILED` for these types → `BILL_PAYMENT_FAILED` / `RECHARGE_FAILED` (IN_APP only, BR-NOT-07), and R-TXN-FAILED excludes them so the payer gets one failure message. `PROVIDER_REJECTED` (simulated provider refused after the ledger posted and was auto-reversed) maps to "The biller could not accept this payment; your money has not been deducted" / "বিলার পেমেন্টটি গ্রহণ করতে পারেনি; আপনার টাকা কাটা হয়নি". `billerName` / `operatorName` come from the contact projection of the biller wallet (`wallet.events`, `partner.events`); a missing contact renders `billerName` as the masked biller wallet code and hides `operatorName`. A later back-office REVERSAL of a bill payment is notified by R-REVERSAL-* (`TXN_REVERSED`) as for any reversal. Worked example: Rahim pays DESCO 1,200 Tk, reference `0123456789`, fee 5.00 + VAT 0.75 → EN "Bill payment Tk 1,200.00 to DESCO successful. Ref: 0123456789. Fee Tk 5.75 (incl. VAT). Receipt: SIM-BP-BP26101400K3M9QX2A. TxnID: BP26101400K3M9QX2A. Time: 14/10/2026 11:05. - Bits Pay".
 
 **Golden template samples** (`src/test/resources/golden/template-samples.json`; Rahim 8801711000000 → Karim 8801811000045, `amountPoisha 50000`, `feePoisha 500`, `vatPoisha 75`, `feeBearer PAYER`, `txnRef PP26100900K3M9QX2A`, `completedAt 2026-10-09T08:03:22.161Z`):
 
@@ -3020,7 +3056,9 @@ Seed rules: `BULK_EXPORT` (THRESHOLD_COUNT, `.*_EXPORT(ED)?$`, 3600 s, 5, HIGH);
 | `KYC_APPROVED` | en | `Congratulations {{name}}! Your Bits Pay KYC is approved and your account is now active (Tier {{kycTier}}). - Bits Pay` | — | GSM7 / 110 / **1** |
 | `KYC_APPROVED` | bn | `অভিনন্দন {{name}}! আপনার বিটস পে কেওয়াইসি অনুমোদিত হয়েছে এবং অ্যাকাউন্ট এখন সক্রিয় (টিয়ার {{kycTier\|digits}})। - Bits Pay` | "অভিনন্দন করিম আহমেদ! … (টিয়ার ২)। - Bits Pay" | UCS2 / 110 / **2** |
 
-IN_APP titles: `P2P_SENT` "Money sent" / "টাকা পাঠানো হয়েছে"; `P2P_RECEIVED` "Money received" / "টাকা গ্রহণ"; `CASH_OUT_SUCCESS` "Cash out successful" / "ক্যাশ আউট সফল"; `WALLET_BLOCKED` "Account blocked" / "অ্যাকাউন্ট বন্ধ"; `KYC_APPROVED` "KYC approved" / "কেওয়াইসি অনুমোদিত"; body = SMS text without " - Bits Pay"; `deepLink` `bitspay://txn/{{txnRef}}` for transactional templates.
+MVP seed texts (v1, CR-ADMIN-1; segment counts fixed by the WP-CR-1 golden test): `BILL_PAYMENT_SUCCESS` en `Bill payment Tk {{amountPoisha|money}} to {{billerName}} successful. Ref: {{billReference}}.{{#feePoisha}} Fee Tk {{feePoisha|money}} (incl. VAT).{{/feePoisha}}{{#providerReceipt}} Receipt: {{providerReceipt}}.{{/providerReceipt}} TxnID: {{txnRef}}. Time: {{time|datetime}}. - Bits Pay`, bn `{{billerName}}-এ ৳{{amountPoisha|money}} বিল পরিশোধ সফল হয়েছে। রেফ: {{billReference}}।{{#feePoisha}} ফি ৳{{feePoisha|money}} (ভ্যাটসহ)।{{/feePoisha}}{{#providerReceipt}} রসিদ: {{providerReceipt}}।{{/providerReceipt}} TxnID: {{txnRef}}। সময়: {{time|datetime}}। - Bits Pay`; `RECHARGE_SUCCESS` en `Recharge Tk {{amountPoisha|money}} to {{msisdn|msisdnMask}}{{#operatorName}} ({{operatorName}}){{/operatorName}} successful.{{#feePoisha}} Fee Tk {{feePoisha|money}} (incl. VAT).{{/feePoisha}} TxnID: {{txnRef}}. Time: {{time|datetime}}. - Bits Pay`, bn `{{msisdn|msisdnMask}}{{#operatorName}} ({{operatorName}}){{/operatorName}} নম্বরে ৳{{amountPoisha|money}} রিচার্জ সফল হয়েছে।{{#feePoisha}} ফি ৳{{feePoisha|money}} (ভ্যাটসহ)।{{/feePoisha}} TxnID: {{txnRef}}। সময়: {{time|datetime}}। - Bits Pay`; `BILL_PAYMENT_FAILED` / `RECHARGE_FAILED` (IN_APP) en `Bill payment / Recharge of Tk {{amountPoisha|money}} failed: {{failureCode|reason}}. TxnID: {{txnRef}}.` with the matching bn text.
+
+IN_APP titles: `P2P_SENT` "Money sent" / "টাকা পাঠানো হয়েছে"; `BILL_PAYMENT_SUCCESS` "Bill paid" / "বিল পরিশোধ হয়েছে"; `BILL_PAYMENT_FAILED` "Bill payment failed" / "বিল পরিশোধ ব্যর্থ"; `RECHARGE_SUCCESS` "Recharge successful" / "রিচার্জ সফল"; `RECHARGE_FAILED` "Recharge failed" / "রিচার্জ ব্যর্থ"; `P2P_RECEIVED` "Money received" / "টাকা গ্রহণ"; `CASH_OUT_SUCCESS` "Cash out successful" / "ক্যাশ আউট সফল"; `WALLET_BLOCKED` "Account blocked" / "অ্যাকাউন্ট বন্ধ"; `KYC_APPROVED` "KYC approved" / "কেওয়াইসি অনুমোদিত"; body = SMS text without " - Bits Pay"; `deepLink` `bitspay://txn/{{txnRef}}` for transactional templates.
 
 ### 7.9 Seed import from the generated contract index
 
@@ -3076,7 +3114,11 @@ IN_APP titles: `P2P_SENT` "Money sent" / "টাকা পাঠানো হয
 | R-FLOAT-SENT / R-FLOAT-RECEIVED | `FLOAT_TRANSFER` | FROM / TO | FLOAT_TRANSFER_SENT / _RECEIVED | IN_APP, SMS |
 | R-REVERSAL-FROM / R-REVERSAL-TO | `REVERSAL` | FROM / TO | TXN_REVERSED | IN_APP, SMS |
 | R-COMMISSION-INLINE (**disabled**) | COMPLETED `commissionPoisha ne 0` ∧ `txnType ne REVERSAL` | COMMISSION_BENEFICIARY | COMMISSION_EARNED | IN_APP |
-| R-TXN-FAILED | txn FAILED `channel ne SYSTEM` | FROM_WALLET | TXN_FAILED | IN_APP |
+| R-BILLPAY-CUST | `BILL_PAY` (MVP) | FROM_WALLET | BILL_PAYMENT_SUCCESS | IN_APP, SMS |
+| R-RECHARGE-CUST | `RECHARGE` (MVP) | FROM_WALLET | RECHARGE_SUCCESS | IN_APP, SMS |
+| R-TXN-FAILED | txn FAILED `channel ne SYSTEM` ∧ `txnType nin [BILL_PAY, RECHARGE]` | FROM_WALLET | TXN_FAILED | IN_APP |
+| R-BILLPAY-FAILED | txn FAILED `txnType eq BILL_PAY` ∧ `channel ne SYSTEM` (MVP) | FROM_WALLET | BILL_PAYMENT_FAILED | IN_APP |
+| R-RECHARGE-FAILED | txn FAILED `txnType eq RECHARGE` ∧ `channel ne SYSTEM` (MVP) | FROM_WALLET | RECHARGE_FAILED | IN_APP |
 | R-WALLET-BLOCKED | wallet `status in [F,X,C]` ∧ `neqPath previousStatus` ∧ `statusReasonCode nin [PARTNER_SUSPENDED, PARTNER_TERMINATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER]` | DATA_WALLET | WALLET_BLOCKED | IN_APP, SMS |
 | R-WALLET-UNBLOCKED | `status eq A` ∧ `previousStatus in [F,X,C,D]` ∧ `statusReasonCode nin [PARTNER_REACTIVATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER, KYC_APPROVED, KYC_UPGRADE]` | DATA_WALLET | WALLET_UNBLOCKED | IN_APP, SMS |
 | R-WALLET-DORMANT | `status eq D` ∧ `neqPath previousStatus` | DATA_WALLET | WALLET_DORMANT | SMS, IN_APP |
@@ -3152,47 +3194,51 @@ Seed providers: `LOG_SMS_A` (SMS, LOG, sender IDs `{"TRANSACTIONAL":"BitsPay","S
 
 Each WP: goal · scope · acceptance tests · depends on. Branches `admin-service/<module>/wp-<n>-<slug>` (`common` for shared WPs).
 
-**WP-1 Skeleton & contracts (common)** — standalone Gradle project, package root `com.bracits.bitspay.admin` with `governance`, `notification`, `common`; three Flyway locations (V1 DDL §4.1, outbox/inbox per kernel K8.2); `ActorContext` filter, `@RequiresActor`, problem model incl. `sodRuleCodes`; `provided/openapi.yaml` served (controllers return 501 until their WP); WireMock stubs for wallet-service and event fixtures wired; provider contract tests for every operation and the 7 event schemas red→green as WPs land; `ArchitectureTest` (ArchUnit); Redis prefix-disjointness test; schema-isolation test. AC: `./gradlew check` green; Swagger lists all 123 operations; Flyway migrates an empty `svc_admin` twice. Depends: —.
+Scope tags (CR-ADMIN-1, SRS v1.2): `[MVP]` WPs are delivered in the MVP release; `[R1+]` WPs follow. In the MVP, staff roles come only from `X-Actor-Roles` (kernel K7) and the seeded role / permission tables (WP-5 administration APIs are R1+); WP-17 runs the wallet, KYC and `notification.requests` rules (commission-settlement, disbursement and campaign rules stay seeded but their products are disabled).
 
-**WP-2 Maker-checker engine (common)** — `MakerCheckerEngine` (create, approve, reject, cancel, expire, levels, subject check, revalidation), `ApprovalHandler<T>` registry, `/v1/approvals` controller, outbox writers for `approval.events` and `audit.events` (own schemas), `ApprovalExpiryJob`, idempotency store. AC: `approve_byMaker_422_CHECKER_IS_MAKER`; `approve_bySubjectStaff_422`; two-level approval needs two distinct checkers; expiry emits `APPROVAL_EXPIRED`; every transition writes exactly one approval + one audit outbox row, both validating against `provided/events/*`. Depends: WP-1.
+**[MVP] WP-1 Skeleton & contracts (common)** — standalone Gradle project, package root `com.bracits.bitspay.admin` with `governance`, `notification`, `common`; three Flyway locations (V1 DDL §4.1, outbox/inbox per kernel K8.2); `ActorContext` filter, `@RequiresActor`, problem model incl. `sodRuleCodes`; `provided/openapi.yaml` served (controllers return 501 until their WP); WireMock stubs for wallet-service and event fixtures wired; provider contract tests for every operation and the 7 event schemas red→green as WPs land; `ArchitectureTest` (ArchUnit); Redis prefix-disjointness test; schema-isolation test. AC: `./gradlew check` green; Swagger lists all 123 operations; Flyway migrates an empty `svc_admin` twice. Depends: —.
 
-**WP-3 Reference data core (governance)** — types + schema validation, item CRUD by approval, versions, effective dating job, publication + republish, admin-owned seeds with one-time publish, CSV import with diff/conflicts, dictionary, `GovernanceFacade.bootstrapRefData`. AC: approving a GEO change emits `REFDATA_UPSERTED` key `GEO:3026` with version + 1; scheduled change publishes only after `effectiveFrom`; orphan parent → INVALID import; Latin-only `nameBn` rejected; `asOf` returns the historical name; republish keeps versions. Depends: WP-2.
+**[MVP] WP-2 Maker-checker engine (common)** — `MakerCheckerEngine` (create, approve, reject, cancel, expire, levels, subject check, revalidation), `ApprovalHandler<T>` registry, `/v1/approvals` controller, outbox writers for `approval.events` and `audit.events` (own schemas), `ApprovalExpiryJob`, idempotency store. AC: `approve_byMaker_422_CHECKER_IS_MAKER`; `approve_bySubjectStaff_422`; two-level approval needs two distinct checkers; expiry emits `APPROVAL_EXPIRED`; every transition writes exactly one approval + one audit outbox row, both validating against `provided/events/*`. Depends: WP-1.
 
-**WP-4 Params, calendar, product switches, retention (governance)** — typed params; calendar endpoints; product switches (2-level enable) publishing `FEATURE.*`; retention policies; legal holds (category + entity); `GL.FISCAL_YEAR_START_MONTH` seed. AC: `calendar_victoryDay_notBusinessDay_nextIs17th`; Friday not a business day; enabling `CASH_OUT` needs 2 approvals and publishes `FEATURE.CASH_OUT` enabled; disabling needs 1; P2P channels without SYSTEM → 400; holds lookup returns the ACTIVE hold; a CATEGORY hold on AUDIT republishes `RETENTION.AUDIT` with `legalHold true`; release needs 2 approvals. Depends: WP-3.
+**[MVP] WP-3 Reference data core (governance)** — types + schema validation, item CRUD by approval, versions, effective dating job, publication + republish, admin-owned seeds with one-time publish, CSV import with diff/conflicts, dictionary, `GovernanceFacade.bootstrapRefData`. AC: approving a GEO change emits `REFDATA_UPSERTED` key `GEO:3026` with version + 1; scheduled change publishes only after `effectiveFrom`; orphan parent → INVALID import; Latin-only `nameBn` rejected; `asOf` returns the historical name; republish keeps versions. Depends: WP-2.
 
-**WP-5 Staff RBAC (governance)** — users, roles, permissions, assignments, scopes, approval routes (all via approvals); SoD engine; effective permissions + `modelVersion`; seeds; `GovernanceFacade.contactOf`. AC: assigning OPS_MAKER to an OPS_CHECKER → 409 `SOD_VIOLATION` `sodRuleCodes ["OPS_MAKER_OPS_CHECKER"]`; WARN rule → `sodWarnings`; a role-permission change creating a violation for a holder → 409; disabled user → empty permissions; effective permissions match the seed matrix for every role (parameterised). Depends: WP-2.
+**[MVP] WP-4 Params, calendar, product switches, retention (governance)** — typed params; calendar endpoints; product switches (2-level enable) publishing `FEATURE.*`; retention policies; legal holds (category + entity); `GL.FISCAL_YEAR_START_MONTH` seed. AC: `calendar_victoryDay_notBusinessDay_nextIs17th`; Friday not a business day; enabling `CASH_OUT` needs 2 approvals and publishes `FEATURE.CASH_OUT` enabled; disabling needs 1; P2P channels without SYSTEM → 400; holds lookup returns the ACTIVE hold; a CATEGORY hold on AUDIT republishes `RETENTION.AUDIT` with `legalHold true`; release needs 2 approvals. Depends: WP-3.
 
-**WP-6 Access review & dormancy (governance)** — `last_activity_at` updater (audit consumer), access review JSON/CSV, `DormantStaffJob` + `GOV_STAFF_DORMANT_DISABLED`, nightly SoD scan. AC: inactive 91 days → DISABLED/DORMANT + audit + request validating against the `notification.requests` schema; inactive 84 days flagged `willAutoDisableOn`; CSV columns stable (snapshot). Depends: WP-5.
+**[R1+] WP-5 Staff RBAC (governance)** — users, roles, permissions, assignments, scopes, approval routes (all via approvals); SoD engine; effective permissions + `modelVersion`; seeds; `GovernanceFacade.contactOf`. AC: assigning OPS_MAKER to an OPS_CHECKER → 409 `SOD_VIOLATION` `sodRuleCodes ["OPS_MAKER_OPS_CHECKER"]`; WARN rule → `sodWarnings`; a role-permission change creating a violation for a holder → 409; disabled user → empty permissions; effective permissions match the seed matrix for every role (parameterised). Depends: WP-2.
 
-**WP-7 Audit ingest & hash chain (governance)** — strict parser, redaction, `CanonicalJson` and `AuditChain` (service), golden vectors V1–V3 (+ V4 frozen), chain writer for `audit.events` and `txn.events` (prefixes `p`/`t`), head optimistic lock, roll-over, partitions job, immutability trigger and grants, DLQ, forwarder SPI. AC: golden vectors pass; duplicate eventId chained once; PIN field redacted with `redacted true`; UPDATE on `audit_record` raises; zombie writer → second TX rolls back, no fork; 1,000 records across Dhaka midnight → two linked segments; a `TRANSACTION_COMPLETED` fixture lands in `t…` with derived columns per §7.3. Depends: WP-1.
+**[R1+] WP-6 Access review & dormancy (governance)** — `last_activity_at` updater (audit consumer), access review JSON/CSV, `DormantStaffJob` + `GOV_STAFF_DORMANT_DISABLED`, nightly SoD scan. AC: inactive 91 days → DISABLED/DORMANT + audit + request validating against the `notification.requests` schema; inactive 84 days flagged `willAutoDisableOn`; CSV columns stable (snapshot). Depends: WP-5.
 
-**WP-8 Seal, anchor, verification, search, export (governance)** — `ChainSealJob`, anchors + files, `AuditVerifier` (job, API, CLI), tail verify, search with cursor, view, exports (CSV/JSONL/BUNDLE), access auditing, offline `--verify-bundle`. AC: tamper tests give the right reason (`HASH_MISMATCH`, `SEQ_GAP`, `ANCHOR_MISMATCH`, `SEAL_MISMATCH`); search writes `AUDIT_SEARCHED` before returning; a bundle verifies VALID offline and BROKEN after a byte flip; search over 31 days with entityId < 3 s on 10 M seeded rows (Testcontainers, laptop-indicative only). Depends: WP-7.
+**[MVP] WP-7 Audit ingest & hash chain (governance)** — strict parser, redaction, `CanonicalJson` and `AuditChain` (service), golden vectors V1–V3 (+ V4 frozen), chain writer for `audit.events` and `txn.events` (prefixes `p`/`t`), head optimistic lock, roll-over, partitions job, immutability trigger and grants, DLQ, forwarder SPI. AC: golden vectors pass; duplicate eventId chained once; PIN field redacted with `redacted true`; UPDATE on `audit_record` raises; zombie writer → second TX rolls back, no fork; 1,000 records across Dhaka midnight → two linked segments; a `TRANSACTION_COMPLETED` fixture lands in `t…` with derived columns per §7.3. Depends: WP-1.
 
-**WP-9 Approval inbox (governance)** — consumer, projection, timeline, routing (event roles first), deep links, list/mine/summary/detail, reminder job. AC: DECIDED before REQUESTED ends APPROVED; late duplicate PENDING doesn't reopen; `/mine` excludes own maker items; bucket boundaries (3 h 59 m LT_4H, 4 h H4_24); overdue flagged without status change; reminder sent once; general-ledger-service item without roles routes to FIN_CHECKER. Depends: WP-2, WP-5.
+**[MVP] WP-8 Seal, anchor, verification, search, export (governance)** — `ChainSealJob`, anchors + files, `AuditVerifier` (job, API, CLI), tail verify, search with cursor, view, exports (CSV/JSONL/BUNDLE), access auditing, offline `--verify-bundle`. AC: tamper tests give the right reason (`HASH_MISMATCH`, `SEQ_GAP`, `ANCHOR_MISMATCH`, `SEAL_MISMATCH`); search writes `AUDIT_SEARCHED` before returning; a bundle verifies VALID offline and BROKEN after a byte flip; search over 31 days with entityId < 3 s on 10 M seeded rows (Testcontainers, laptop-indicative only). Depends: WP-7.
 
-**WP-10 Activity monitoring (governance)** — rule CRUD via approvals, evaluator (Redis counters, calendar-aware off-hours), alerts API and lifecycle, staff fan-out. AC: 6 exports in 60 min by one staff → exactly one BULK_EXPORT alert across 3 instances; 22:30 Thursday action → OFF_HOURS alert; Friday 11:00 → alert (weekend); subject cannot close own alert; Redis down → ingest unaffected. Depends: WP-7, WP-4.
+**[MVP] WP-9 Approval inbox (governance)** — consumer, projection, timeline, routing (event roles first), deep links, list/mine/summary/detail, reminder job. AC: DECIDED before REQUESTED ends APPROVED; late duplicate PENDING doesn't reopen; `/mine` excludes own maker items; bucket boundaries (3 h 59 m LT_4H, 4 h H4_24); overdue flagged without status change; reminder sent once; general-ledger-service item without roles routes to FIN_CHECKER. Depends: WP-2, WP-5.
 
-**WP-11 Notification store, templates, renderer (notification)** — `notif_*` tables, partitions job, template + version CRUD, preview, renderer (sections, formatters incl. `date`, Bangla digits, lakh grouping), `SmsSegmentCalculator`, worst-case validation, approvals. AC: §7.8 golden samples render byte-exact with segment counts 1/2, 1/2, 1/3, 1/2, 1/2; `money(12345678, bn)` = `১,২৩,৪৫৬.৭৮`; maker approving own version → 422; activation retires the previous version in one TX and emits audit. Depends: WP-2.
+**[R1+] WP-10 Activity monitoring (governance)** — rule CRUD via approvals, evaluator (Redis counters, calendar-aware off-hours), alerts API and lifecycle, staff fan-out. AC: 6 exports in 60 min by one staff → exactly one BULK_EXPORT alert across 3 instances; 22:30 Thursday action → OFF_HOURS alert; Friday 11:00 → alert (weekend); subject cannot close own alert; Redis down → ingest unaffected. Depends: WP-7, WP-4.
 
-**WP-12 Seed import from the generated index (governance + notification)** — Gradle `copyContractIndex`; `SeedImportJob`; template declarations (`NotificationFacade.declareTemplates`), admin-owned templates, BN/EN seed texts, reason codes, product codes; internal endpoint; report. AC: an index with a new producer template + text file → template ACTIVE after restart with no contract change; without text → listed in `missingText` and requests rejected `UNKNOWN_TEMPLATE`; a new reason code → one `REFDATA_UPSERTED`; a new product code → `FEATURE.<code>` disabled; re-running with the same index changes nothing; a test fails if any template declared in the index lacks BN/EN text (DoD gate). Depends: WP-3, WP-4, WP-11.
+**[MVP] WP-11 Notification store, templates, renderer (notification)** — `notif_*` tables, partitions job, template + version CRUD, preview, renderer (sections, formatters incl. `date`, Bangla digits, lakh grouping), `SmsSegmentCalculator`, worst-case validation, approvals. AC: §7.8 golden samples render byte-exact with segment counts 1/2, 1/2, 1/3, 1/2, 1/2; `money(12345678, bn)` = `১,২৩,৪৫৬.৭৮`; maker approving own version → 422; activation retires the previous version in one TX and emits audit. Depends: WP-2.
 
-**WP-13 Projections: contacts, preferences, refdata (notification)** — wallet/customer/partner consumers with version guards and replay guard; refdata consumer; preferences API; Caffeine contact cache. AC: older wallet version ignored; customer KYC event updates names on every listed wallet; partner event never overwrites MSISDN; opt-out of TRANSACTIONAL → 400 `MANDATORY_CATEGORY`; reason name localised from a refdata fixture. Depends: WP-11.
+**[MVP] WP-12 Seed import from the generated index (governance + notification)** — Gradle `copyContractIndex`; `SeedImportJob`; template declarations (`NotificationFacade.declareTemplates`), admin-owned templates, BN/EN seed texts, reason codes, product codes; internal endpoint; report. AC: an index with a new producer template + text file → template ACTIVE after restart with no contract change; without text → listed in `missingText` and requests rejected `UNKNOWN_TEMPLATE`; a new reason code → one `REFDATA_UPSERTED`; a new product code → `FEATURE.<code>` disabled; re-running with the same index changes nothing; a test fails if any template declared in the index lacks BN/EN text (DoD gate). Depends: WP-3, WP-4, WP-11.
 
-**WP-14 Rule engine & txn ingest (notification)** — rule snapshot, condition DSL, variable-map expressions (`when`, `sum`, `contact`, `refdata`, `param`), batch writer, seed rules, `POST /v1/rules:test`. AC: P2P fixture → exactly 2 notifications, 2 inbox items, 2 SMS deliveries with `amountPoisha`/`feePoisha` variables; fixture delivered twice → no new rows; FAILED from SYSTEM channel → nothing; 25 h-old event → SMS `SUPPRESSED(STALE_EVENT)`, inbox created; REVERSED fixture → nothing (FILTERED). Depends: WP-13.
+**[MVP] WP-13 Projections: contacts, preferences, refdata (notification)** — wallet/customer/partner consumers with version guards and replay guard; refdata consumer; preferences API; Caffeine contact cache. AC: older wallet version ignored; customer KYC event updates names on every listed wallet; partner event never overwrites MSISDN; opt-out of TRANSACTIONAL → 400 `MANDATORY_CATEGORY`; reason name localised from a refdata fixture. Depends: WP-11.
 
-**WP-15 In-app inbox (notification)** — holder and staff inbox APIs (role inboxes), unread counter (Redis + DB fallback), internal support view (audited). AC: list pruned to partitions in window (EXPLAIN); read twice idempotent; another wallet's item → 404; unread count correct after Redis flush; role item read by one OPS_CHECKER shows READ for another. Depends: WP-14.
+**[MVP] WP-14 Rule engine & txn ingest (notification)** — rule snapshot, condition DSL, variable-map expressions (`when`, `sum`, `contact`, `refdata`, `param`), batch writer, seed rules, `POST /v1/rules:test`. AC: P2P fixture → exactly 2 notifications, 2 inbox items, 2 SMS deliveries with `amountPoisha`/`feePoisha` variables; fixture delivered twice → no new rows; FAILED from SYSTEM channel → nothing; 25 h-old event → SMS `SUPPRESSED(STALE_EVENT)`, inbox created; REVERSED fixture → nothing (FILTERED). Depends: WP-13.
 
-**WP-16 Channel SPI, dispatch, DLR, retry (notification)** — `ChannelProvider` SPI, `LogChannelProvider` with DLR simulation and error injection, `ProviderRouter` (routes, sender IDs, circuit breaker, rate limit, failover), `Dispatcher` + `DeliverySweeper`, DLR endpoint, `DlrTimeoutJob`, wallet contact fallback. AC: `…98` → RETRY_WAIT then SENT; `…99` → FAILED(PERMANENT_ERROR); provider A circuit open → B used; killed worker mid-SENDING → resent exactly once; simulated DLR → DELIVERED; no DLR → SENT_NO_DLR (clock-controlled); WAITING_CONTACT → wallet stub fills MSISDN. Depends: WP-14.
+**[MVP] WP-15 In-app inbox (notification)** — holder and staff inbox APIs (role inboxes), unread counter (Redis + DB fallback), internal support view (audited). AC: list pruned to partitions in window (EXPLAIN); read twice idempotent; another wallet's item → 404; unread count correct after Redis flush; role item read by one OPS_CHECKER shows READ for another. Depends: WP-14.
 
-**WP-17 Other sources & notification.requests (notification)** — wallet status, KYC, commission, disbursement, campaign rules; `notification.requests` (wallet / staff / msisdn-only / role; dedupeKey; unknown template/variable rejection); subscribed-no-rule topics with metrics. AC: FRAUD_FREEZE fixture → WALLET_BLOCKED bn SMS with localised reason; AML_FREEZE fixture → nothing; replayed 3-day-old WALLET_UPSERTED → no notification; msisdn-only request → SMS, no inbox; `GOV_ACTIVITY_ALERT` request → staff inbox item + SMS; role request → role inbox; same dedupeKey twice → one message. Depends: WP-16, WP-12.
+**[MVP] WP-16 Channel SPI, dispatch, DLR, retry (notification)** — `ChannelProvider` SPI, `LogChannelProvider` with DLR simulation and error injection, `ProviderRouter` (routes, sender IDs, circuit breaker, rate limit, failover), `Dispatcher` + `DeliverySweeper`, DLR endpoint, `DlrTimeoutJob`, wallet contact fallback. AC: `…98` → RETRY_WAIT then SENT; `…99` → FAILED(PERMANENT_ERROR); provider A circuit open → B used; killed worker mid-SENDING → resent exactly once; simulated DLR → DELIVERED; no DLR → SENT_NO_DLR (clock-controlled); WAITING_CONTACT → wallet stub fills MSISDN. Depends: WP-14.
 
-**WP-18 Reminders (notification)** — policies, subjects, occurrence planning, scheduler (SKIP LOCKED), REST + `reminder{}` + `NOTIFICATION_REMINDER_CANCELLED`. AC: BR-NOT-50 example timestamps; cancel before D-1 → nothing fires; two scheduler instances fire each occurrence once; idempotent POST with the same key returns the same reminderId; cancel message for an unknown subject → no-op. Depends: WP-17.
+**[MVP] WP-17 Other sources & notification.requests (notification)** — wallet status, KYC, commission, disbursement, campaign rules; `notification.requests` (wallet / staff / msisdn-only / role; dedupeKey; unknown template/variable rejection); subscribed-no-rule topics with metrics. AC: FRAUD_FREEZE fixture → WALLET_BLOCKED bn SMS with localised reason; AML_FREEZE fixture → nothing; replayed 3-day-old WALLET_UPSERTED → no notification; msisdn-only request → SMS, no inbox; `GOV_ACTIVITY_ALERT` request → staff inbox item + SMS; role request → role inbox; same dedupeKey twice → one message. Depends: WP-16, WP-12.
 
-**WP-19 Quiet hours, caps, fallback (notification, R2)** — policy CRUD via approvals, DEFERRED handling with jitter, Redis caps, fallback chains. AC: MARKETING at 23:00 Dhaka → DEFERRED until 08:00–08:15; TRANSACTIONAL at 23:00 → sent; 3rd MARKETING of the day → SUPPRESSED(FREQ_CAP); PUSH SUPPRESSED(NO_ADDRESS) → one SMS fallback. Depends: WP-16.
+**[R1+] WP-18 Reminders (notification)** — policies, subjects, occurrence planning, scheduler (SKIP LOCKED), REST + `reminder{}` + `NOTIFICATION_REMINDER_CANCELLED`. AC: BR-NOT-50 example timestamps; cancel before D-1 → nothing fires; two scheduler instances fire each occurrence once; idempotent POST with the same key returns the same reminderId; cancel message for an unknown subject → no-op. Depends: WP-17.
 
-**WP-20 Logs API, delivery report, retention (notification)** — logs search (exactly one selector, ≤ 93 days), detail, content visibility by role, access audit, `notif_delivery_daily` + delivery summary (OPEN D-37), partition report. AC: msisdn query returns time-ordered cursor pages; two selectors → 400 `SELECTOR_REQUIRED`; READ_ONLY → 403; SUP_AGENT sees content, support-service SERVICE call sees content; every call writes `NOTIFICATION_LOG_VIEWED`; partitions older than 6 months listed archivable. Depends: WP-16.
+**[R1+] WP-19 Quiet hours, caps, fallback (notification, R2)** — policy CRUD via approvals, DEFERRED handling with jitter, Redis caps, fallback chains. AC: MARKETING at 23:00 Dhaka → DEFERRED until 08:00–08:15; TRANSACTIONAL at 23:00 → sent; 3rd MARKETING of the day → SUPPRESSED(FREQ_CAP); PUSH SUPPRESSED(NO_ADDRESS) → one SMS fallback. Depends: WP-16.
 
-**WP-21 Compose integration & hardening (both)** — run in the Compose stack against real topics; manual scenarios (§11); PII log scan; traceability doc; load smoke (local only, indicative). AC: chain verification VALID after the five-feature scenario; inbox shows approvals from ≥ 3 services with working deep links; Karim's inbox shows the P2P message once; no DLQ records; log scan finds no MSISDN/NID pattern. Depends: all.
+**[R1+] WP-20 Logs API, delivery report, retention (notification)** — logs search (exactly one selector, ≤ 93 days), detail, content visibility by role, access audit, `notif_delivery_daily` + delivery summary (OPEN D-37), partition report. AC: msisdn query returns time-ordered cursor pages; two selectors → 400 `SELECTOR_REQUIRED`; READ_ONLY → 403; SUP_AGENT sees content, support-service SERVICE call sees content; every call writes `NOTIFICATION_LOG_VIEWED`; partitions older than 6 months listed archivable. Depends: WP-16.
+
+**[MVP] WP-CR-1 MVP product switches and bill payment / recharge receipts (governance + notification; CR-ADMIN-1)** — `FEATURE.*` seed of BR-GOV-47 (Flyway seed + `seed/product-switch-defaults.json`); templates `BILL_PAYMENT_SUCCESS`, `BILL_PAYMENT_FAILED`, `RECHARGE_SUCCESS`, `RECHARGE_FAILED` with BN/EN seed texts (§7.8) and IN_APP titles; rules R-BILLPAY-CUST, R-RECHARGE-CUST, R-BILLPAY-FAILED, R-RECHARGE-FAILED and the narrowed R-TXN-FAILED (§7.12, BR-NOT-16); `failureCode` text for `PROVIDER_REJECTED`; golden samples for the two SMS templates; fixtures `txn.events.TRANSACTION_COMPLETED` (BILL_PAY, RECHARGE) and `TRANSACTION_FAILED` (BILL_PAY `PROVIDER_REJECTED`) built in-test until the re-pinned transaction-service 1.1.0 fixtures arrive. AC: `seed_emptyDb_billPayAndRechargeEnabled_othersDisabled`; `seed_existingDisabledBillPay_notOverwritten`; `ingest_billPayCompleted_payerSmsAndInbox_noBillerMessage`; `ingest_rechargeCompleted_msisdnMaskedInSms`; `ingest_billPayFailed_providerRejected_oneInAppOnly_noTxnFailed`; `ingest_rechargeFailed_systemChannel_nothing`; `golden_billPaymentSuccess_enBn_segments`; `seedImport_newTemplates_haveBnEnText`. Depends: WP-4, WP-12, WP-14.
+
+**[MVP] WP-21 Compose integration & hardening (both)** — run in the Compose stack against real topics; manual scenarios (§11); PII log scan; traceability doc; load smoke (local only, indicative). AC: chain verification VALID after the five-feature scenario; inbox shows approvals from ≥ 3 services with working deep links; Karim's inbox shows the P2P message once; no DLQ records; log scan finds no MSISDN/NID pattern. Depends: all.
 
 ## 11. Test plan
 
@@ -3203,7 +3249,8 @@ Each WP: goal · scope · acceptance tests · depends on. Branches `admin-servic
 - **Integration (Testcontainers Postgres/Kafka/Redis + WireMock):** `auditIngest_endToEnd_chainedAndOffsetsCommitted`, `auditIngest_duplicateDelivery_storedOnce`, `auditIngest_zombieWriter_rollsBackWithoutFork`, `auditRecord_updateBlockedByTrigger`, `auditIngest_malformedJson_toDlqAndAlert`, `txnChain_endToEnd`, `sealJob_createsSealsAndAnchorFile`, `auditSearch_auditsItself`, `auditExport_bundle_verifiesOffline`, `refdata_approve_publishesOutboxEnvelope`, `productSwitch_enableRequiresTwoApprovals`, `inbox_consumesApprovalEventsFixtures`, `monitoring_multiInstance_dedupedAlert`, `pipeline_p2p_inboxAndSmsDelivered`, `pipeline_batchFailure_retriedNoDuplicates`, `dispatch_transientThenSuccess`, `dispatch_permanentFailure`, `dispatch_failoverWhenCircuitOpen`, `sweeper_leaseExpiry_resendOnce`, `dlr_simulated_delivered`, `dlr_timeout_sentNoDlr`, `contact_waitingThenWalletFallback`, `contact_walletFallbackDown_failsNoContact`, `reminder_firesOnceAcrossTwoSchedulers`, `reminder_registeredViaTopic_cancelledViaTopic`, `inbox_unreadCount_afterRedisFlush`, `logs_msisdnQuery_audited`, `partitionMaintenance_createsAhead`, `schemaIsolation_cannotReadOtherSchema`.
 - **Event idempotency:** every consumed fixture delivered twice → single effect.
 - **Concurrency:** `auditChain_100ParallelBatchesSamePartition_noForkNoGap`, `approve_concurrentCheckers_onlyOneWins`, `ingest_100ParallelDuplicateDeliveries_oneNotification`, `inbox_concurrentReadAndReadAll_consistentCount`, `dispatch_twoWorkersSameRow_singleSend`.
-- **Golden:** audit chain vectors; template samples.
+- **Golden:** audit chain vectors; template samples (incl. `BILL_PAYMENT_SUCCESS`, `RECHARGE_SUCCESS`).
+- **MVP (CR-ADMIN-1, WP-CR-1):** `seed_emptyDb_billPayAndRechargeEnabled_othersDisabled`, `seed_existingDisabledBillPay_notOverwritten`, `ingest_billPayCompleted_payerSmsAndInbox_noBillerMessage`, `ingest_rechargeCompleted_msisdnMaskedInSms`, `ingest_billPayFailed_providerRejected_oneInAppOnly_noTxnFailed`, `ingest_rechargeFailed_systemChannel_nothing`, `golden_billPaymentSuccess_enBn_segments`, `seedImport_newTemplates_haveBnEnText`.
 - **Manual Compose scenarios:** (1) wallet block approval appears in the inbox with a working deep link, then disappears after approve; (2) P2P Rahim → Karim: two inbox items, two SMS log lines (masked), one chained `t…` record each; (3) `FEATURE.CASH_OUT` disable → transaction-service refuses cash-out; (4) governance alert to staff inbox after 6 exports; (5) verification VALID for the day.
 
 ## 12. Definition of done (additions to kernel K10)
@@ -3235,6 +3282,9 @@ Each WP: goal · scope · acceptance tests · depends on. Branches `admin-servic
 | OPEN D-37 | Owner of the notification-delivery report (RPT-005) | admin-service/notification owns it (`GET /v1/notifications/reports/delivery-summary`) | §5.1.16, BR-NOT-37 |
 | OPEN D-40 | SMS to agents/merchants for every payment | IN_APP + SMS on R-CASHIN-AGENT, R-CASHOUT-AGENT, R-MERCHANT-MER; R-REFUND-MER IN_APP only | §7.12 |
 | OPEN D-49 | Use of `CUTOFF.SETTLEMENT_BANK` | seeded `15:00`, no rule | §5.4.2 |
+| OPEN B-24 | MVP pilot audience and exit criteria | MVP switches enabled with `channels: []` (all channels); a pilot restriction is a later product-switch change | BR-GOV-47 |
+| OPEN B-25 | Biller / MNO catalogue sign-off | receipts name the biller from the contact projection; wording provisional | BR-NOT-16 |
+| MVP deferral (CR-ADMIN-1) | Admin features outside the MVP | staff RBAC administration (WP-5), access review (WP-6), activity monitoring (WP-10), reminders incl. `BILL_DUE` (WP-18, policy stays disabled), quiet hours / caps / fallback (WP-19), logs API and delivery report (WP-20) → R1+; no message to the biller wallet; electricity `token` not carried on `txn.events`, so not in the receipt | §1.2, §10, BR-NOT-16 |
 
 **Deferred (with interim behaviour):** real channel providers (LOG provider only); push tokens and e-mails (`SUPPRESSED(NO_ADDRESS)`); security notifications (rules disabled); delivery-status event feed (logs API instead); balance in receipts (not available); SIEM forwarding (log forwarder); archival execution (R2 archiver reads registry and holds); rule-driven notifications from treasury/support/case/recon/gl events (senders use `notification.requests`).
 
@@ -3258,6 +3308,7 @@ Each WP: goal · scope · acceptance tests · depends on. Branches `admin-servic
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-15 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit + GL CCRs |
+| 1.1.0 | 2026-10-14 | CR-ADMIN-1 | MVP scope (SRS v1.2): `FEATURE.*` seed switched to the MVP sets (`BILL_PAY`, `RECHARGE` now enabled; BR-GOV-47; data contract `refdata-system-params`); new group-A templates `BILL_PAYMENT_SUCCESS`, `BILL_PAYMENT_FAILED`, `RECHARGE_SUCCESS`, `RECHARGE_FAILED` with rules R-BILLPAY-*, R-RECHARGE-*, R-TXN-FAILED narrowed (BR-NOT-16); `BILL_DUE` stays disabled; §2 MVP markers; §10 WPs tagged [MVP]/[R1+], WP-CR-1; removed the GL journal export entity type `GlExport` from the general-ledger approval-route note (general-ledger-service 2.0.0 drops the export). Kind B |
 
 ## Appendix A — Initial reason-code seed snapshot
 
@@ -3277,5 +3328,7 @@ Snapshot of the producer-declared reason codes at baseline (OPEN D-32). It is **
 | Blacklist entry | `FRAUD_CONFIRMED`, `MULE_ACCOUNT`, `IDENTITY_FRAUD`, `AML_SUSPICION`, `REGULATORY_INSTRUCTION`, `SANCTIONS`, `OTHER` |
 | E-money redemption | `FLOAT_RETURN_TO_BANK`, `MERCHANT_SETTLEMENT`, `REVENUE_SWEEP`, `VAT_REMITTANCE`, `AIT_REMITTANCE`, `CAMPAIGN_FUNDING_RETURN`, `CLOSURE_PAYOUT`, `OTHER` |
 | Manual journal | `FEE_CORRECTION`, `VAT_RECLASS`, `SUSPENSE_CLEARING`, `COMMISSION_FUNDING`, `CAMPAIGN_FUNDING_TRANSFER`, `OTHER` |
+
+**Product switches (`FEATURE.<PRODUCT>`) at the MVP baseline (BR-GOV-47, CR-ADMIN-1):** enabled `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE`; disabled `DISBURSEMENT`, `SCHEDULED_TRANSFER`, `REQUEST_MONEY`, `CAMPAIGN`, `ADD_MONEY`, `WALLET_TO_BANK`, `REMITTANCE`, `CARD`, `OFF_US_QR`. As for reason codes, the product codes themselves come from the generated index; this list fixes only the seed value.
 
 Producer-local code lists that are not `REASON_CODE` items (commission-adjustment and clawback codes, disbursement release/pause reasons, limits-risk evaluate reasons, transaction `failureCode`) are not seeded.

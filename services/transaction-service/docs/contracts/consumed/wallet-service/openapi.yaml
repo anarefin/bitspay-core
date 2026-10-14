@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: wallet-service — provided API
-  version: 1.0.0
+  version: 1.1.0
   description: 'Every operation served by wallet-service (modules wallet and partner), incl. staff, channel and internal/test operations. Kernel
     1.0 rules apply (headers K3.1, idempotency K3.3, pagination K3.4, problem+json K3.6, maker-checker K5). x-audience: service | staff | customer
     | partner | internal. x-actors: allowed actor types, roles and SERVICE X-Actor-Id values.'
@@ -14,7 +14,7 @@ tags:
 - name: wallet
   description: wallet module (customers, KYC, wallets, lifecycle, status cache)
 - name: partner
-  description: partner module (agents, merchants, distributors, institutions, hierarchy, Bangla QR)
+  description: partner module (agents, merchants, distributors, institutions, billers and the biller catalogue, hierarchy, Bangla QR)
 - name: approvals
   description: shared maker-checker engine (kernel K5)
 - name: internal
@@ -66,6 +66,7 @@ paths:
                   - MERCHANT
                   - DISTRIBUTOR
                   - INSTITUTION
+                  - BILLER
                   description: must match walletType; `CUSTOMER` from outside → 403
                 ownerId:
                   type: string
@@ -74,7 +75,7 @@ paths:
                   description: customerId / partnerId
                 walletType:
                   type: string
-                  description: code `C|A|D|M|I` or name; CUSTOMER↔C AGENT↔A MERCHANT↔M DISTRIBUTOR↔D INSTITUTION↔I
+                  description: code `C|A|D|M|I|B` or name; CUSTOMER↔C AGENT↔A MERCHANT↔M DISTRIBUTOR↔D INSTITUTION↔I BILLER↔B
                 msisdn:
                   type: string
                   description: accepts `01…`, `880…`, `+880…`; normalised; unique among non-CLOSED wallets
@@ -600,7 +601,7 @@ paths:
         required: false
         schema:
           type: string
-        description: code `C|A|D|M|I` or name; default `C`
+        description: code `C|A|D|M|I|B` or name; default `C`
       responses:
         '200':
           description: success
@@ -616,7 +617,7 @@ paths:
                     pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
                   displayNameMasked:
                     type: string
-                    description: 'C: first name + initial + `***`; A/M/D/I: full display name'
+                    description: 'C: first name + initial + `***`; A/M/D/I/B: full display name'
                   walletType:
                     type: string
                     enum:
@@ -625,6 +626,7 @@ paths:
                     - D
                     - M
                     - I
+                    - B
                   status:
                     type: string
                     enum:
@@ -720,7 +722,7 @@ paths:
               properties:
                 walletType:
                   type: string
-                  description: code `C|A|D|M|I` or name
+                  description: code `C|A|D|M|I|B` or name
                 msisdns:
                   type: array
                   items:
@@ -769,6 +771,7 @@ paths:
                           - D
                           - M
                           - I
+                          - B
                         status:
                           type:
                           - string
@@ -5922,6 +5925,7 @@ paths:
                           - D
                           - M
                           - I
+                          - B
                         dormantSince:
                           type: string
                           format: date-time
@@ -7385,6 +7389,7 @@ paths:
                   - MERCHANT
                   - DISTRIBUTOR
                   - INSTITUTION
+                  - BILLER
                 subType:
                   type: string
                   enum:
@@ -7403,8 +7408,13 @@ paths:
                   - GOVERNMENT
                   - NGO
                   - OTHER
+                  - UTILITY
+                  - EDUCATION
+                  - GOVT_FEE
+                  - INTERNET_TV
+                  - MNO
                   description: 'AGENT: RETAIL|SUPER_AGENT|MERCHANT_AGENT|BANK_AGENT; MERCHANT: MICRO|SMALL|ENTERPRISE|ONLINE; DISTRIBUTOR: MASTER|DISTRIBUTOR|SUB;
-                    INSTITUTION: EMPLOYER|GOVERNMENT|NGO|OTHER'
+                    INSTITUTION: EMPLOYER|GOVERNMENT|NGO|OTHER; BILLER: UTILITY|EDUCATION|GOVT_FEE|INTERNET_TV|MNO'
                 proposedParentPartnerId:
                   type:
                   - string
@@ -7605,6 +7615,7 @@ paths:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
       - name: stageCode
         in: query
         required: false
@@ -9387,6 +9398,8 @@ paths:
                       - INVALID_TRANSITION
                       - MAX_RESUBMISSIONS
                       - NO_APPROVAL_CHAIN
+                      - DUPLICATE_BILLER_CODE
+                      - MSISDN_PREFIX_TAKEN
                       - null
         '422':
           description: RISK_BLOCKED — an identifier is blacklisted
@@ -10069,6 +10082,7 @@ paths:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
       - name: subType
         in: query
         required: false
@@ -10347,7 +10361,7 @@ paths:
         required: true
         schema:
           type: string
-          pattern: ^[AMDI][0-9]{9}$
+          pattern: ^[AMDIB][0-9]{9}$
       responses:
         '200':
           description: success
@@ -10363,7 +10377,7 @@ paths:
                     pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
                   partnerCode:
                     type: string
-                    pattern: ^[AMDI][0-9]{9}$
+                    pattern: ^[AMDIB][0-9]{9}$
                   partnerType:
                     type: string
                     enum:
@@ -10371,6 +10385,7 @@ paths:
                     - MERCHANT
                     - DISTRIBUTOR
                     - INSTITUTION
+                    - BILLER
                   displayName:
                     type: string
                   status:
@@ -10530,6 +10545,7 @@ paths:
                           - MERCHANT
                           - DISTRIBUTOR
                           - INSTITUTION
+                          - BILLER
                         subType:
                           type: string
                           enum:
@@ -10548,6 +10564,11 @@ paths:
                           - GOVERNMENT
                           - NGO
                           - OTHER
+                          - UTILITY
+                          - EDUCATION
+                          - GOVT_FEE
+                          - INTERNET_TV
+                          - MNO
                         effectiveFrom:
                           type: string
                           format: date-time
@@ -10673,6 +10694,7 @@ paths:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
       - $ref: '#/components/parameters/Limit'
       - $ref: '#/components/parameters/Cursor'
       responses:
@@ -10696,7 +10718,7 @@ paths:
                           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
                         partnerCode:
                           type: string
-                          pattern: ^[AMDI][0-9]{9}$
+                          pattern: ^[AMDIB][0-9]{9}$
                         partnerType:
                           type: string
                           enum:
@@ -10704,6 +10726,7 @@ paths:
                           - MERCHANT
                           - DISTRIBUTOR
                           - INSTITUTION
+                          - BILLER
                         displayName:
                           type: string
                         status:
@@ -11378,6 +11401,11 @@ paths:
                   - GOVERNMENT
                   - NGO
                   - OTHER
+                  - UTILITY
+                  - EDUCATION
+                  - GOVT_FEE
+                  - INTERNET_TV
+                  - MNO
                 mcc:
                   type:
                   - string
@@ -11678,7 +11706,7 @@ paths:
                   type: object
                   additionalProperties: true
                   description: subset of email, displayNameBn (DIRECT); addressLine, geo, displayName, msisdn, legalName, tradeLicenceNo, tradeLicenceExpiry,
-                    tin, bin (APPROVAL)
+                    tin, bin, biller (APPROVAL; `biller` = a full BillerProfileInput, BILLER partners only, billerCode immutable — CR-WALLET-1)
                 comment:
                   type:
                   - string
@@ -11776,6 +11804,8 @@ paths:
                       - ALREADY_PENDING
                       - DUPLICATE_MSISDN
                       - MSISDN_COOLING
+                      - DUPLICATE_BILLER_CODE
+                      - MSISDN_PREFIX_TAKEN
                       - null
         '422':
           description: RISK_BLOCKED — new MSISDN blacklisted
@@ -14289,6 +14319,292 @@ paths:
                       enum:
                       - ALREADY_PENDING
                       - null
+  /v1/billers:
+    get:
+      operationId: listBillers
+      tags:
+      - partner
+      summary: List the biller catalogue (CR-WALLET-1, BIL-008 / BIL-011 / BIL-012).
+      description: Activated BILLER partners with their biller profile (BR-PAR-85). Holder actors see only ACTIVE billers; STAFF and SERVICE may
+        filter by status. Same data as the Redis data contract biller-catalogue-cache v1, which is the hot-path source for transaction-service; this
+        operation is its cache-miss fallback and the channel catalogue read.
+      x-audience: service
+      x-actors:
+      - type: CUSTOMER
+        scope: ACTIVE billers only
+      - type: AGENT
+        scope: ACTIVE billers only
+      - type: MERCHANT
+        scope: ACTIVE billers only
+      - type: DISTRIBUTOR
+        scope: ACTIVE billers only
+      - type: INSTITUTION
+        scope: ACTIVE billers only
+      - type: STAFF
+        roles:
+        - '*'
+      - type: SERVICE
+        actorIds:
+        - '*'
+      - type: SYSTEM
+      x-module: partner
+      x-release: MVP
+      x-idempotency: none
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - $ref: '#/components/parameters/Traceparent'
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - UTILITY_ELECTRICITY
+          - UTILITY_GAS
+          - UTILITY_WATER
+          - INTERNET
+          - TV
+          - EDUCATION
+          - GOVT_FEE
+          - MOBILE_PREPAID
+          - MOBILE_POSTPAID
+      - name: subType
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - UTILITY
+          - EDUCATION
+          - GOVT_FEE
+          - INTERNET_TV
+          - MNO
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - SUSPENDED
+          - PENDING_TERMINATION
+          - TERMINATED
+        description: default ACTIVE; values other than ACTIVE only for STAFF / SERVICE (holder actors → 403)
+      - name: msisdnPrefix
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^01[3-9]$
+        description: MNO whose msisdnPrefixes contains this prefix (recharge operator resolution)
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 50
+        description: billerCode or nameEn prefix (case-insensitive)
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Biller'
+                  nextCursor:
+                    type:
+                    - string
+                    - 'null'
+                required:
+                - items
+                - nextCursor
+              example:
+                items:
+                - billerId: 0192f4a0-0b01-7c00-8a00-00000000b001
+                  version: 3
+                  partnerCode: B000000018
+                  subType: UTILITY
+                  categoryCode: 501
+                  status: ACTIVE
+                  walletId: 0192f4a1-0b01-7c00-8a00-00000000b001
+                  billerCode: DESCO
+                  nameEn: Dhaka Electric Supply Company (DESCO)
+                  nameBn: ঢাকা ইলেকট্রিক সাপ্লাই কোম্পানি (ডেসকো)
+                  category: UTILITY_ELECTRICITY
+                  logoKey: billers/desco.png
+                  referenceLabelEn: Account number
+                  referenceLabelBn: হিসাব নম্বর
+                  referencePattern: ^[0-9]{8,12}$
+                  amountMode: ENQUIRY
+                  fixedAmountPoisha: null
+                  minAmountPoisha: 1000
+                  maxAmountPoisha: 5000000
+                  feeBearer: PAYER
+                  msisdnPrefixes: []
+                  rechargeTypes: []
+                  denominationsPoisha: []
+                  updatedAt: '2026-10-14T06:00:00.000Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED — malformed header, parameter or body
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - properties:
+                    code:
+                      type: string
+                      enum:
+                      - VALIDATION_FAILED
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED — actor type, role or caller not permitted
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - properties:
+                    code:
+                      type: string
+                      enum:
+                      - ACTOR_NOT_ALLOWED
+  /v1/billers/{billerId}:
+    get:
+      operationId: getBiller
+      tags:
+      - partner
+      summary: One biller of the catalogue (CR-WALLET-1).
+      description: 404 when the id is not an activated BILLER partner, or (holder actors) the biller is not ACTIVE.
+      x-audience: service
+      x-actors:
+      - type: CUSTOMER
+        scope: ACTIVE billers only
+      - type: AGENT
+        scope: ACTIVE billers only
+      - type: MERCHANT
+        scope: ACTIVE billers only
+      - type: DISTRIBUTOR
+        scope: ACTIVE billers only
+      - type: INSTITUTION
+        scope: ACTIVE billers only
+      - type: STAFF
+        roles:
+        - '*'
+      - type: SERVICE
+        actorIds:
+        - '*'
+      - type: SYSTEM
+      x-module: partner
+      x-release: MVP
+      x-idempotency: none
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - $ref: '#/components/parameters/Traceparent'
+      - name: billerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Biller'
+              example:
+                billerId: 0192f4a0-0b01-7c00-8a00-00000000b001
+                version: 3
+                partnerCode: B000000018
+                subType: UTILITY
+                categoryCode: 501
+                status: ACTIVE
+                walletId: 0192f4a1-0b01-7c00-8a00-00000000b001
+                billerCode: DESCO
+                nameEn: Dhaka Electric Supply Company (DESCO)
+                nameBn: ঢাকা ইলেকট্রিক সাপ্লাই কোম্পানি (ডেসকো)
+                category: UTILITY_ELECTRICITY
+                logoKey: billers/desco.png
+                referenceLabelEn: Account number
+                referenceLabelBn: হিসাব নম্বর
+                referencePattern: ^[0-9]{8,12}$
+                amountMode: ENQUIRY
+                fixedAmountPoisha: null
+                minAmountPoisha: 1000
+                maxAmountPoisha: 5000000
+                feeBearer: PAYER
+                msisdnPrefixes: []
+                rechargeTypes: []
+                denominationsPoisha: []
+                updatedAt: '2026-10-14T06:00:00.000Z'
+        '400':
+          description: VALIDATION_FAILED — malformed header, parameter or body
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - properties:
+                    code:
+                      type: string
+                      enum:
+                      - VALIDATION_FAILED
+        '403':
+          description: ACTOR_NOT_ALLOWED — actor type, role or caller not permitted
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - properties:
+                    code:
+                      type: string
+                      enum:
+                      - ACTOR_NOT_ALLOWED
+        '404':
+          description: NOT_FOUND — path entity missing (or not visible to the actor)
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - properties:
+                    code:
+                      type: string
+                      enum:
+                      - NOT_FOUND
   /v1/internal/partners:republish:
     post:
       operationId: republishPartners
@@ -14486,6 +14802,7 @@ components:
           - D
           - M
           - I
+          - B
         categoryCode:
           type: integer
           format: int32
@@ -14523,6 +14840,7 @@ components:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
         ownerId:
           type: string
           format: uuid
@@ -14579,6 +14897,7 @@ components:
           - D
           - M
           - I
+          - B
         walletTypeName:
           type: string
           enum:
@@ -14587,6 +14906,7 @@ components:
           - DISTRIBUTOR
           - MERCHANT
           - INSTITUTION
+          - BILLER
         categoryCode:
           type: integer
           format: int32
@@ -14824,6 +15144,7 @@ components:
                 - D
                 - M
                 - I
+                - B
               status:
                 type: string
                 enum:
@@ -16074,7 +16395,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
         partnerCode:
           type: string
-          pattern: ^[AMDI][0-9]{9}$
+          pattern: ^[AMDIB][0-9]{9}$
           description: 8-digit sequence + Luhn digit
         partnerType:
           type: string
@@ -16083,6 +16404,7 @@ components:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
         subType:
           type: string
           enum:
@@ -16101,8 +16423,13 @@ components:
           - GOVERNMENT
           - NGO
           - OTHER
+          - UTILITY
+          - EDUCATION
+          - GOVT_FEE
+          - INTERNET_TV
+          - MNO
           description: 'AGENT: RETAIL|SUPER_AGENT|MERCHANT_AGENT|BANK_AGENT; MERCHANT: MICRO|SMALL|ENTERPRISE|ONLINE; DISTRIBUTOR: MASTER|DISTRIBUTOR|SUB;
-            INSTITUTION: EMPLOYER|GOVERNMENT|NGO|OTHER'
+            INSTITUTION: EMPLOYER|GOVERNMENT|NGO|OTHER; BILLER: UTILITY|EDUCATION|GOVT_FEE|INTERNET_TV|MNO'
         mcc:
           type:
           - string
@@ -16219,6 +16546,11 @@ components:
           format: int64
           minimum: 1
           description: = PARTNER_UPSERTED.version
+        biller:
+          oneOf:
+          - $ref: '#/components/schemas/BillerProfileInput'
+          - type: 'null'
+          description: Additive (CR-WALLET-1). Biller profile; present only when partnerType = BILLER.
       required:
       - partnerId
       - partnerCode
@@ -16245,6 +16577,298 @@ components:
       - activatedAt
       - version
       description: Partner detail (GET /v1/partners/{partnerId}; also the 200 body of status-changes).
+    BillerProfileInput:
+      type: object
+      additionalProperties: true
+      properties:
+        billerCode:
+          type: string
+          pattern: ^[A-Z0-9-]{2,16}$
+          description: short unique code (e.g. DESCO, GP); immutable after activation
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameBn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type: string
+          enum:
+            - UTILITY_ELECTRICITY
+            - UTILITY_GAS
+            - UTILITY_WATER
+            - INTERNET
+            - TV
+            - EDUCATION
+            - GOVT_FEE
+            - MOBILE_PREPAID
+            - MOBILE_POSTPAID
+          description: codes.yaml billerCategory; must be allowed for the biller subType
+        logoKey:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+          description: object-store key of the logo
+        referenceLabelEn:
+          type: string
+          minLength: 1
+          maxLength: 60
+        referenceLabelBn:
+          type: string
+          minLength: 1
+          maxLength: 60
+        referencePattern:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Java-compatible regex that the whole bill reference must match; MNO billers use ^01[3-9][0-9]{8}$
+        amountMode:
+          type: string
+          enum:
+          - ENQUIRY
+          - FIXED
+          - OPEN
+        fixedAmountPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          description: required iff amountMode = FIXED; within min..max
+        minAmountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+        maxAmountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          description: '>= minAmountPoisha'
+        feeBearer:
+          type: string
+          enum:
+          - PAYER
+          - BILLER
+          description: codes.yaml billerFeeBearer
+        msisdnPrefixes:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            pattern: ^01[3-9]$
+          description: MNO only (≥ 1, unique across live MNO billers); [] otherwise
+        rechargeTypes:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum:
+            - PREPAID
+            - POSTPAID
+          description: MNO only (≥ 1); [] otherwise
+        denominationsPoisha:
+          type: array
+          maxItems: 20
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          description: MNO quick picks, ascending, within min..max; may be []
+      required:
+      - billerCode
+      - nameEn
+      - nameBn
+      - category
+      - logoKey
+      - referenceLabelEn
+      - referenceLabelBn
+      - referencePattern
+      - amountMode
+      - fixedAmountPoisha
+      - minAmountPoisha
+      - maxAmountPoisha
+      - feeBearer
+      - msisdnPrefixes
+      - rechargeTypes
+      - denominationsPoisha
+      description: Biller profile (CR-WALLET-1, BIL-008) — part of the BILLER partner model (PartnerForm.biller, PartnerDetail.biller, profile-changes
+        changes.biller, PARTNER_UPSERTED.biller).
+    Biller:
+      type: object
+      additionalProperties: true
+      properties:
+        billerId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = partnerId
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: = PARTNER_UPSERTED.version
+        partnerCode:
+          type: string
+          pattern: ^B[0-9]{9}$
+        subType:
+          type: string
+          enum:
+          - UTILITY
+          - EDUCATION
+          - GOVT_FEE
+          - INTERNET_TV
+          - MNO
+        categoryCode:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 99999
+          description: codes.yaml categoryCode (501..505)
+        status:
+          type: string
+          enum:
+          - PENDING_SCREENING
+          - PENDING_APPROVAL
+          - ACTIVE
+          - SUSPENDED
+          - PENDING_TERMINATION
+          - TERMINATED
+          - REJECTED
+          description: partner status; only ACTIVE is payable
+        walletId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: the biller's settlement wallet (type B, ledger account type 150)
+        billerCode:
+          type: string
+          pattern: ^[A-Z0-9-]{2,16}$
+          description: short unique code (e.g. DESCO, GP); immutable after activation
+        nameEn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nameBn:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type: string
+          enum:
+            - UTILITY_ELECTRICITY
+            - UTILITY_GAS
+            - UTILITY_WATER
+            - INTERNET
+            - TV
+            - EDUCATION
+            - GOVT_FEE
+            - MOBILE_PREPAID
+            - MOBILE_POSTPAID
+          description: codes.yaml billerCategory; must be allowed for the biller subType
+        logoKey:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+          description: object-store key of the logo
+        referenceLabelEn:
+          type: string
+          minLength: 1
+          maxLength: 60
+        referenceLabelBn:
+          type: string
+          minLength: 1
+          maxLength: 60
+        referencePattern:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Java-compatible regex that the whole bill reference must match; MNO billers use ^01[3-9][0-9]{8}$
+        amountMode:
+          type: string
+          enum:
+          - ENQUIRY
+          - FIXED
+          - OPEN
+        fixedAmountPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          description: required iff amountMode = FIXED; within min..max
+        minAmountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+        maxAmountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          description: '>= minAmountPoisha'
+        feeBearer:
+          type: string
+          enum:
+          - PAYER
+          - BILLER
+          description: codes.yaml billerFeeBearer
+        msisdnPrefixes:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            pattern: ^01[3-9]$
+          description: MNO only (≥ 1, unique across live MNO billers); [] otherwise
+        rechargeTypes:
+          type: array
+          maxItems: 2
+          items:
+            type: string
+            enum:
+            - PREPAID
+            - POSTPAID
+          description: MNO only (≥ 1); [] otherwise
+        denominationsPoisha:
+          type: array
+          maxItems: 20
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          description: MNO quick picks, ascending, within min..max; may be []
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+      required:
+      - billerId
+      - version
+      - partnerCode
+      - subType
+      - categoryCode
+      - status
+      - walletId
+      - billerCode
+      - nameEn
+      - nameBn
+      - category
+      - logoKey
+      - referenceLabelEn
+      - referenceLabelBn
+      - referencePattern
+      - amountMode
+      - fixedAmountPoisha
+      - minAmountPoisha
+      - maxAmountPoisha
+      - feeBearer
+      - msisdnPrefixes
+      - rechargeTypes
+      - denominationsPoisha
+      - updatedAt
+      description: Catalogue view of an activated biller; same fields as data contract biller-catalogue-cache v1 §3 (without `schema`).
     Stage:
       type: object
       additionalProperties: true
@@ -16397,6 +17021,12 @@ components:
           - WALLET
           - BANK
           description: BANK → 422 SERVICE_DISABLED
+        biller:
+          oneOf:
+          - $ref: '#/components/schemas/BillerProfileInput'
+          - type: 'null'
+          description: Additive (CR-WALLET-1). Required when partnerType = BILLER (validated at submit, BR-PAR-80..84); must be absent or null for every
+            other type.
       required:
       - legalName
       - displayName
@@ -16424,7 +17054,7 @@ components:
           type:
           - string
           - 'null'
-          pattern: ^[AMDI][0-9]{9}$
+          pattern: ^[AMDIB][0-9]{9}$
         partnerType:
           type: string
           enum:
@@ -16432,6 +17062,7 @@ components:
           - MERCHANT
           - DISTRIBUTOR
           - INSTITUTION
+          - BILLER
         subType:
           type: string
           enum:
@@ -16450,6 +17081,11 @@ components:
           - GOVERNMENT
           - NGO
           - OTHER
+          - UTILITY
+          - EDUCATION
+          - GOVT_FEE
+          - INTERNET_TV
+          - MNO
         status:
           type: string
           enum:
@@ -17092,7 +17728,7 @@ components:
           type:
           - string
           - 'null'
-          pattern: ^[AMDI][0-9]{9}$
+          pattern: ^[AMDIB][0-9]{9}$
         merchantWalletId:
           type:
           - string

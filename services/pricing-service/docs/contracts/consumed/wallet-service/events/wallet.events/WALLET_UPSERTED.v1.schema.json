@@ -25,7 +25,8 @@
         "AGENT",
         "MERCHANT",
         "DISTRIBUTOR",
-        "INSTITUTION"
+        "INSTITUTION",
+        "BILLER"
       ]
     },
     "ownerId": {
@@ -41,7 +42,8 @@
         "A",
         "D",
         "M",
-        "I"
+        "I",
+        "B"
       ]
     },
     "msisdn": {

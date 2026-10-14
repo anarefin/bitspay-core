@@ -3,8 +3,10 @@
 
 You are implementing **admin-service** (SVC-15) of Bits Pay: module `governance` (staff RBAC model, approval inbox, hash-chained audit store, refdata/params/calendar/product switches, retention, activity monitoring) and module `notification` (rules, contacts, BN/EN templates, in-app inbox, channel SPI, deliveries, reminders, logs). This folder is the whole world for this service.
 
+**Release scope (SRS v1.2, CR-ADMIN-1, contractVersion 1.1.0):** MVP product switches enabled = `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE`; all others disabled (BR-GOV-47). Own MVP templates add `BILL_PAYMENT_SUCCESS` / `_FAILED` and `RECHARGE_SUCCESS` / `_FAILED` (BR-NOT-16, WP-CR-1); reminder policy `BILL_DUE` stays disabled. SPEC §10 tags each WP `[MVP]` or `[R1+]` (R1+: WP-5, WP-6, WP-10, WP-18, WP-19, WP-20).
+
 ## Read first (every session)
-1. `docs/SPEC.md` — the specification (§10 lists work packages WP-1 … WP-21).
+1. `docs/SPEC.md` — the specification (§10 lists work packages WP-1 … WP-21 and WP-CR-1).
 2. `docs/contracts/contract.yaml` — what this service provides (incl. the three **inbound topics** it owns) and consumes (pins).
 3. `docs/contracts/provided/*` — binding API, event, code and data contracts this service owns.
 4. `docs/contracts/consumed/*` — snapshots of everything used from others (read-only).

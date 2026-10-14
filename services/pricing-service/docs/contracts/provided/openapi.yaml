@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: pricing-service
-  version: 1.0.0
+  version: 1.1.0
   description: 'Provided API of pricing-service (modules pricing and campaign). Kernel 1.0: headers K3.1, idempotency K3.3, pagination K3.4, problem K3.6. x-audience
     = service|staff|customer|partner|internal; x-actors = allowed actor types/roles (serviceActorIds ''*'' = any SERVICE caller); x-problem-reasons = provider-owned
     problem.reason values per HTTP status; x-module = owning module.'
@@ -6293,6 +6293,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
         match:
           type: object
@@ -6328,6 +6330,7 @@ components:
               - D
               - M
               - I
+              - B
               - null
               description: null = any
             payeeWalletType:
@@ -6340,6 +6343,7 @@ components:
               - D
               - M
               - I
+              - B
               - null
               description: null = any
             payerKycTier:
@@ -6542,6 +6546,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
         match:
           type: object
@@ -6577,6 +6583,7 @@ components:
               - D
               - M
               - I
+              - B
               - null
               description: null = any
             payeeWalletType:
@@ -6589,6 +6596,7 @@ components:
               - D
               - M
               - I
+              - B
               - null
               description: null = any
             payerKycTier:
@@ -6795,6 +6803,7 @@ components:
           - D
           - M
           - I
+          - B
           description: letters; names also accepted
         kycTier:
           type: integer
@@ -6823,6 +6832,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
         channel:
           type:
@@ -7054,6 +7065,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
         description:
           type:
@@ -7697,6 +7710,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
           - null
         beneficiaryWalletId:
@@ -7937,6 +7952,8 @@ components:
           - MERCHANT_PAYMENT
           - MERCHANT_REFUND
           - FLOAT_TRANSFER
+          - BILL_PAY
+          - RECHARGE
           - REVERSAL
           - null
         grossPoisha:

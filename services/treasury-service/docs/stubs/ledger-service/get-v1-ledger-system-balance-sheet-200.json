@@ -92,6 +92,11 @@
           "accountType": "INSTITUTION_WALLET",
           "balancePoisha": 0,
           "source": "PROJECTION"
+        },
+        {
+          "accountType": "BILLER_WALLET",
+          "balancePoisha": 0,
+          "source": "PROJECTION"
         }
       ],
       "projectionAsOf": "2026-10-09T08:04:59.870Z",
@@ -102,6 +107,6 @@
   "metadata": {
     "generatedBy": "contracts.py snapshot",
     "producer": "ledger-service",
-    "producerContractVersion": "1.0.0"
+    "producerContractVersion": "1.1.0"
   }
 }

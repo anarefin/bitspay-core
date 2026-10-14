@@ -1,4 +1,4 @@
-# wallet-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# wallet-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.1.0, kernel 1.0.
 # Producer-owned (O1): only wallet-service edits this file, through CHANGE-PROCESS.
 codeSets:
   walletStatus:
@@ -68,6 +68,11 @@ codeSets:
       name: INSTITUTION
       ledgerAccountType: INSTITUTION_WALLET
       ownerType: INSTITUTION
+    - code: B
+      name: BILLER
+      ledgerAccountType: BILLER_WALLET
+      ownerType: BILLER
+      description: settlement wallet of a BILLER partner (ledger account type 150, owner type 6); MVP, CR-WALLET-1
   walletStatusReason:
     description: Wallet statusReasonCode / status-changes reasonCode values (reasonCodes group 'Wallet status'); RESTRICTED is display-only.
     values:
@@ -98,9 +103,10 @@ codeSets:
     - MERCHANT
     - DISTRIBUTOR
     - INSTITUTION
+    - BILLER
   categoryCode:
     description: Partner category (int32, 0..99999), derived only by the partner module; never an MCC. CUSTOMER = 0; AGENT 101..104; DISTRIBUTOR 201..203; INSTITUTION
-      401..404; MERCHANT = 3000 + d*100 + g with d = MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4 and g = refdata MCC attributes.group (01 GROCERY_RETAIL, 02 FOOD, 03
+      401..404; BILLER 501..505; MERCHANT = 3000 + d*100 + g with d = MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4 and g = refdata MCC attributes.group (01 GROCERY_RETAIL, 02 FOOD, 03
       UTILITY_TELCO, 04 TRANSPORT, 05 HEALTH, 06 EDUCATION, 07 DIGITAL, 99 OTHER). Consumers may match a merchant size class by its hundred group (3100, 3200, 3300,
       3400). Pending architect sign-off (OPEN D-21).
     formula: 'merchant: 3000 + d*100 + int(mccGroup)'
@@ -194,6 +200,16 @@ codeSets:
       name: INSTITUTION_NGO
     - code: 404
       name: INSTITUTION_OTHER
+    - code: 501
+      name: BILLER_UTILITY
+    - code: 502
+      name: BILLER_EDUCATION
+    - code: 503
+      name: BILLER_GOVT_FEE
+    - code: 504
+      name: BILLER_INTERNET_TV
+    - code: 505
+      name: BILLER_MNO
   kycTier:
     description: KYC tier (definitions configurable in KYC_TIERS).
     values:
@@ -299,6 +315,7 @@ codeSets:
     - MERCHANT
     - DISTRIBUTOR
     - INSTITUTION
+    - BILLER
   partnerSubType:
     description: Partner sub-type per partner type.
     values:
@@ -332,6 +349,17 @@ codeSets:
       partnerType: INSTITUTION
     - code: OTHER
       partnerType: INSTITUTION
+    - code: UTILITY
+      partnerType: BILLER
+    - code: EDUCATION
+      partnerType: BILLER
+    - code: GOVT_FEE
+      partnerType: BILLER
+    - code: INTERNET_TV
+      partnerType: BILLER
+    - code: MNO
+      partnerType: BILLER
+      description: mobile network operator (recharge)
   partnerStatus:
     description: Compliance screens on PENDING_SCREENING; money paths treat only ACTIVE as active (float return also from PENDING_TERMINATION).
     values:
@@ -399,6 +427,47 @@ codeSets:
     - BAD_TLV
     - MISSING_TAG
     - BAD_FORMAT
+  billerCategory:
+    description: Biller profile category (CR-WALLET-1). Allowed per biller subType - UTILITY → UTILITY_ELECTRICITY | UTILITY_GAS | UTILITY_WATER; INTERNET_TV
+      → INTERNET | TV; EDUCATION → EDUCATION; GOVT_FEE → GOVT_FEE; MNO → MOBILE_PREPAID | MOBILE_POSTPAID.
+    values:
+    - code: UTILITY_ELECTRICITY
+      subType: UTILITY
+    - code: UTILITY_GAS
+      subType: UTILITY
+    - code: UTILITY_WATER
+      subType: UTILITY
+    - code: INTERNET
+      subType: INTERNET_TV
+    - code: TV
+      subType: INTERNET_TV
+    - code: EDUCATION
+      subType: EDUCATION
+    - code: GOVT_FEE
+      subType: GOVT_FEE
+    - code: MOBILE_PREPAID
+      subType: MNO
+    - code: MOBILE_POSTPAID
+      subType: MNO
+  billerAmountMode:
+    description: How a bill amount is determined (CR-WALLET-1).
+    values:
+    - code: ENQUIRY
+      description: due amount fetched by bill enquiry (in the MVP the simulated provider of transaction-service), payment must equal it
+    - code: FIXED
+      description: amount must equal fixedAmountPoisha
+    - code: OPEN
+      description: payer enters any amount within minAmountPoisha..maxAmountPoisha
+  billerFeeBearer:
+    description: Who bears the bill-payment fee of this biller (BIL-008); pricing-service applies the plan. Not the kernel feeBearer enum.
+    values:
+    - PAYER
+    - BILLER
+  rechargeType:
+    description: Recharge types an MNO biller accepts (BIL-012).
+    values:
+    - PREPAID
+    - POSTPAID
 problemReasons:
 - code: STATE_CONFLICT
   reason: DUPLICATE_MSISDN
@@ -593,6 +662,16 @@ problemReasons:
   operations:
   - POST /v1/qr/static
   - POST /v1/qr/dynamic
+- code: STATE_CONFLICT
+  reason: DUPLICATE_BILLER_CODE
+  operations:
+  - POST /v1/partner-applications/{applicationId}:submit
+  - POST /v1/partners/{partnerId}/profile-changes
+- code: STATE_CONFLICT
+  reason: MSISDN_PREFIX_TAKEN
+  operations:
+  - POST /v1/partner-applications/{applicationId}:submit
+  - POST /v1/partners/{partnerId}/profile-changes
 - code: RISK_BLOCKED
   reason: BLACKLISTED
   operations:
@@ -1099,6 +1178,11 @@ txnRefPrefixes:
   meaning: partnerCode of an INSTITUTION (not a txnRef)
   format: I{8-digit sequence}{Luhn digit}
   length: 10
+- prefix: B
+  kind: business
+  meaning: partnerCode of a BILLER (not a txnRef; the short billerCode such as DESCO is separate)
+  format: B{8-digit sequence}{Luhn digit}
+  length: 10
 - prefix: Q
   kind: business
   meaning: dynamic Bangla QR reference (tag 62.05; not a txnRef)
@@ -1225,3 +1309,9 @@ metrics:
   type: counter
   labels: []
   description: blacklist matches on partners
+- name: bitspay_partner_biller_cache_writes_total
+  type: counter
+  labels:
+  - source
+  - result
+  description: biller-catalogue-cache writes (source writethrough|refresh; result applied|stale|error)

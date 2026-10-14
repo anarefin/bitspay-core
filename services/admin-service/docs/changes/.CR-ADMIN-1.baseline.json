@@ -1,0 +1,22 @@
+{
+  "cr": "CR-ADMIN-1",
+  "analysedAt": "2026-10-14T13:06:16.038908Z",
+  "kind": "B",
+  "planPacks": [
+    "admin-service"
+  ],
+  "baseline": {
+    "ledger-service": "9ca4ee2361a281923814a83cdb98a949032d24e9a784a37b832ba1c308e8a8a0",
+    "transaction-service": "5e79ab4ecde858d980c0f01bd747ae83cf816cfbc3bdbcabb063a93eb2bc46c0",
+    "wallet-service": "76e916142ddc75504a58dc8bff6c0b30e797666c0f0152f26bb2a14b58b6be6e",
+    "limits-risk-service": "5722d8799be0e9502b281cc5ae29a855740a5bac8ff3380207748967b4680cf9",
+    "pricing-service": "52931ae49eed88cbb71cfaaf5cbced26fe82409cc2f92a6d93fb34413638b2f6",
+    "treasury-service": "1852b61fac634ad226dc8aa2b61016e9929537269d9bb6a233927c63848e6af6",
+    "disbursement-service": "538ae057b65f04433c87d26d5ee270edf8a88302974505edcda534f155eece48",
+    "support-service": "0a7836580a5d384ce6c1ae8d03287ed007124ef1d355c8f8feed0cc5e5e5e000",
+    "compliance-service": "d4be28b70ce933df500fb78c8d4e8072adb089012dc4c9edd5ee2c355de624cb",
+    "finance-ops-service": "c381d0e807dc969d0d86f6ce9720fd794b1bc26ded5b876eedd6a563e338ba38",
+    "admin-service": "1b51c1012db35dc61d6ae200abc1c4a330d47ceda19ab494c5e6e187b41d7a85",
+    "general-ledger-service": "e5efc3e5e600ad00767172138fbd2c608a0bb85204eedc0f94579c682b7f108a"
+  }
+}

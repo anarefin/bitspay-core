@@ -4,8 +4,8 @@
 |---|---|
 | Service | `ledger-service` (`spring.application.name`; also the envelope `producer` of both run roles) |
 | Number / owner | SVC-01 · Dev-1 (no modules; one image, two run roles `api` and `cdc-bridge`, the latter named `ledger-cdc-bridge` in contracts) |
-| Layer / release | Core (ledger & money movement) · R1 (command 16 and disbursement throughput targets are R2 features delivered now) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Core (ledger & money movement) · **MVP** (wallet and ledger core: accounts incl. BILLER_WALLET 150, commands 1–7, 9–11, 14–16, 18, 19, reads, CDC bridge) · R1+ for commands 8, 12, 13, 17 (disbursement, campaign, commission settlement and wallet-closure payout have no MVP caller); command 16 and disbursement throughput targets are R2 features delivered now |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-LEDGER-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8101 · management 9101 |
 | Schema / role | `svc_ledger` (login role `svc_ledger`); outbox `svc_ledger.outbox` (used for `audit.events` only) |
@@ -16,7 +16,7 @@
 
 ### 1.1 Mission
 
-ledger-service is the **only door to TigerBeetle (TB)**. Every taka that moves in Bits Pay moves through one of its 17 business commands; no other service may reach TB, and no other service holds a balance.
+ledger-service is the **only door to TigerBeetle (TB)**. Every taka that moves in Bits Pay moves through one of its 19 business commands; no other service may reach TB, and no other service holds a balance.
 
 Worked example. Rahim sends Karim 500 Tk; the fee is 5 Tk, the VAT on the fee 0.75 Tk, and Karim's maximum balance is 300,000 Tk. transaction-service sends one `post-p2p` command with `commandId` = its `txnId`. ledger-service turns it into one **linked chain** of TB transfers: principal 50,000 poisha Rahim → Karim (code 1001), fee 500 Rahim → FEE_INCOME (2001), VAT 75 Rahim → VAT_PAYABLE (2002), plus four technical legs (codes 9001–9004) that prove Karim stays under 30,000,000 poisha. The chain is submitted in a shared TB request with other callers' chains, and the ledger answers `OK` with the three business transfer ids. If the same command arrives again (retry, sweeper, crash recovery), the deterministic transfer ids make TB answer `exists`, so money moves exactly once and the ledger answers `EXISTS` with the original ids. If Rahim had only 300 Tk, TB rejects leg 0 with `exceeds_credits`, nothing is applied, and the ledger answers `REJECTED INSUFFICIENT_FUNDS` — final for that `commandId`.
 
@@ -25,7 +25,7 @@ A second role of the same image, the **CDC bridge** (`ledger-cdc-bridge`), strea
 ### 1.2 In scope
 
 - TB access (Java client 0.17.9), account create/close, chart of accounts (config table + seed), fixed system accounts (idempotent bootstrap at start-up).
-- All **17** command types (§5.1) with their leg templates (§7.3), deterministic transfer-id derivation (§5.4), idempotency (`OK`/`EXISTS`/`409`), "REJECTED is final", max-balance enforcement (balance-bounds recipe), holds (pending/void), reversals (incl. partial), disbursement batches, closure payouts.
+- All **19** command types (§5.1) with their leg templates (§7.3), deterministic transfer-id derivation (§5.4), idempotency (`OK`/`EXISTS`/`409`), "REJECTED is final", max-balance enforcement (balance-bounds recipe), holds (pending/void), reversals (incl. partial), disbursement batches, closure payouts.
 - The ledger's own authorisation policy: allowed callers per command and per read (§5.1.2, `x-actors`).
 - In-process request batcher (many HTTP requests → one TB request), with `online` and `bulk` lanes.
 - Command journal (Postgres) for replay answers, payload-conflict detection, pre-TB rejection finality and integrity; hold registry; reversal claims; account registry.
@@ -33,11 +33,13 @@ A second role of the same image, the **CDC bridge** (`ledger-cdc-bridge`), strea
 - CDC bridge → `ledger.changes` (TB AMQP CDC via RabbitMQ, polling fallback), per-account-type totals projection.
 - `audit.events` (via outbox) for account lifecycle, holds, reversals, back-office and bulk commands, closure payouts and integrity mismatches.
 
+**MVP vs R1+ (SRS v1.2).** The MVP release (before R1) uses: account create/close for all wallet types incl. `BILLER_WALLET` 150 (one per biller, owner type 6 `BILLER`); payment commands 1–6 (P2P, cash-in, cash-out, merchant payment, merchant refund, float transfer); **18 `post-bill-payment` and 19 `post-recharge`** (customer → biller wallet against the internal biller catalogue, CR-LEDGER-1); 7 reversal (support reversals, wrong transfer, and transaction-service's automatic reversal when the simulated biller provider rejects); 9, 10, 11, 16 (treasury e-money issuance, redemption, adjustment, trust rebalance); 14, 15 holds; 17 closure payout; every read; the CDC bridge (feeds the GL-R1a books). Commands 8 (disbursement), 12 (campaign reward) and 13 (commission settlement) are specified and contract-stable but have **no MVP caller** (R1+); MVP agent commission is in-line (legs 3–4 of commands 1–6).
+
 ### 1.3 Out of scope / deferred
 
 | Deferred item | Replacement now |
 |---|---|
-| Interop / network settlement (NPSB, banks, billers) | Account code 310 `NETWORK_SETTLEMENT` reserved, never created |
+| Interop / network settlement (NPSB, banks, external biller aggregators such as ekPay — R1+) | Account code 310 `NETWORK_SETTLEMENT` reserved, never created. MVP billers are on-us: each settles into its own `BILLER_WALLET` 150 (CR-LEDGER-1); biller bank settlement is R1+ |
 | Two-phase external holds (post of a hold) | Only create (pending) and void are exposed |
 | Business validation needing other services' data (wallet status, limits, fees, partner hierarchy, same-person rule) | Callers do it; the ledger enforces money invariants and its account-type guards only |
 | Statements, EOD snapshots, GL, chart-of-accounts mapping | Built by finance-ops and general-ledger from `ledger.changes` and the read APIs |
@@ -46,6 +48,7 @@ A second role of the same image, the **CDC bridge** (`ledger-cdc-bridge`), strea
 | Provisional dispute credit (SRS SUP-004) | No command — OPEN D-34 |
 | Unclaimed-balance account (SRS LED-017) | No account type — OPEN D-35 |
 | Reversal of disbursement rows by a caller | Ledger supports type-8 originals, but no caller is authorised in R1 — OPEN D-36 |
+| Biller wallet (150) in holds, closure payout and e-money redemption (biller bank settlement is R1+) | 150 is not in the guards of 14 and 17 nor in `emoney.redeem-source-codes` — MVP deferral (§13) |
 | VAT withheld on commission (SRS COM-005) | AIT only; names reserved — OPEN D-02 |
 | `SHARED` fee bearer (SRS FEE-002) | Reserved name, rejected with 400 — OPEN D-03 |
 | Two-phase max-balance fallback (`bounds.mode=two-phase`) | Implemented behind a switch for the spike only; needs an accepted CR before use in any shared environment |
@@ -71,35 +74,39 @@ None. One standalone Gradle project, one image, two run roles (§3.3).
 
 ## 2. SRS traceability
 
+Baseline: **SRS v1.2 (14 Oct 2026)**. `· MVP` at the end of the Covered-by column marks a row the MVP release (before R1) delivers; unmarked rows are R1+ or later, or ledger capabilities that have no MVP caller. Withdrawn in v1.2 (no ledger row affected): GLD-031, INT-01, B-18.
+
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
-| LED-001 | Balanced double-entry, atomic | BR-01-05/06 (linked chains), §7.3 templates; WP-2, WP-3 |
-| LED-002 | Separate account types incl. system accounts | `account_type` (§4.1), codes.yaml `accountType`, BR-01-01..03; WP-2 |
-| LED-003 | Multiple wallets per customer | One TB account per wallet id; no owner ↔ account 1:1 assumption; `POST /v1/ledger/accounts` |
-| LED-004 | Real-time consistent balances | `GET …/balance` reads TB directly, never cached; WP-2, WP-7 |
-| LED-005 | Available / ledger / held balances, holds | `create-hold` / `release-hold`, BR-01-30; WP-5 |
-| LED-006 | No negative wallet balances | TB flag `debits_must_not_exceed_credits` on 100–140 and 240; WP-2 |
-| LED-007 | Unique txn id, links | `user_data_128 = commandId`, `txnRef` journaled, reversal link via `originalCommandId`; WP-3, WP-5 |
-| LED-008 | Idempotent financial APIs | Deterministic transfer ids, `EXISTS`, `409`, REJECTED final — BR-01-10..14; WP-3 |
-| LED-009 | Transaction states | Owned by transaction-service; ledger gives definitive `OK/EXISTS/REJECTED` + command lookup |
-| LED-010 | Pending resolution by status enquiry | `GET /v1/ledger/commands/{commandId}` (never 404); WP-3 |
-| LED-011 | Reversals as compensating postings | `post-reversal`, BR-01-40..47; WP-5 |
-| LED-012/013/014 | History, EOD, GL | Ledger provides `…/transfers`, balances, `ledger.changes`; features built by consumers |
-| LED-015 | BDT, 2-decimal precision | `ledger = 1`, integer poisha only; rounding lives in pricing |
+| LED-001 | Balanced double-entry, atomic | BR-01-05/06 (linked chains), §7.3 templates; WP-2, WP-3 · MVP |
+| LED-002 | Separate account types incl. system accounts | `account_type` (§4.1), codes.yaml `accountType` (incl. 150 `BILLER_WALLET`, BR-01-72), BR-01-01..03; WP-2, WP-CR-1 · MVP |
+| LED-003 | Multiple wallets per customer | One TB account per wallet id; no owner ↔ account 1:1 assumption; `POST /v1/ledger/accounts` · MVP |
+| LED-004 | Real-time consistent balances | `GET …/balance` reads TB directly, never cached; WP-2, WP-7 · MVP |
+| LED-005 | Available / ledger / held balances, holds | `create-hold` / `release-hold`, BR-01-30; WP-5 · MVP |
+| LED-006 | No negative wallet balances | TB flag `debits_must_not_exceed_credits` on 100–140, 150 and 240; WP-2, WP-CR-1 · MVP |
+| LED-007 | Unique txn id, links | `user_data_128 = commandId`, `txnRef` journaled, reversal link via `originalCommandId`; WP-3, WP-5 · MVP |
+| LED-008 | Idempotent financial APIs | Deterministic transfer ids, `EXISTS`, `409`, REJECTED final — BR-01-10..14; WP-3 · MVP |
+| LED-009 | Transaction states | Owned by transaction-service; ledger gives definitive `OK/EXISTS/REJECTED` + command lookup · MVP |
+| LED-010 | Pending resolution by status enquiry | `GET /v1/ledger/commands/{commandId}` (never 404); WP-3 · MVP |
+| LED-011 | Reversals as compensating postings | `post-reversal`, BR-01-40..47 (originals incl. 18, 19, BR-01-73); WP-5, WP-CR-1 · MVP |
+| LED-012/013/014 | History, EOD, mapping to the Operator's chart of accounts (LED-014 reworded in v1.2) | Ledger provides `…/transfers`, balances, `ledger.changes`; the CoA mapping is done by general-ledger-service (GLD-006, GLD-013) and the real-time view is its GL open-day overlay (GLD-030) · MVP |
+| LED-015 | BDT, 2-decimal precision | `ledger = 1`, integer poisha only; rounding lives in pricing · MVP |
 | LED-016 | Dormancy (R2) | Wallet-service feature; ledger provides command 17 and account close |
 | LED-017 | Unclaimed balances (R2) | Not available — OPEN D-35 |
-| LED-018 | Ledger protected from direct modification | TB transfers immutable; journal `row_mac`; integrity verifier — BR-01-70; WP-10 |
-| LED-019 | Real-time system balance sheet | `GET /v1/ledger/system-balance-sheet` — BR-01-60..63 (per-type part eventually consistent, OPEN D-45); WP-7 |
-| EMY-001 | Issuance only against trust | `post-emoney-issue` always debits a TRUST_SETTLEMENT account; WP-6 |
-| EMY-002 | Redemption | `post-emoney-redeem` credits TRUST_SETTLEMENT; WP-6 |
-| EMY-004 | 1:1 backing identity | Identity in the balance sheet; trust flag `credits_must_not_exceed_debits` |
-| EMY-005 | Multiple trust accounts, attribution | One TB account per trust bank account (`…0300nn`) |
-| EMY-006 | Trust rebalancing | `post-trust-rebalance` (code 1015); WP-6 |
-| ACL-006 | Closure payout to same-person wallet | `post-closure-payout` (command 17, code 1016) + `:close`; WP-5, WP-6 |
-| REL-001 | Complete fully or no effect | Linked chains; unknown → 503, never partial |
-| PER-003 | P2P p99 ≤ 300 ms end-to-end | Ledger budget p99 ≤ 20 ms (§3.7) |
+| LED-018 | Ledger protected from direct modification | TB transfers immutable; journal `row_mac`; integrity verifier — BR-01-70; WP-10 · MVP |
+| LED-019 | Real-time system balance sheet | `GET /v1/ledger/system-balance-sheet` — BR-01-60..63 (per-type part eventually consistent, OPEN D-45); WP-7 · MVP |
+| EMY-001 | Issuance only against trust | `post-emoney-issue` always debits a TRUST_SETTLEMENT account; WP-6 · MVP |
+| EMY-002 | Redemption | `post-emoney-redeem` credits TRUST_SETTLEMENT; WP-6 · MVP |
+| EMY-004 | 1:1 backing identity | Identity in the balance sheet; trust flag `credits_must_not_exceed_debits` · MVP |
+| EMY-005 | Multiple trust accounts, attribution | One TB account per trust bank account (`…0300nn`) · MVP |
+| EMY-006 | Trust rebalancing | `post-trust-rebalance` (code 1015); WP-6 · MVP |
+| ACL-006 | Closure payout to same-person wallet | `post-closure-payout` (command 17, code 1016) + `:close`; WP-5, WP-6 · R1+ (wallet closure is not in the MVP) |
+| REL-001 | Complete fully or no effect | Linked chains; unknown → 503, never partial · MVP |
+| PER-003 | P2P p99 ≤ 300 ms end-to-end | Ledger budget p99 ≤ 20 ms (§3.7) · MVP |
 | PER-010 | Bulk ≥ 1M rows/h without degrading online | `post-disbursement-batch` (≤ 1,000 rows/call), `bulk` lane — BR-01-52; WP-4, WP-6 |
-| PER-013 | Hot accounts not a bottleneck | TB has no row locks; batcher amortises; hot-account test |
+| PER-013 | Hot accounts not a bottleneck | TB has no row locks; batcher amortises; hot-account test · MVP |
+| BIL-011 | Internal biller catalogue and simulated biller settlement (MVP) | Account type 150 `BILLER_WALLET` / owner type 6 `BILLER` (BR-01-72); command 18 `post-bill-payment`, principal code 1017, guard 100 → 150 (BR-01-71); reversible (BR-01-73); WP-CR-1 · MVP |
+| BIL-012 | Mobile recharge via the operator catalogue, simulated fulfilment (MVP) | Command 19 `post-recharge`, principal code 1018, guard 100 → 150 (operator = MNO biller wallet) (BR-01-71); reversible (BR-01-73); WP-CR-1 · MVP |
 
 ## 3. Architecture
 
@@ -122,14 +129,14 @@ flowchart LR
   TB[(TigerBeetle 0.17.9)]
   RMQ[[RabbitMQ tb.cdc]]
   PG[(PostgreSQL svc_ledger)]
-  TXN -- "POST /v1/ledger/commands/{name} v1 (1-7)" --> LED
+  TXN -- "POST /v1/ledger/commands/{name} v1 (1-7, 18, 19)" --> LED
   PRC -- "POST /v1/ledger/commands/{name} v1 (7, 12, 13)" --> LED
   DSB -- "POST /v1/ledger/commands/post-disbursement-batch v1" --> LED
   TRS -- "POST /v1/ledger/commands/{name} v1 (9, 10, 11, 16)" --> LED
   FOP -- "POST /v1/ledger/commands/post-adjustment v1" --> LED
   SUP -- "POST /v1/ledger/commands/{name} v1 (14, 15)" --> LED
   CMP -- "POST /v1/ledger/commands/{name} v1 (14, 15)" --> LED
-  WAL -- "POST /v1/ledger/accounts v1 and post-closure-payout v1" --> LED
+  WAL -- "POST /v1/ledger/accounts v1 (incl. BILLER 150) and post-closure-payout v1" --> LED
   TRS -- "POST /v1/ledger/accounts v1 (TRUST)" --> LED
   GL -- "GET /v1/ledger/accounts/{id}/balance v1" --> LED
   FOP -- "GET /v1/ledger/system-balance-sheet v1" --> LED
@@ -286,6 +293,8 @@ sequenceDiagram
   L-->>T: 200 result OK, transferIds leg0 leg1 leg2, postedAt
   L--)J: async journal row (hash, OK, ids)
 ```
+
+The other payment commands (2–6, and 18 `post-bill-payment` / 19 `post-recharge` from CR-LEDGER-1) follow the same flow; only the guard (§5.1.5), the principal code and the emitted legs differ. For 18/19 the guard is customer 100 → biller 150, and a provider rejection after `OK` is compensated by transaction-service with a `post-reversal` (F4 without the hold leg, BR-01-73).
 
 **F2 — Replay / crash recovery (same commandId again)**
 
@@ -449,7 +458,7 @@ stateDiagram-v2
 | ADR | Decision | Why | Consequence |
 |---|---|---|---|
 | ADR-01 (WP-1) | One Gradle project, one image, two run roles (`api`, `cdc-bridge`) | Shared mapping code and DB; standalone build rule | Locally both roles run in one container |
-| ADR-02 (WP-3) | Journal is **write-behind** (group commit ≤ 5 ms) for `OK` results of the hot-path commands 1–6 and 12; the HTTP response does not wait. Every other journal row (all `REJECTED` decided before TB, all results of commands 7–11, 13–17) is written **synchronously** before responding, together with registry/audit rows | TB result is authoritative and must not get journal latency; pre-TB rejections must be final (TB never saw them); back-office commands audit in the same DB transaction | Replay asks the `command_rejection` table first, then TB; the journal is read only when TB reports `exists`/`id_already_failed`. Loss of a write-behind row is recoverable (TB `exists_with_different_*` still catches conflicts) |
+| ADR-02 (WP-3) | Journal is **write-behind** (group commit ≤ 5 ms) for `OK` results of the hot-path commands 1–6, 18, 19 and 12; the HTTP response does not wait. Every other journal row (all `REJECTED` decided before TB, all results of commands 7–11, 13–17) is written **synchronously** before responding, together with registry/audit rows | TB result is authoritative and must not get journal latency; pre-TB rejections must be final (TB never saw them); back-office commands audit in the same DB transaction | Replay asks the `command_rejection` table first, then TB; the journal is read only when TB reports `exists`/`id_already_failed`. Loss of a write-behind row is recoverable (TB `exists_with_different_*` still catches conflicts) |
 | ADR-03 (WP-2) | Max balance via the TB **balance-bounds recipe** (legs 5–8 against BOUNDS_CONTROL/BOUNDS_OPERATOR) | Atomic, no race between check and post | The two-phase fallback exists behind `bounds.mode=two-phase` for the spike only; it changes visible ids and events and needs an accepted CR before use in any shared environment (OPEN D-16) |
 | ADR-04 (WP-8) | `ledger.changes` from TB native AMQP CDC (`tigerbeetle amqp`) via RabbitMQ; fallback poller on `query_transfers` | Debezium cannot read TB | Mode switch is safe (shared cursor); consumers dedupe by `eventId` |
 | ADR-05 (WP-5) | Double reversal prevented by a Postgres `reversal_claim` row inserted **before** TB submission | Reversal ids derive from the reversal's own `commandId`, so TB cannot enforce "one reversal per original" | Claim deleted on every `REJECTED` except `ALREADY_REVERSED` |
@@ -457,13 +466,13 @@ stateDiagram-v2
 | ADR-07 (WP-7) | System balance sheet: exact totals of system/trust accounts + identity for the wallets total; per-wallet-type totals from the CDC projection (eventually consistent, `projectionAsOf` reported) | TB has no group-by; tens of millions of accounts cannot be summed per request | `byWalletType` lag alert > 10 s (OPEN D-45) |
 | ADR-08 (WP-2) | Transfer ids rendered as canonical UUID text of the big-endian u128; `ledger.changes` `eventId` = `transferId` | Consumers store ids in `uuid` columns and dedupe by `eventId` | Data contract `transfer-id-derivation` v1 |
 | ADR-09 (WP-3) | Account-type guards per command via an immutable-entry Caffeine cache | Defence in depth at < 0.1 ms; account code never changes | Misses are batched `lookup_accounts` |
-| ADR-10 (WP-4) | Two batcher lanes: `online` (commands 1–7, 9, 10, 11, 14, 15, 16, 17) and `bulk` (8, 12, 13); bulk has ≤ 1 in-flight TB request and yields while `online` has work | PER-010: bulk must not degrade online latency | Disbursement chains of one call stay in one TB request, in row order |
+| ADR-10 (WP-4) | Two batcher lanes: `online` (commands 1–7, 9, 10, 11, 14, 15, 16, 17, 18, 19) and `bulk` (8, 12, 13); bulk has ≤ 1 in-flight TB request and yields while `online` has work | PER-010: bulk must not degrade online latency | Disbursement chains of one call stay in one TB request, in row order |
 | ADR-11 (WP-3) | Pre-TB rejections are stored in a small synchronous table `command_rejection` and checked before every TB submission | A rejection that TB never saw must still be final for its `commandId` | One indexed Postgres read per command; Postgres down → commands return 503 (§9) |
 | ADR-12 (WP-2) | Every non-technical account carries the TB `history` flag (wallets, trust and system accounts 200–240, 400–420) | `ledger.changes` `*BalanceAfter` always present; consumers need no delta accumulation | TB flags are immutable: must be in place before the first `create_accounts` in any shared environment (laptops: `make reset`) |
 
 ### 3.7 Latency / throughput budget
 
-Service-side p99 ≤ 20 ms for commands 1–6 (single-replica local TB):
+Service-side p99 ≤ 20 ms for commands 1–6, 18, 19 (single-replica local TB):
 
 | Step | Budget |
 |---|---|
@@ -473,9 +482,9 @@ Service-side p99 ≤ 20 ms for commands 1–6 (single-replica local TB):
 | Batcher wait | ≤ 1 ms (`max-wait-micros` 500) |
 | TB request round trip | ≤ 10 ms |
 | Result resolution + response | ≤ 1 ms |
-| Journal write | off the response path for OK results of 1–6, 12 (ADR-02) |
+| Journal write | off the response path for OK results of 1–6, 18, 19, 12 (ADR-02) |
 
-Per-command p99 targets: 1–6 20 ms · 7 40 ms (two TB round trips) · 8 250 ms per 1,000 rows · 9, 10, 11, 16, 17 50 ms · 12, 13 50 ms · 14, 15 40 ms. Reads: balance p95 ≤ 10 ms, command lookup p99 ≤ 15 ms, system balance sheet p99 ≤ 30 ms.
+Per-command p99 targets: 1–6, 18, 19 20 ms · 7 40 ms (two TB round trips) · 8 250 ms per 1,000 rows · 9, 10, 11, 16, 17 50 ms · 12, 13 50 ms · 14, 15 40 ms. Reads: balance p95 ≤ 10 ms, command lookup p99 ≤ 15 ms, system balance sheet p99 ≤ 30 ms.
 
 Throughput: the system-wide design target is 5k TPS sustained (10k burst for 10 min). Every payment is one ledger command, so the ledger's share is the full 5k commands/s (avg ≈ 4 TB transfers each incl. bounds) plus disbursement rows at ≥ 1,000,000 rows/h on the bulk lane. Performance is never measured on a laptop.
 
@@ -566,7 +575,7 @@ CREATE TABLE IF NOT EXISTS account_type (
   is_system         boolean     NOT NULL,
   fixed_account_id  uuid,                                -- null for wallets and trust instances
   creatable_via_api boolean     NOT NULL DEFAULT false,
-  wallet_type_code  char(1),                             -- C/A/D/M/I for wallet types
+  wallet_type_code  char(1),                             -- C/A/D/M/I/B for wallet types
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 
@@ -576,6 +585,7 @@ INSERT INTO account_type (code,name,normal_side,tb_flags,is_system,fixed_account
  (120,'DISTRIBUTOR_WALLET','CREDIT','{debits_must_not_exceed_credits,history}',false,NULL,true,'D'),
  (130,'MERCHANT_WALLET','CREDIT','{debits_must_not_exceed_credits,history}',false,NULL,true,'M'),
  (140,'INSTITUTION_WALLET','CREDIT','{debits_must_not_exceed_credits,history}',false,NULL,true,'I'),
+ (150,'BILLER_WALLET','CREDIT','{debits_must_not_exceed_credits,history}',false,NULL,true,'B'),   -- CR-LEDGER-1
  (200,'FEE_INCOME','CREDIT','{history}',true,'00000000-0000-0000-0000-000000000200',false,NULL),
  (210,'VAT_PAYABLE','CREDIT','{history}',true,'00000000-0000-0000-0000-000000000210',false,NULL),
  (220,'COMMISSION_PAYABLE','CREDIT','{history}',true,'00000000-0000-0000-0000-000000000220',false,NULL),
@@ -595,8 +605,8 @@ ON CONFLICT (code) DO NOTHING;
 CREATE TABLE IF NOT EXISTS ledger_account (
   account_id        uuid PRIMARY KEY,
   account_code      smallint    NOT NULL REFERENCES account_type(code),
-  owner_type        text        NOT NULL CHECK (owner_type IN ('CUSTOMER','AGENT','DISTRIBUTOR','MERCHANT','INSTITUTION','SYSTEM')),
-  owner_type_code   smallint    NOT NULL,             -- = TB account user_data_32 (1,2,3,4,5,9)
+  owner_type        text        NOT NULL CHECK (owner_type IN ('CUSTOMER','AGENT','DISTRIBUTOR','MERCHANT','INSTITUTION','BILLER','SYSTEM')),
+  owner_type_code   smallint    NOT NULL,             -- = TB account user_data_32 (1,2,3,4,5,6,9)
   trust_index       smallint    CHECK (trust_index BETWEEN 1 AND 99),
   created_by        text        NOT NULL,             -- caller X-Actor-Id
   created_at        timestamptz NOT NULL DEFAULT now(),
@@ -608,7 +618,7 @@ CREATE TABLE IF NOT EXISTS ledger_account (
 CREATE INDEX IF NOT EXISTS ledger_account_code ON ledger_account (account_code);
 CREATE UNIQUE INDEX IF NOT EXISTS ledger_account_trust_idx ON ledger_account (trust_index) WHERE trust_index IS NOT NULL;
 
--- 4.1.3 Command journal (partitioned daily; retention 8 days). ADR-02: write-behind for OK of 1-6/12, synchronous otherwise.
+-- 4.1.3 Command journal (partitioned daily; retention 8 days). ADR-02: write-behind for OK of 1-6/18/19/12, synchronous otherwise.
 CREATE TABLE IF NOT EXISTS command_journal (
   command_id          uuid        NOT NULL,
   command_type        smallint    NOT NULL,           -- codes.yaml commandType
@@ -745,7 +755,9 @@ Mirror of `contracts/provided/`. On any conflict the artefact wins (kernel prece
 | `POST /v1/ledger/commands/release-hold` | service | SERVICE `support-service`, `compliance-service` | `commandId` | Command 15 |
 | `POST /v1/ledger/commands/post-trust-rebalance` | service | SERVICE `treasury-service` | `commandId` | Command 16 |
 | `POST /v1/ledger/commands/post-closure-payout` | service | SERVICE `wallet-service` | `commandId` | Command 17 |
-| `POST /v1/ledger/accounts` | service | SERVICE `wallet-service` (wallet types), `treasury-service` (TRUST) | `accountId` | Create account |
+| `POST /v1/ledger/commands/post-bill-payment` | service | SERVICE `transaction-service` | `commandId` | Command 18 (CR-LEDGER-1) |
+| `POST /v1/ledger/commands/post-recharge` | service | SERVICE `transaction-service` | `commandId` | Command 19 (CR-LEDGER-1) |
+| `POST /v1/ledger/accounts` | service | SERVICE `wallet-service` (wallet types incl. BILLER 150), `treasury-service` (TRUST) | `accountId` | Create account |
 | `POST /v1/ledger/accounts/{id}:close` | service | SERVICE `wallet-service` | deterministic close id | Close account |
 | `GET /v1/ledger/accounts/{id}/balance` | service | SERVICE `wallet-service`, `support-service`, `compliance-service`, `treasury-service`, `disbursement-service`, `pricing-service`, `general-ledger-service`; SYSTEM `general-ledger-service`; STAFF (any role); wallet holders for their own wallet | read-only | Balance |
 | `POST /v1/ledger/accounts/balances:batchGet` | service | SERVICE `finance-ops-service`, `treasury-service`, `wallet-service`, `general-ledger-service`; SYSTEM `general-ledger-service`; STAFF | read-only | Batch balances |
@@ -758,7 +770,7 @@ Mirror of `contracts/provided/`. On any conflict the artefact wins (kernel prece
 | `POST /v1/internal/ledger/integrity:verify` | internal | STAFF `ADMIN`, `AUDITOR` | naturally idempotent | Integrity check on a window |
 | `GET /v1/internal/ledger/cdc/status` | internal | STAFF (any role); SYSTEM (platform tools) | read-only | CDC bridge status |
 
-Every command is modelled as **its own OpenAPI operation with a literal path** (`/v1/ledger/commands/post-p2p`, …), so a consumer can pin exactly the command it calls. All 17 share the response schema `CommandResponse` (except 8: `DisbursementBatchResponse`).
+Every command is modelled as **its own OpenAPI operation with a literal path** (`/v1/ledger/commands/post-p2p`, …), so a consumer can pin exactly the command it calls. All 19 share the response schema `CommandResponse` (except 8: `DisbursementBatchResponse`).
 
 #### 5.1.1 Rules common to all commands
 
@@ -795,6 +807,8 @@ Caller identity is the `X-Actor-Id` value, checked against config `bitspay.ledge
 | 15 | `release-hold` | `support-service`, `compliance-service` | — | void pending | N | online |
 | 16 | `post-trust-rebalance` | `treasury-service` | — | single | Y | online |
 | 17 | `post-closure-payout` | `wallet-service` | wallet module; source wallet in `PENDING_CLOSURE` and destination a same-person wallet (caller-checked) | single | Y | online |
+| 18 | `post-bill-payment` | `transaction-service` | — | linked | Y | online |
+| 19 | `post-recharge` | `transaction-service` | — | linked | Y | online |
 
 Read operations: allowed callers as in the §5.1 summary table (same config, key per operation). `general-ledger-service` may call the balance, batch-balances and balance-sheet reads with `X-Actor-Type` `SERVICE` or `SYSTEM`. Wallet-holder actors (`CUSTOMER`, `AGENT`, `DISTRIBUTOR`, `MERCHANT`, `INSTITUTION`) may read `GET …/{id}/balance` only when `X-Actor-Wallet-Id = {id}`.
 
@@ -823,13 +837,13 @@ Ledger config (codes, not names; `bitspay.ledger.guards.*`). Mismatch → `REJEC
 
 | Type | Debit side (from) | Credit side (to) | Other |
 |---|---|---|---|
-| 1 | 100 | 100 | commission beneficiary (all of 1–6, when commission > 0) ∈ {110, 120} |
+| 1 | 100 | 100 | commission beneficiary (all of 1–6, 18, 19, when commission > 0) ∈ {110, 120} |
 | 2 | 110 | 100 | |
 | 3 | 100 | 110 | |
 | 4 | 100 | 130 | |
 | 5 | 130 | 100 | |
 | 6 | {110, 120} | {110, 120} | |
-| 7 | as the original legs | | original type ∈ {1–6, 8, 12} |
+| 7 | as the original legs | | original type ∈ {1–6, 8, 12, 18, 19} |
 | 8 | payer ∈ `disbursement.payer-codes` (seed {140}) | 100 | |
 | 9 | 300 | `emoney.issue-target-codes` {110, 120, 140, 240} | |
 | 10 | `emoney.redeem-source-codes` {110, 120, 130, 140, 200, 210, 230, 240} | 300 | |
@@ -839,10 +853,14 @@ Ledger config (codes, not names; `bitspay.ledger.guards.*`). Mismatch → `REJEC
 | 14 | {100, 110, 120, 130, 140} | 420 (fixed) | |
 | 16 | 300 | 300 | from ≠ to |
 | 17 | {100, 110, 120, 130, 140} | {100, 110, 120, 130, 140} | from ≠ to |
+| 18 | 100 | 150 | |
+| 19 | 100 | 150 | |
+
+`BILLER_WALLET` 150 is accepted only as the credit side of 18 and 19 (and, as an original leg account, by 7 and 11). It is not in the guards of 8, 9, 10, 12, 14 or 17 in the MVP (§13).
 
 #### 5.1.6 Command response (`CommandResponse`)
 
-HTTP 200 for `OK`, `EXISTS` and `REJECTED` (types 1–7 and 9–17; for type 8 each row result has this shape).
+HTTP 200 for `OK`, `EXISTS` and `REJECTED` (types 1–7 and 9–19; for type 8 each row result has this shape).
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
@@ -873,9 +891,9 @@ HTTP 200 for `OK`, `EXISTS` and `REJECTED` (types 1–7 and 9–17; for type 8 e
 | 409 | `IDEMPOTENCY_CONFLICT` | — | — | same `commandId`, different body (batch: only if every row conflicts) | never retry; bug alert |
 | 503 | `DEPENDENCY_UNAVAILABLE` | — | — | TB unreachable or no answer within `tb.request-timeout-ms`; ledger Postgres down | outcome unknown → retry same `commandId` and body, or resolve via the lookup |
 
-#### 5.1.7 Payment commands 1–6 (one body shape, `PaymentCommandRequest`)
+#### 5.1.7 Payment commands 1–6, 18, 19 (one body shape, `PaymentCommandRequest`)
 
-`POST /v1/ledger/commands/post-p2p` (1), `…/post-cash-in` (2), `…/post-cash-out` (3), `…/post-merchant-payment` (4), `…/post-merchant-refund` (5), `…/post-float-transfer` (6). Principal code = 1000 + type. Actors: SERVICE `transaction-service`. Leg templates §7.3.
+`POST /v1/ledger/commands/post-p2p` (1), `…/post-cash-in` (2), `…/post-cash-out` (3), `…/post-merchant-payment` (4), `…/post-merchant-refund` (5), `…/post-float-transfer` (6), `…/post-bill-payment` (18), `…/post-recharge` (19). Principal code = 1000 + type for 1–6; 1017 for 18 and 1018 for 19. Actors: SERVICE `transaction-service`. Leg templates §7.3. Commands 18 and 19 (CR-LEDGER-1, MVP) mirror `post-merchant-payment`'s request and response exactly; only the guard (100 → 150, §5.1.5) and the principal code differ.
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
@@ -925,7 +943,17 @@ Cash-out with commission (Karim → Salma):
 ```
 Response `OK`, `transferIds` = legs 0–4: `["c5b496e8-1aa9-093d-930a-e107848107c2", "aa8c5943-a9ea-25bf-1e15-2fbe19752f1f", "08f54db5-44b8-87b7-f16f-965f75f64b01", "127ae35f-10e2-5ac5-89f9-16c567ae0950", "dc466b2d-ca31-7df9-d5b5-01f5ec55fbe4"]`.
 
-Rejections (1–6): `INSUFFICIENT_FUNDS`, `MAX_BALANCE_EXCEEDED`, `ACCOUNT_NOT_FOUND`, `ACCOUNT_CLOSED`, `INVALID_AMOUNT`, `OTHER` (`ACCOUNT_TYPE_MISMATCH`, raw TB result).
+Bill payment (Rahim → DESCO biller wallet, 1,200 Tk, fee 5 Tk + VAT 0.75 Tk, bearer PAYER; command 18):
+```json
+{ "commandId": "0192f3e2-0000-7000-8000-000000000001", "txnRef": "BP26101400K7M2Q9XA",
+  "fromAccountId": "0192f2aa-0000-7000-8000-00000000a001", "toAccountId": "0192f2ee-0000-7000-8000-00000000e006", "amountPoisha": 120000,
+  "pricing": { "feePoisha": 500, "vatPoisha": 75, "feeBearer": "PAYER", "commissionPoisha": 0, "commissionSource": null,
+               "commissionBeneficiaryAccountId": null, "aitPoisha": 0 },
+  "constraints": null, "metadata": { "channel": "APP", "initiatorActorId": "0192f1bb-0000-7000-8000-000000000001" } }
+```
+Response `OK`, `transferIds` = legs 0–2: `["6e842c27-8041-53a9-bf9b-da45f13489ca", "769b1f8d-9d0e-66f2-8bd6-5ec5a628b60c", "b73d137a-0db5-ac9c-e8b9-75d5d844d8d1"]`. A recharge (19, e.g. 50 Tk to the GP biller wallet `…e007`, `feeBearer` OPERATOR, fee 0) has the same shape and returns leg 0 only (`a847315f-4048-d028-13bd-b433f171cf75` for `commandId` `0192f3e3-0000-7000-8000-000000000001`).
+
+Rejections (1–6, 18, 19): `INSUFFICIENT_FUNDS`, `MAX_BALANCE_EXCEEDED`, `ACCOUNT_NOT_FOUND`, `ACCOUNT_CLOSED`, `INVALID_AMOUNT`, `OTHER` (`ACCOUNT_TYPE_MISMATCH`, raw TB result).
 
 #### 5.1.8 `POST /v1/ledger/commands/post-reversal` (7)
 
@@ -935,7 +963,7 @@ Actors: SERVICE `transaction-service` (`commandId` = reversal `txnId`), `pricing
 |---|---|---|---|---|---|
 | commandId | uuid | Y | N | stable per attempt | |
 | txnRef | string | Y | N | 1..32 `[A-Z0-9-]` | |
-| originalCommandId | uuid | Y | N | original type ∈ {1–6, 8 (row `commandId`), 12} | other type (incl. a reversal) → `REJECTED OTHER NOT_REVERSIBLE`; unknown → `REJECTED ORIGINAL_NOT_FOUND` |
+| originalCommandId | uuid | Y | N | original type ∈ {1–6, 8 (row `commandId`), 12, 18, 19} | other type (incl. a reversal) → `REJECTED OTHER NOT_REVERSIBLE`; unknown → `REJECTED ORIGINAL_NOT_FOUND` |
 | reverseFee | bool | Y | N | false when partial; false for `pricing-service` | mirrors original legs 1–2 |
 | reverseCommission | bool | Y | N | false when partial; false for `pricing-service` | mirrors original legs 3–4 |
 | releaseHoldCommandId | uuid | N | Y | hold must be OPEN, on the original leg-0 **credit** account, created by `support-service` with `reasonCode` ∈ {`DISPUTE_HOLD`, `WRONG_TRANSFER_HOLD`} (OPEN D-16) | else `REJECTED HOLD_NOT_FOUND` |
@@ -1165,13 +1193,13 @@ Rejections: `INSUFFICIENT_FUNDS`, `MAX_BALANCE_EXCEEDED`, `ACCOUNT_NOT_FOUND`, `
 
 #### 5.1.19 `POST /v1/ledger/accounts`
 
-Actors: SERVICE `wallet-service` (wallet types 100–140), `treasury-service` (TRUST_SETTLEMENT only). Idempotent on `accountId`; `Idempotency-Key` optional and ignored. Writes `ledger_account` + audit `LEDGER_ACCOUNT_CREATED` in one DB transaction after TB `ok`/`exists`.
+Actors: SERVICE `wallet-service` (wallet types 100–140 and 150; the partner module creates one `BILLER_WALLET` per biller), `treasury-service` (TRUST_SETTLEMENT only). Idempotent on `accountId`; `Idempotency-Key` optional and ignored. Writes `ledger_account` + audit `LEDGER_ACCOUNT_CREATED` in one DB transaction after TB `ok`/`exists`.
 
 | Request field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | accountId | uuid | Y | N | wallet: UUIDv7 (= walletId; version nibble 7, timestamp prefix ≠ 0); TRUST: `00000000-0000-0000-0000-0000000300nn`, nn 01..99 | |
-| accountType | enum{CUSTOMER_WALLET, AGENT_WALLET, DISTRIBUTOR_WALLET, MERCHANT_WALLET, INSTITUTION_WALLET, TRUST_SETTLEMENT} | Y | N | other types are not creatable via API | |
-| ownerType | enum{CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION, SYSTEM} | Y | N | must match: CUSTOMER↔100, AGENT↔110, DISTRIBUTOR↔120, MERCHANT↔130, INSTITUTION↔140, SYSTEM↔300 | |
+| accountType | enum{CUSTOMER_WALLET, AGENT_WALLET, DISTRIBUTOR_WALLET, MERCHANT_WALLET, INSTITUTION_WALLET, BILLER_WALLET, TRUST_SETTLEMENT} | Y | N | other types are not creatable via API | |
+| ownerType | enum{CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION, BILLER, SYSTEM} | Y | N | must match: CUSTOMER↔100, AGENT↔110, DISTRIBUTOR↔120, MERCHANT↔130, INSTITUTION↔140, BILLER↔150, SYSTEM↔300 | |
 
 ```json
 { "accountId": "0192f2bb-0000-7000-8000-00000000b001", "accountType": "CUSTOMER_WALLET", "ownerType": "CUSTOMER" }
@@ -1303,7 +1331,7 @@ Actors: SERVICE `finance-ops-service`; STAFF. TB `get_account_transfers` (debits
 |---|---|---|---|---|---|
 | transferId | uuid | Y | N | | |
 | commandId | uuid | Y | N | `user_data_128` | |
-| commandType | int32 | Y | N | 1..17 | |
+| commandType | int32 | Y | N | 1..19 | |
 | legIndex | int32 | Y | N | 0..5 | |
 | code | int32 | Y | N | business code | |
 | direction | enum{DEBIT, CREDIT} | Y | N | relative to `{id}` | |
@@ -1378,7 +1406,7 @@ Actors: SERVICE `treasury-service`, `finance-ops-service`, `general-ledger-servi
 | systemAccounts[].pendingInPoisha | int64 (poisha) | N | N | present only for HOLD_CONTROL (420): credits_pending | |
 | walletsTotalPoisha | int64 (poisha) | Y | N | **wallets only** = `trustMirrorTotalPoisha − Σ systemAccounts[].balancePoisha` | exact |
 | eMoneyLiabilityPoisha | int64 (poisha) | Y | N | all wallets + e-money system accounts = `trustMirrorTotalPoisha` | exact |
-| byWalletType | array<object> | Y | N | one per wallet type 100–140 | eventually consistent (CDC projection), OPEN D-45 |
+| byWalletType | array<object> | Y | N | one per wallet type 100–150 | eventually consistent (CDC projection), OPEN D-45 |
 | byWalletType[].accountType | string | Y | N | | |
 | byWalletType[].balancePoisha | int64 (poisha) | Y | N | | |
 | byWalletType[].source | enum{PROJECTION} | Y | N | | |
@@ -1403,7 +1431,8 @@ Actors: SERVICE `treasury-service`, `finance-ops-service`, `general-ledger-servi
                     { "accountType": "AGENT_WALLET", "balancePoisha": 999785, "source": "PROJECTION" },
                     { "accountType": "DISTRIBUTOR_WALLET", "balancePoisha": 0, "source": "PROJECTION" },
                     { "accountType": "MERCHANT_WALLET", "balancePoisha": 0, "source": "PROJECTION" },
-                    { "accountType": "INSTITUTION_WALLET", "balancePoisha": 0, "source": "PROJECTION" } ],
+                    { "accountType": "INSTITUTION_WALLET", "balancePoisha": 0, "source": "PROJECTION" },
+                    { "accountType": "BILLER_WALLET", "balancePoisha": 0, "source": "PROJECTION" } ],
   "projectionAsOf": "2026-10-09T08:04:59.870Z", "projectionLagMs": 130, "identityHolds": true }
 ```
 (The eight system balances sum to 215, so `walletsTotalPoisha` = 100,000,000 − 215 = 99,999,785.)
@@ -1434,7 +1463,7 @@ Field-level schemas and examples: `contracts/provided/openapi.yaml`. Errors: 400
 - **aggregateType** `LedgerTransfer`; **aggregateId** = `debitAccountId` (= Kafka key).
 - **eventId = `transferId`** (canonical UUID text; the declared exception to the outbox-row rule). Consumers dedupe on `eventId`.
 - **correlationId** = `commandId`; **occurredAt** = TB timestamp converted to ms (3 digits); **producer** = `ledger-service`.
-- **When emitted:** one event per committed **business** TB transfer (codes 1001–1016 and 2001–2004), including pending creation (hold), void and post. Technical codes 9001–9099 are never published.
+- **When emitted:** one event per committed **business** TB transfer (codes 1001–1018 and 2001–2004), including pending creation (hold), void and post. Technical codes 9001–9099 are never published.
 - **Ordering:** ascending TB timestamp within the bridge; partitions are independent, so consumers guard by `timestamp` per account. Re-publication is possible (at-least-once delivery, e.g. after a bridge crash or a mode switch); reordering is not.
 - **Schema:** `contracts/provided/events/ledger.changes/LEDGER_TRANSFER_POSTED.v1.schema.json`.
 
@@ -1442,9 +1471,9 @@ Field-level schemas and examples: `contracts/provided/openapi.yaml`. Errors: 400
 |---|---|---|---|---|---|
 | `transferId` | uuid | Y | N | canonical UUID text | = envelope `eventId` |
 | `commandId` | uuid | Y | N | TB `user_data_128` | = envelope `correlationId`; disbursement: the row commandId |
-| `commandType` | int32 | Y | N | 1..17 (codes.yaml `commandType`) | TB `user_data_64` |
+| `commandType` | int32 | Y | N | 1..19 (codes.yaml `commandType`) | TB `user_data_64` |
 | `legIndex` | int32 | Y | N | 0..5 for business legs | reversal: 0 = hold void, 1..5 = mirror legs (all business) |
-| `code` | int32 | Y | N | business codes 1001–1016, 2001–2004 | technical codes never published |
+| `code` | int32 | Y | N | business codes 1001–1018, 2001–2004 | technical codes never published |
 | `debitAccountId` | uuid | Y | N | | = key / `aggregateId` |
 | `creditAccountId` | uuid | Y | N | | |
 | `amountPoisha` | int64 (poisha) | Y | N | ≥ 0 | void legs carry the pending amount |
@@ -1496,6 +1525,7 @@ Field rules:
 | 120 | DISTRIBUTOR_WALLET | same | credit | — | yes (DISTRIBUTOR) |
 | 130 | MERCHANT_WALLET | same | credit | — | yes (MERCHANT) |
 | 140 | INSTITUTION_WALLET | same | credit | — | yes (INSTITUTION) |
+| 150 | BILLER_WALLET (one per biller; CR-LEDGER-1) | same | credit | — | yes (BILLER) |
 | 200 | FEE_INCOME | `history` | credit | `00000000-0000-0000-0000-000000000200` | no |
 | 210 | VAT_PAYABLE | `history` | credit | `…000000000210` | no |
 | 220 | COMMISSION_PAYABLE | `history` | credit (debit balance allowed) | `…000000000220` | no |
@@ -1509,13 +1539,13 @@ Field rules:
 | 900 | BOUNDS_CONTROL (technical) | `credits_must_not_exceed_debits` | either (net 0) | `…000000000900` | no |
 | 910 | BOUNDS_OPERATOR (technical) | — | either (net 0) | `…000000000910` | no |
 
-Owner type codes (`ownerType`): 1 CUSTOMER, 2 AGENT, 3 DISTRIBUTOR, 4 MERCHANT, 5 INSTITUTION, 9 SYSTEM. Wallet ids are UUIDv7 (timestamp prefix ≠ 0), so they never collide with system ids. Codes are provisional until Finance confirms the chart of accounts (SRS Appendix B-08) — consumers treat them as config. No account type exists for unclaimed balances (OPEN D-35).
+Owner type codes (`ownerType`): 1 CUSTOMER, 2 AGENT, 3 DISTRIBUTOR, 4 MERCHANT, 5 INSTITUTION, 6 BILLER (→ 150), 9 SYSTEM. Wallet ids are UUIDv7 (timestamp prefix ≠ 0), so they never collide with system ids. Codes are provisional until Finance confirms the chart of accounts (SRS Appendix B-08) — consumers treat them as config. No account type exists for unclaimed balances (OPEN D-35).
 
-**Transfer codes** (`transferCode`): 1001 P2P_PRINCIPAL · 1002 CASH_IN_PRINCIPAL · 1003 CASH_OUT_PRINCIPAL · 1004 MERCHANT_PAYMENT_PRINCIPAL · 1005 MERCHANT_REFUND_PRINCIPAL · 1006 FLOAT_TRANSFER_PRINCIPAL · 1007 DISBURSEMENT_PRINCIPAL · 1008 EMONEY_ISSUE · 1009 EMONEY_REDEEM · 1010 ADJUSTMENT · 1011 CAMPAIGN_REWARD · 1012 COMMISSION_SETTLEMENT · 1013 REVERSAL (mirror of any leg) · 1014 LIEN (pending, and its void) · 1015 TRUST_REBALANCE · 1016 CLOSURE_PAYOUT · 2001 FEE · 2002 VAT · 2003 COMMISSION · 2004 AIT. Technical (range 9001–9099 reserved, net-zero, never published): 9001 BOUNDS_SET · 9002 BOUNDS_CHECK · 9003 BOUNDS_VOID · 9004 BOUNDS_RESET · 9005 ACCOUNT_CLOSE.
+**Transfer codes** (`transferCode`): 1001 P2P_PRINCIPAL · 1002 CASH_IN_PRINCIPAL · 1003 CASH_OUT_PRINCIPAL · 1004 MERCHANT_PAYMENT_PRINCIPAL · 1005 MERCHANT_REFUND_PRINCIPAL · 1006 FLOAT_TRANSFER_PRINCIPAL · 1007 DISBURSEMENT_PRINCIPAL · 1008 EMONEY_ISSUE · 1009 EMONEY_REDEEM · 1010 ADJUSTMENT · 1011 CAMPAIGN_REWARD · 1012 COMMISSION_SETTLEMENT · 1013 REVERSAL (mirror of any leg) · 1014 LIEN (pending, and its void) · 1015 TRUST_REBALANCE · 1016 CLOSURE_PAYOUT · 1017 BILL_PAY_PRINCIPAL · 1018 RECHARGE_PRINCIPAL · 2001 FEE · 2002 VAT · 2003 COMMISSION · 2004 AIT. Technical (range 9001–9099 reserved, net-zero, never published): 9001 BOUNDS_SET · 9002 BOUNDS_CHECK · 9003 BOUNDS_VOID · 9004 BOUNDS_RESET · 9005 ACCOUNT_CLOSE.
 
 **Transfer user data:** `user_data_128` = `commandId` (row commandId for disbursement); `user_data_64` = command type code; `user_data_32` = leg index.
 
-**Command types** (`commandType`): §5.1.2 table. **Command results** (`commandResult`): OK, EXISTS, REJECTED. **Rejection codes** (`rejectionCode`): §5.1.6. **Detail tokens** callers may branch on (`rejectionDetailToken`): `NOT_REVERSIBLE`, `ACCOUNT_TYPE_MISMATCH`, `TRUST_ATTRIBUTION_EXCEEDED`, `id_already_failed`, `IDEMPOTENCY_CONFLICT` (batch rows only). Other sets: `feeBearer`, `commissionSource`, `transferFlag`, `transferDirection`, `balanceSource`, `accountCreateResult`.
+**Command types** (`commandType`): §5.1.2 table. **Command results** (`commandResult`): OK, EXISTS, REJECTED. **Rejection codes** (`rejectionCode`): §5.1.6. **Detail tokens** callers may branch on (`rejectionDetailToken`): `NOT_REVERSIBLE`, `ACCOUNT_TYPE_MISMATCH`, `TRUST_ATTRIBUTION_EXCEEDED`, `id_already_failed`, `IDEMPOTENCY_CONFLICT` (batch rows only). Other sets: `feeBearer` and `commissionSource` (payment commands 1–6, 18, 19), `transferFlag`, `transferDirection`, `balanceSource`, `accountCreateResult`.
 
 **Problem reasons** (`problemReasons`): `STATE_CONFLICT` / `BALANCE_NOT_ZERO`, `OPEN_HOLDS`, `SYSTEM_ACCOUNT` on `POST /v1/ledger/accounts/{id}:close`; kernel-reserved `INVALID_CURSOR` on `GET …/transfers`. **Problem extensions:** none.
 
@@ -1529,7 +1559,7 @@ Owner type codes (`ownerType`): 1 CUSTOMER, 2 AGENT, 3 DISTRIBUTOR, 4 MERCHANT, 
 
 | Id | Version | File | Kind | Content |
 |---|---|---|---|---|
-| `transfer-id-derivation` | 1 | `contracts/provided/data/transfer-id-derivation.v1.md` | algorithm | `transferId(commandId, legIndex)`, text form, leg index conventions, UUID ↔ u128, close command id |
+| `transfer-id-derivation` | 1 | `contracts/provided/data/transfer-id-derivation.v1.md` | algorithm | `transferId(commandId, legIndex)`, text form, leg index conventions (payments 1–6, 18, 19), UUID ↔ u128, close command id |
 | `transfer-id-golden-vectors` | 1 | `contracts/provided/data/transfer-id-golden-vectors.v1.json` | golden vectors | the vectors below + u128 halves + close id example |
 
 ```
@@ -1585,7 +1615,7 @@ ledger-service calls **no other Bits Pay service** and consumes **no Kafka topic
 
 Rejected back-office commands are audited with `outcome: "FAILURE"` (`after` = the rejection code and detail). An `EXISTS` replay writes no audit row.
 
-**Declared exceptions to kernel K6:** commands 1–6 (payments) and 12 (campaign reward) write **no** audit row: they are high-volume, the calling service audits the business action, and every posting is on `ledger.changes`. Read operations and the internal status endpoints write none. `POST /v1/internal/ledger/integrity:verify` audits only the mismatches it finds.
+**Declared exceptions to kernel K6:** commands 1–6, 18, 19 (payments) and 12 (campaign reward) write **no** audit row: they are high-volume, the calling service audits the business action, and every posting is on `ledger.changes`. Read operations and the internal status endpoints write none. `POST /v1/internal/ledger/integrity:verify` audits only the mismatches it finds.
 
 ### 6.2 Infrastructure dependencies (not contracts)
 
@@ -1608,8 +1638,8 @@ None.
 
 ### 7.1 Accounts
 
-- **BR-01-01** Every TB account: `ledger = 1`, `code` = account type code, `flags` from `account_type.tb_flags`, `user_data_32` = owner type code (1 customer, 2 agent, 3 distributor, 4 merchant, 5 institution, 9 system), `user_data_128 = 0`, `user_data_64 = 0`, `timestamp = 0`.
-- **BR-01-02** Wallet account id = wallet UUID (UUIDv7). Owner type ↔ account type must match (CUSTOMER↔100, AGENT↔110, DISTRIBUTOR↔120, MERCHANT↔130, INSTITUTION↔140, SYSTEM↔300); mismatch → 400. A trust account id must be `00000000-0000-0000-0000-0000000300nn` (nn 01..99, `trust_index` = nn).
+- **BR-01-01** Every TB account: `ledger = 1`, `code` = account type code, `flags` from `account_type.tb_flags`, `user_data_32` = owner type code (1 customer, 2 agent, 3 distributor, 4 merchant, 5 institution, 6 biller, 9 system), `user_data_128 = 0`, `user_data_64 = 0`, `timestamp = 0`.
+- **BR-01-02** Wallet account id = wallet UUID (UUIDv7). Owner type ↔ account type must match (CUSTOMER↔100, AGENT↔110, DISTRIBUTOR↔120, MERCHANT↔130, INSTITUTION↔140, BILLER↔150, SYSTEM↔300); mismatch → 400. A trust account id must be `00000000-0000-0000-0000-0000000300nn` (nn 01..99, `trust_index` = nn).
 - **BR-01-03** On every `api` start-up, `SystemAccountBootstrap` calls `create_accounts` for all rows with `fixed_account_id` (200–240, 400, 410, 420, 900, 910). `ok`/`exists` → fine; `exists_with_different_*` → fail start-up (mis-configured cluster, e.g. created before the `history` flag was added — ADR-12; laptops `make reset`). Trust accounts `…0300nn` are created only by treasury via the API.
 - **BR-01-04** UUID ↔ TB u128: `hi = uuid.getMostSignificantBits()`, `lo = uuid.getLeastSignificantBits()`; pass `UInt128.asBytes(lo, hi)` to the Java client (TB byte arrays are little-endian — never pass the UUID bytes directly). Round trip `00000000-0000-0000-0000-000000000200` ↔ u128 `0x200`.
 - **BR-01-09** The account-type guard (§5.1.5) uses `AccountTypeCache`; a cache miss is one batched `lookup_accounts`. An id that TB does not know → `REJECTED ACCOUNT_NOT_FOUND` (pre-TB rejection, journaled synchronously). Technical ids 900/910 always count as not found.
@@ -1640,11 +1670,11 @@ None.
 
 Accounts: F = from, T = to, FEE = `…0200`, VAT = `…0210`, CP = `…0220`, AIT = `…0230`, CF = `…0240`, HC = `…0420`, SUS = `…0400`, BC = `…0900` (bounds control), BO = `…0910` (bounds operator). "bearer" = F if `feeBearer = PAYER`, T if `PAYEE`; `OPERATOR` requires fee = vat = 0. "src" = `commissionSource` (FEE or CP). "ben" = `commissionBeneficiaryAccountId`.
 
-**Types 1–6 (payments)**
+**Types 1–6, 18, 19 (payments)**
 
 | Leg | Debit | Credit | Amount | Code | Flags | When |
 |---|---|---|---|---|---|---|
-| 0 | F | T | amount | 1001 / 1002 / 1003 / 1004 / 1005 / 1006 | linked\* | always |
+| 0 | F | T | amount | 1001 / 1002 / 1003 / 1004 / 1005 / 1006; 18 → 1017, 19 → 1018 | linked\* | always |
 | 1 | bearer | FEE | fee | 2001 | linked\* | fee > 0 |
 | 2 | bearer | VAT | vat | 2002 | linked\* | vat > 0 |
 | 3 | src | ben | commission − ait | 2003 | linked\* | commission > 0 and commission − ait > 0 |
@@ -1661,6 +1691,8 @@ Worked examples (Salma = agent, Nirob Store = merchant):
 - **Cash-out** Karim → Salma 500 Tk, fee 750, VAT 112, commission 300 (source FEE_INCOME, beneficiary Salma), AIT 30: leg 0 Karim → Salma 50,000 (1003); leg 1 Karim → FEE 750; leg 2 Karim → VAT 112; leg 3 FEE → Salma 270; leg 4 FEE → AIT 30. Karim debited 50,862.
 - **Cash-in** Salma → Rahim 1,000 Tk, fee 0, commission 400 from COMMISSION_PAYABLE, AIT 40: leg 0 Salma → Rahim 100,000 (1002); leg 3 CP → Salma 360; leg 4 CP → AIT 40. Legs 1, 2 skipped (indexes kept).
 - **Merchant payment** Rahim → Nirob Store 350 Tk, MDR 525 + VAT 79, bearer PAYEE: leg 0 Rahim → Nirob 35,000 (1004); leg 1 Nirob → FEE 525; leg 2 Nirob → VAT 79. When a bound is set, it is checked after the fee legs (Nirob's net credit 34,396).
+- **Bill payment** (18) Rahim → DESCO biller wallet 1,200 Tk, fee 500, VAT 75, bearer PAYER, no commission: leg 0 Rahim → DESCO 120,000 (1017); leg 1 Rahim → FEE 500; leg 2 Rahim → VAT 75. Rahim debited 120,575; legs 3, 4 skipped.
+- **Recharge** (19) Rahim → GP biller wallet 50 Tk, bearer OPERATOR, fee 0: leg 0 Rahim → GP 5,000 (1018) only.
 
 **Type 7 post-reversal** — BR-01-40..47.
 
@@ -1683,6 +1715,8 @@ Worked examples (Salma = agent, Nirob Store = merchant):
 **Type 16 post-trust-rebalance** — money moves from bank account `from` to bank account `to`, so the mirror of `to` grows: **debit `toTrustAccountId`, credit `fromTrustAccountId`**, code 1015. TB `exceeds_debits` on `from` → `INSUFFICIENT_FUNDS` (`TRUST_ATTRIBUTION_EXCEEDED`). Total e-money unchanged.
 
 **Type 17 post-closure-payout** — leg 0: debit `fromAccountId`, credit `toAccountId`, code 1016, `user_data_64 = 17`; legs 5–8 when `constraints` set. Guard {100–140} → {100–140}, from ≠ to (`REJECTED INVALID_AMOUNT`). Audited (`LEDGER_CLOSURE_PAYOUT_POSTED`).
+
+**Types 18 post-bill-payment and 19 post-recharge** — the payment template above (BR-01-71); principal code 1017 / 1018, `user_data_64` = 18 / 19.
 
 ### 7.4 Max balance (balance-bounds recipe, ADR-03)
 
@@ -1735,7 +1769,7 @@ Worked examples (Salma = agent, Nirob Store = merchant):
 
 ### 7.7 Reversal
 
-- **BR-01-40** Allowed original command types: 1–6, 8 (row `commandId`), 12. Others (incl. 7) → `REJECTED OTHER` `detail: "NOT_REVERSIBLE"`. When `X-Actor-Id = pricing-service`: the original must be type 12 (else `NOT_REVERSIBLE`) and `reverseFee = reverseCommission = false` (else 400).
+- **BR-01-40** Allowed original command types: 1–6, 8 (row `commandId`), 12, 18, 19. Others (incl. 7) → `REJECTED OTHER` `detail: "NOT_REVERSIBLE"`. When `X-Actor-Id = pricing-service`: the original must be type 12 (else `NOT_REVERSIBLE`) and `reverseFee = reverseCommission = false` (else 400).
 - **BR-01-41** Claim first: `INSERT INTO reversal_claim(original, reversal, 'CLAIMED') ON CONFLICT DO NOTHING`; if the existing row's `reversal_command_id ≠ commandId` → `REJECTED ALREADY_REVERSED`. Same `commandId` → continue (retry).
 - **BR-01-42** `lookup_transfers` for `transferId(originalCommandId, 0..4)`. Leg 0 missing → `REJECTED ORIGINAL_NOT_FOUND`. With `releaseHoldCommandId`, the hold must be OPEN in the registry, `hold.account_id` = original leg-0 `creditAccountId`, `hold.created_by_service = support-service` and `hold.reason_code` ∈ {`DISPUTE_HOLD`, `WRONG_TRANSFER_HOLD`}; otherwise → `REJECTED HOLD_NOT_FOUND` (OPEN D-16). A partial `amountPoisha` > original principal → 400 (after the lookup).
 - **BR-01-43** Chain: leg 0 (only with `releaseHoldCommandId`) = void of the hold (as type 15); leg `1 + i` = mirror of original leg `i`: debit = original credit, credit = original debit, same amount (principal: `amountPoisha` when partial), code 1013, `user_data_64 = 7`, `user_data_32 = 1 + i`. Original legs 1–2 only if `reverseFee`, legs 3–4 only if `reverseCommission`; principal always. All legs 0–5 are business legs.
@@ -1779,6 +1813,12 @@ Reconciliation term mapping (informative, the shape above is authoritative): `wa
 
 - **BR-01-70** `row_mac = HMAC-SHA256(LEDGER_JOURNAL_MAC_KEY, command_id|command_type|request_hash|result|rejection_code|transfer_ids|created_at)`. `IntegrityVerifier` (hourly, sample 1,000 rows/hour, plus on demand): recompute the MAC; for `OK` rows check every `transfer_id` exists in TB with `user_data_128 = command_id`. Mismatch → `LEDGER_INTEGRITY_MISMATCH` audit + `bitspay_ledger_integrity_mismatch_total` (page).
 
+### 7.13 Bill payment and recharge (CR-LEDGER-1, MVP)
+
+- **BR-01-71** Commands 18 `post-bill-payment` and 19 `post-recharge` are payment commands: body `PaymentCommandRequest`, the leg template of types 1–6 (0 principal, 1 FEE 2001, 2 VAT 2002, 3 COMMISSION 2003, 4 AIT 2004, 5–8 bounds), the same semantic rules and `feeBearer` / `commissionSource` semantics, guard 100 `CUSTOMER_WALLET` → 150 `BILLER_WALLET`, principal 1017 / 1018, lane `online`, write-behind journal (ADR-02), no audit row (§6.1 declared exception), caller `transaction-service` only. The ledger does not know billers, references or MSISDNs; the biller catalogue and the simulated provider live in wallet-service and transaction-service.
+- **BR-01-72** `BILLER_WALLET` 150 (normal side credit, flags `debits_must_not_exceed_credits`, `history`) is one account per biller (account id = the biller's wallet id), owner type 6 `BILLER`, created by wallet-service via `POST /v1/ledger/accounts`. It counts as a wallet in `walletsTotalPoisha`, `eMoneyLiabilityPoisha` and `byWalletType`. In the MVP it is accepted only by the guards of 18, 19 (credit side), 7 (as an original leg account) and 11.
+- **BR-01-73** Originals of type 18 and 19 are reversible by `post-reversal` (BR-01-40..47 unchanged): the principal mirror debits the biller wallet, fee/VAT mirrors follow `reverseFee`. transaction-service uses this when the simulated biller provider rejects after ledger `OK`; a biller wallet cannot carry a hold in the MVP, so such reversals never send `releaseHoldCommandId`.
+
 ## 8. Configuration
 
 | Property | Default | Meaning | Provisional / OPEN |
@@ -1791,7 +1831,7 @@ Reconciliation term mapping (informative, the shape above is authoritative): `wa
 | `bitspay.ledger.batch.max-wait-micros` | 500 | batch window | tune in WP-4 |
 | `bitspay.ledger.batch.max-inflight` | 8 (online) / 1 (bulk) | | |
 | `bitspay.ledger.bounds.mode` | `recipe` | `recipe` \| `two-phase` (spike only, needs CR) \| `off` (tests only) | OPEN D-16 |
-| `bitspay.ledger.journal.mode` | `full` | `full` \| `backoffice-and-rejections` (skip write-behind OK rows of 1–6, 12 if PG write load is a problem) | |
+| `bitspay.ledger.journal.mode` | `full` | `full` \| `backoffice-and-rejections` (skip write-behind OK rows of 1–6, 18, 19, 12 if PG write load is a problem) | |
 | `bitspay.ledger.journal.retention-days` | 8 | journal and `command_rejection` | |
 | `bitspay.ledger.journal.flush-ms` / `.max-batch` | 5 / 2000 | write-behind group commit | |
 | `bitspay.ledger.journal.buffer-max-rows` | 100000 | write-behind buffer before 503 | |
@@ -1817,7 +1857,7 @@ Reconciliation term mapping (informative, the shape above is authoritative): `wa
 | Aspect | Target / behaviour |
 |---|---|
 | Throughput | System design target 5k TPS sustained (10k burst for 10 min): the ledger carries every payment, so ≥ 5,000 commands/s (P2P mix, ≈ 4 TB transfers each incl. bounds) with `api` scaled horizontally; ≥ 1,000,000 disbursement rows/h concurrently with online load, online p99 degrading ≤ 10 %. Never measured on a laptop; WP-4 records a local baseline only |
-| Latency | Commands 1–6 p99 ≤ 20 ms, p50 ≤ 5 ms at the service; other commands per §3.7; balance p95 ≤ 10 ms; command lookup p99 ≤ 15 ms; balance sheet p99 ≤ 30 ms |
+| Latency | Commands 1–6, 18, 19 p99 ≤ 20 ms, p50 ≤ 5 ms at the service; other commands per §3.7; balance p95 ≤ 10 ms; command lookup p99 ≤ 15 ms; balance sheet p99 ≤ 30 ms |
 | Hot accounts | FEE_INCOME, VAT_PAYABLE, BC/BO and a busy merchant (Nirob Store) receiving thousands of transfers/s: no latency degradation vs cold accounts (PER-013 test) |
 | Scaling | `api` stateless, horizontal; TB single cluster (6 replicas in production, 1 in Compose); CDC bridge single active instance (scale = batch size) |
 | Availability | TB down → 503 on commands and reads, readiness DOWN (`tigerbeetle` health = `lookup_accounts([FEE_INCOME])` ≤ 500 ms). Postgres down → commands 503 (the `command_rejection` check and synchronous journal/registry writes need it); balance/batch/lookup-by-TB reads keep working; write-behind journal rows buffered up to 100k. Kafka/RabbitMQ down → API unaffected; the bridge lags (alert) |
@@ -1849,15 +1889,17 @@ Plus the kernel K8.4 HTTP and outbox metrics. **Alert conditions** (rules are no
 
 ## 10. Work packages (build order for Claude Code)
 
+Scope tags: `[MVP]` = needed by the MVP release (SRS v1.2); `[R1+]` = no MVP caller. WP-CR-1 is applied after WP-3 and before WP-9.
+
 Every WP ends with `./gradlew check` green, OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated and `make verify` green. No other Bits Pay service is ever needed: TB, Postgres, RabbitMQ and Kafka come from Testcontainers or the Compose stack. Branch `ledger-service/wp-<n>-<slug>`.
 
-### WP-1 Skeleton & contracts
+### WP-1 [MVP] Skeleton & contracts
 - Goal: the project builds, runs in Compose and serves every provided operation.
-- Scope: standalone Gradle project from the build template (Java 25, Spring Boot 4.1, virtual threads, Actuator on 9101, JSON logs); `ActorContextFilter`, `@RequiresActor`, `CallerPolicy` (config seeded from §5.1.2), problem+json mapper (kernel codes, `reason`); controllers + DTOs for **all 29 operations** returning `501`, generated from/compared with `contracts/provided/openapi.yaml`; Flyway `V1__init.sql` (§4.1) incl. outbox/inbox; partition maintenance skeleton; Testcontainers base `TbPostgresIT` (TB 0.17.9 `--development`, Postgres 18); `ArchitectureTest` (ArchUnit): layer dependencies controller → service → repository / client / messaging, only `client` (`TbGateway` and its batchers) imports `com.tigerbeetle`, no `double`/`float` in money packages; provider contract tests (red).
+- Scope: standalone Gradle project from the build template (Java 25, Spring Boot 4.1, virtual threads, Actuator on 9101, JSON logs); `ActorContextFilter`, `@RequiresActor`, `CallerPolicy` (config seeded from §5.1.2), problem+json mapper (kernel codes, `reason`); controllers + DTOs for **all 31 operations** (29 + the two of CR-LEDGER-1) returning `501`, generated from/compared with `contracts/provided/openapi.yaml`; Flyway `V1__init.sql` (§4.1) incl. outbox/inbox; partition maintenance skeleton; Testcontainers base `TbPostgresIT` (TB 0.17.9 `--development`, Postgres 18); `ArchitectureTest` (ArchUnit): layer dependencies controller → service → repository / client / messaging, only `client` (`TbGateway` and its batchers) imports `com.tigerbeetle`, no `double`/`float` in money packages; provider contract tests (red).
 - Acceptance: app starts in Compose; Swagger lists all operations; Flyway from an empty `svc_ledger` twice is idempotent; a test proves `svc_ledger` cannot read another schema; ArchUnit fails on a planted violation; 403 for an unlisted caller on every command.
 - Depends on: —.
 
-### WP-2 TigerBeetle spike, gateway, early ledger (critical path)
+### WP-2 [MVP] TigerBeetle spike, gateway, early ledger (critical path)
 - Goal: prove TB 0.17.9 mechanics with executable tests, then let callers post real money.
 - Scope: `TransferIds` + golden vectors (§5.4), UUID ↔ u128; `TbGateway` (create_accounts, create_transfers, lookup_accounts, lookup_transfers); **`TbBehaviourSpikeIT`** (kept forever as the TB upgrade gate; results recorded in `docs/TB-NOTES.md` and ADR-03):
   - `linkedChain_failureInLastLeg_rollsBackAll`
@@ -1874,45 +1916,52 @@ Every WP ends with `./gradlew check` green, OpenAPI drift check green against `c
 - Acceptance: all spike tests green and documented; in Compose: create TRUST #01 and two customer wallets, issue 10,000 Tk, P2P returns `OK`, replay `EXISTS`, overdraft `REJECTED INSUFFICIENT_FUNDS`.
 - Depends on: WP-1.
 
-### WP-3 Payment commands, idempotency, journal, max balance
+### WP-3 [MVP] Payment commands, idempotency, journal, max balance
 - Scope: `LegTemplates` for 1–6 with guards (§5.1.5) and bounds legs 5–8; semantic rules and the 400-vs-REJECTED split (§5.1.4); `ResultResolver` (BR-01-14) + mapping §7.6 (table-driven); `command_rejection` (ADR-11) + `JournalWriter` write-behind (ADR-02), `request_hash`, `row_mac`; replay path with the 50 ms journal wait; BR-01-13; final command-lookup semantics; jqwik properties.
 - Acceptance: §11 groups A and B green; contract tests for every command 1–6 request/response against `openapi.yaml`.
 - Depends on: WP-2.
 
-### WP-4 Batcher and local performance baseline
+### WP-4 [MVP] Batcher and local performance baseline
 - Scope: `TbBatcher` with lanes (BR-01-50..52), `ReadBatcher` (BR-01-53), `CompletableFuture` slicing; concurrency test 200 threads × 500 P2P across 1,000 wallets (zero-sum, replays all `EXISTS`); hot-account scenario (all to Nirob Store); disbursement concurrently; record a local baseline in `docs/PERF.md` and tune `max-wait-micros`.
 - Acceptance: batch-size histogram shows batching under load; online p99 unchanged (± 10 %) while a 100k-row disbursement runs; no laptop number is reported as a performance result.
 - Depends on: WP-3.
 
-### WP-5 Holds, reversal, account close, closure payout
+### WP-5 [MVP] Holds, reversal, account close, closure payout
 - Scope: create-hold / release-hold (14, 15) + `hold` registry + audit; post-reversal (BR-01-40..47) incl. hold release in the same chain, claim rules, partial reversal; `POST …/{id}:close` (BR-01-35); `GET /v1/ledger/holds`; `post-closure-payout` (17).
 - Acceptance: P2P Rahim → Karim, hold on Karim 500 Tk (`WRONG_TRANSFER_HOLD` by support-service), reversal with `releaseHoldCommandId` → Rahim restored (incl. fee if `reverseFee`); second reversal with a new `commandId` → `ALREADY_REVERSED`; a reversal rejected `HOLD_NOT_FOUND` releases the claim and a new `commandId` then succeeds; an `AML_LIEN` hold cannot be voided by a reversal; 50 concurrent reversals of one original with 50 `commandId`s → exactly one `OK`; closure payout then `:close` → later transfer `ACCOUNT_CLOSED`, SUSPENSE still open.
 - Depends on: WP-3.
 
-### WP-6 Back-office and bulk commands
+### WP-6 [MVP] Back-office and bulk commands
+- Scope tag: commands 9, 10, 11, 16 are MVP (treasury); commands 8, 12, 13 are **[R1+]** (no MVP caller) and may be finished after the MVP without blocking it.
 - Scope: commands 8, 9, 10, 11, 12, 13, 16 with templates §7.3 and caller policy (incl. the pricing-service reversal rule); `audit.events` via the outbox for back-office commands (Debezium + polling relay).
 - Acceptance: issue 1,000,000 Tk to a distributor; a 5,000-row batch with 8 rows to closed/unknown accounts → 4,992 OK, 8 REJECTED; re-run the same batch → 4,992 EXISTS + 8 REJECTED; redeem more than the trust attribution → `INSUFFICIENT_FUNDS TRUST_ATTRIBUTION_EXCEEDED`; rebalance keeps the trust total constant; audit rows present for each back-office command.
 - Depends on: WP-4, WP-5.
 
-### WP-7 Read APIs and system balance sheet
+### WP-7 [MVP] Read APIs and system balance sheet
 - Scope: `balances:batchGet`, `…/transfers` (with `balanceAfterPoisha`, cursor per kernel K3.4), system balance sheet (BR-01-60..63; projection fields present, may be 0 until WP-8); internal operations (chart of accounts, raw account); `BoundsMonitor`.
 - Acceptance: identity test after 10k random commands: `walletsTotalPoisha` equals the brute-force sum of wallet balances; history paging returns every transfer exactly once; tampered cursor → `400 INVALID_CURSOR`.
 - Depends on: WP-6.
 
-### WP-8 CDC bridge
+### WP-8 [MVP] CDC bridge
 - Scope: `cdc-bridge` role, RabbitMQ consumer, mapping (BR-01-21), Kafka producer, projection + cursor (BR-01-22), filtering (BR-01-25), `reasonCode` for 10/11 (BR-01-19); poll fallback (BR-01-23) with advisory-lock leadership; `GET /v1/internal/ledger/cdc/status`; ADR-04 final.
 - Acceptance: IT with TB + RabbitMQ + Kafka + Postgres: 1,000 commands → exactly the expected business transfers on `ledger.changes` (none with code ≥ 9000), every envelope validates against `LEDGER_TRANSFER_POSTED.v1.schema.json` and the kernel envelope, `*BalanceAfter` non-null for every account incl. system accounts; kill the bridge mid-batch → restart → no event missing, projection totals equal brute-force sums; same in poll mode.
 - Depends on: WP-7.
 
-### WP-9 Integration on the Compose stack
-- Scope: run in the full stack with both roles; callers switch from WireMock to the real ledger; walk the milestone scenarios by hand (P2P, cash-in/out, merchant payment, wrong-transfer reversal, disbursement, e-money issue/redeem) through Swagger/curl; watch `ledger.changes` and `audit.events` in Kafka UI.
+### WP-9 [MVP] Integration on the Compose stack
+- Scope: run in the full stack with both roles; callers switch from WireMock to the real ledger; walk the milestone scenarios by hand (P2P, cash-in/out, merchant payment and refund, bill payment, recharge, wrong-transfer reversal, e-money issue/redeem; disbursement [R1+]) through Swagger/curl; watch `ledger.changes` and `audit.events` in Kafka UI.
 - Acceptance: scenarios pass on the stack; Swagger reachable through the edge proxy; healthy within 448 MB.
 - Depends on: WP-8.
 
-### WP-10 Hardening
+### WP-10 [MVP] Hardening
 - Scope: chaos on the Compose stack (kill `api` during load — callers retry, no duplicates; stop Postgres — commands 503 and recover; stop RabbitMQ — lag then catch-up; stop TB — 503 and readiness DOWN); `IntegrityVerifier` job + endpoint; log-scan test (no PII); `docs/TRACEABILITY.md`.
 - Acceptance: chaos runs show zero-sum and no duplicate or partial chains (check with `ledger.changes` and the balance sheet); all DoD items.
 - Depends on: WP-9.
+
+### WP-CR-1 [MVP] Biller wallet and bill-payment / recharge commands (CR-LEDGER-1)
+- Goal: billers have ledger accounts and transaction-service can post bill payments and recharges (SRS v1.2 BIL-011, BIL-012).
+- Scope: `account_type` seed row 150 `BILLER_WALLET` (wallet type `B`) and owner type 6 `BILLER` (`V<n>` migration if `V1__init.sql` is already merged; CHECK constraint widened); `POST /v1/ledger/accounts` accepts `BILLER_WALLET`/`BILLER`; transfer codes 1017/1018; commands 18 `post-bill-payment` and 19 `post-recharge` (controllers, `LegTemplates` reuse of the payment template, guard 100 → 150, caller policy `transaction-service`, online lane, write-behind journal); `post-reversal` accepts originals 18, 19; `byWalletType` includes 150; CDC maps `commandType` 18/19. BR-01-71..73.
+- Acceptance: §11 tests `billPayment_legs_principal1017_payerBearerFeeVat`, `recharge_operatorBearer_principalOnly_code1018`, `guardTable_billPaymentRecharge_customerToBillerOnly`, `createAccount_billerWallet_ownerTypeMismatch_400`, `billPayment_ok_customerDebited_billerCredited`, `recharge_reversal_restoresCustomer_debitsBiller`, `billPayment_duplicateCommandId_exists`, `systemBalanceSheet_byWalletType_includesBillerWallet`, `cdc_billPaymentAndRecharge_commandTypeAndCode` green; provider contract tests for both new operations (examples validate, `x-actors` 403 for every other caller).
+- Depends on: WP-3 (WP-5 for the reversal test, WP-8 for the CDC test).
 
 ## 11. Test plan
 
@@ -1927,6 +1976,9 @@ Unit (`service` package ≥ 90 % line coverage), service unit tests with Mockito
 - `cashIn_feeSkipped_commissionLegsKeepIndexes3and4`
 - `cashOut_commissionFromFeeIncome_netOfAit`
 - `merchantPayment_payeeBearer_feeDebitedFromMerchant`
+- `billPayment_legs_principal1017_payerBearerFeeVat` (WP-CR-1)
+- `recharge_operatorBearer_principalOnly_code1018` (WP-CR-1)
+- `guardTable_billPaymentRecharge_customerToBillerOnly` (WP-CR-1: merchant/agent/customer destination → `ACCOUNT_TYPE_MISMATCH`; biller wallet as source → mismatch)
 - `operatorBearer_nonZeroFee_rejectedInvalidAmount`
 - `aitGreaterThanCommission_rejectedInvalidAmount`
 - `sameFromTo_rejectedInvalidAmount`, `sharedFeeBearer_400`, `commissionSettlementVatPoisha_400`
@@ -1958,6 +2010,11 @@ Unit (`service` package ≥ 90 % line coverage), service unit tests with Mockito
 - `p2p_maxBalanceExceeded_noLegApplied_controlAccountsNetZero`
 - `p2p_maxBalanceExactlyAtLimit_ok`
 - `merchantPayment_payeeBearerBoundsCheckedAfterFee`
+- `createAccount_billerWallet_ownerTypeMismatch_400` (WP-CR-1: `BILLER_WALLET` + `BILLER` → OK, then EXISTS; `BILLER_WALLET` + `MERCHANT` → 400)
+- `billPayment_ok_customerDebited_billerCredited` (WP-CR-1: Rahim −120,575; DESCO +120,000; FEE +500; VAT +75)
+- `billPayment_duplicateCommandId_exists` (WP-CR-1)
+- `recharge_reversal_restoresCustomer_debitsBiller` (WP-CR-1: full reversal of a type-19 original → OK; second reversal → `ALREADY_REVERSED`)
+- `systemBalanceSheet_byWalletType_includesBillerWallet` (WP-CR-1)
 - `createHold_exceedsAvailable_insufficientFunds`
 - `releaseHold_twiceSameCommand_exists_differentCommand_holdNotFound`
 - `reversal_withHoldRelease_atomic`
@@ -1996,6 +2053,7 @@ Unit (`service` package ≥ 90 % line coverage), service unit tests with Mockito
 - `cdc_poll_mode_equivalentToAmqp`
 - `cdc_kafkaDown_noAck_thenCatchUp`
 - `cdc_reasonCode_setForTypes10And11_nullOtherwise`
+- `cdc_billPaymentAndRecharge_commandTypeAndCode` (WP-CR-1: `commandType` 18/19, `code` 1017/1018 validate against the schema)
 
 **G. Resilience**
 - `tbDown_commandReturns503_andNoJournalOk`
@@ -2027,6 +2085,9 @@ Unit (`service` package ≥ 90 % line coverage), service unit tests with Mockito
 | OPEN D-35 | Unclaimed-balance account (SRS LED-017, B-08) | No account type | §1.3, §2, §5.3 |
 | OPEN D-36 | Reversal path for disbursement rows | Type-8 originals reversible in the ledger; no caller authorised | §1.3, BR-01-40 |
 | OPEN D-45 | "Real-time" per-segment e-money (SRS LED-019) | `byWalletType` from the projection, lag exposed, alert > 10 s | §5.1.26, BR-01-63, §8 |
+| OPEN MVP-01 | Commands 8, 12, 13 in the MVP (disbursement, campaign and commission settlement are R1+; MVP commission is in-line) | Specified and contract-stable; no caller in the MVP; WP-6 part tagged [R1+] | §1.2, §10 WP-6 |
+| OPEN MVP-02 | Biller wallet 150 in holds (14), closure payout (17) and e-money redemption (10) — biller bank settlement is R1+ | Not accepted by those guards / `emoney.redeem-source-codes`; widening is additive (a later CR) | §1.3, §5.1.5, BR-01-72 |
+| OPEN MVP-03 | Biller commission on 18/19 (R1) and off-us billers via ekPay / aggregators (R1+, code 310) | 18/19 accept commission legs like 1–6, MVP pricing sends 0; no network settlement account | §5.1.7, BR-01-71 |
 
 The kernel's retention tag OPEN D-01 (Idempotency-Key ≥ 7 days) does not apply: ledger commands are keyed on `commandId` (kernel K3.3 rule 6).
 
@@ -2054,3 +2115,4 @@ The kernel's retention tag OPEN D-01 (Idempotency-Key ≥ 7 days) does not apply
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-01 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit + GL CCRs (GL-01, GL-02, GL-03) |
+| 1.1.0 | 2026-10-14 | [CR-LEDGER-1](changes/CR-LEDGER-1.md) | MVP (SRS v1.2 BIL-011, BIL-012): account type 150 `BILLER_WALLET`, owner type 6 `BILLER`, transfer codes 1017/1018, commands 18 `post-bill-payment` and 19 `post-recharge` (guard 100 → 150, reversible); §2 traced to SRS v1.2 with MVP markers; WPs scope-tagged; BR-01-71..73; WP-CR-1 |

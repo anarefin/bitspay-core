@@ -1,4 +1,4 @@
-# transaction-service (SVC-02) — owned code lists. contractVersion 1.0.0, kernel 1.0.
+# transaction-service (SVC-02) — owned code lists. contractVersion 1.1.0, kernel 1.0.
 # Mirror: SPEC.md §5.3. This file wins over the SPEC.md table on any conflict (kernel precedence rule 3).
 
 codeSets:
@@ -12,6 +12,8 @@ codeSets:
       - {code: MERCHANT_REFUND, name: MERCHANT_REFUND, description: "Merchant to customer (M -> C), refund of a MERCHANT_PAYMENT. Prefix MR. Ledger command post-merchant-refund (type 5)."}
       - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "Distributor/agent float top-up or return (D<->A, A<->A super-agent; D<->D only when enabled). Prefix FT. Ledger command post-float-transfer (type 6)."}
       - {code: REVERSAL, name: REVERSAL, description: "Mirror of an original transaction (original.to -> original.from). Prefix RV. Ledger command post-reversal (type 7)."}
+      - {code: BILL_PAY, name: BILL_PAY, description: "Customer to biller settlement wallet (C -> B), internal biller catalogue, simulated provider (MVP, CR-TRANSACTION-1). Prefix BP. Ledger command post-bill-payment (type 18)."}
+      - {code: RECHARGE, name: RECHARGE, description: "Customer to operator (MNO) biller settlement wallet (C -> B), mobile top-up, simulated provider (MVP, CR-TRANSACTION-1). Prefix RC. Ledger command post-recharge (type 19)."}
 
   paymentResultStatus:
     description: "PaymentResult.status — the outcome of THAT request. INITIATED appears only inside a 503 problem's `transaction` member."
@@ -47,6 +49,7 @@ codeSets:
       - {code: LEDGER_INVALID_AMOUNT, name: LEDGER_INVALID_AMOUNT, description: "Ledger REJECTED INVALID_AMOUNT."}
       - {code: LEDGER_OTHER, name: LEDGER_OTHER, description: "Ledger REJECTED OTHER (incl. ACCOUNT_TYPE_MISMATCH, NOT_REVERSIBLE) or ledger HTTP 400/403."}
       - {code: LEDGER_NOT_POSTED, name: LEDGER_NOT_POSTED, description: "Sweeper: command not found in the ledger after two checks >= 60 s apart."}
+      - {code: PROVIDER_REJECTED, name: PROVIDER_REJECTED, description: "BILL_PAY / RECHARGE: the (simulated) biller provider refused after the ledger post; the money was returned by an automatic compensating REVERSAL (reason SYSTEM_ERROR). CR-TRANSACTION-1."}
 
   transactionDirection:
     description: "Direction of a list item relative to the queried walletId (GET /v1/transactions)."
@@ -72,6 +75,14 @@ codeSets:
       - {code: CASH_OUT, name: CASH_OUT, description: "Quote for cash-out."}
       - {code: MERCHANT_PAYMENT, name: MERCHANT_PAYMENT, description: "Quote for merchant payment."}
       - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "Quote for float transfer."}
+      - {code: BILL_PAY, name: BILL_PAY, description: "Quote for bill payment (billerId instead of toWalletId)."}
+      - {code: RECHARGE, name: RECHARGE, description: "Quote for mobile recharge (billerId of the operator instead of toWalletId)."}
+
+  rechargeType:
+    description: "RechargeRequest.rechargeType (request enum; must be one of the operator's rechargeTypes in the biller catalogue)."
+    values:
+      - {code: PREPAID, name: PREPAID, description: "Prepaid top-up."}
+      - {code: POSTPAID, name: POSTPAID, description: "Postpaid bill payment through the recharge flow."}
 
   auditAction:
     description: "Values of audit.events data.action written by transaction-service. Customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT and FLOAT_TRANSFER are NOT audited here (their trail is txn.events chained by governance, OPEN D-05)."
@@ -106,6 +117,47 @@ problemReasons:
       - "GET /v1/approvals"
       - "GET /v1/internal/admin/anomalies"
     extensions: []
+  # ---- CR-TRANSACTION-1 (MVP bill payment and recharge, simulated biller provider) ----
+  - code: NOT_FOUND
+    reason: BILLER_NOT_FOUND
+    description: "billerId / operatorBillerId absent from the biller-catalogue-cache (biller:{billerId})"
+    operations: ["POST /v1/bills:enquire", "POST /v1/payments/bill-payment", "POST /v1/payments/recharge", "POST /v1/payments/quote"]
+    extensions: []
+  - code: STATE_CONFLICT
+    reason: BILLER_INACTIVE
+    description: "biller status in the catalogue (biller:{billerId}.status) is not ACTIVE; not persisted"
+    operations: ["POST /v1/bills:enquire", "POST /v1/payments/bill-payment", "POST /v1/payments/recharge", "POST /v1/payments/quote"]
+    extensions: []
+  - code: VALIDATION_FAILED
+    reason: BILL_REFERENCE_INVALID
+    description: "billReference does not fully match the biller's referencePattern"
+    operations: ["POST /v1/bills:enquire", "POST /v1/payments/bill-payment"]
+    extensions: []
+  - code: VALIDATION_FAILED
+    reason: BILL_AMOUNT_MISMATCH
+    description: "ENQUIRY biller: amountPoisha differs from the enquired due amount, or enquiryRef is stale (other Dhaka month) or belongs to another bill"
+    operations: ["POST /v1/payments/bill-payment"]
+    extensions: []
+  - code: VALIDATION_FAILED
+    reason: BILL_AMOUNT_OUT_OF_RANGE
+    description: "amountPoisha outside the biller's minAmountPoisha..maxAmountPoisha, or not equal to fixedAmountPoisha (FIXED)"
+    operations: ["POST /v1/payments/bill-payment", "POST /v1/payments/recharge", "POST /v1/payments/quote"]
+    extensions: []
+  - code: VALIDATION_FAILED
+    reason: MSISDN_INVALID
+    description: "msisdn is not 01[3-9]XXXXXXXX, or no operator owns its 3-digit prefix (biller:mno-prefix:{prefix} absent)"
+    operations: ["POST /v1/payments/recharge"]
+    extensions: []
+  - code: VALIDATION_FAILED
+    reason: OPERATOR_MISMATCH
+    description: "operatorBillerId differs from the operator derived from the MSISDN prefix, or the biller is not an MNO"
+    operations: ["POST /v1/payments/recharge", "POST /v1/payments/quote"]
+    extensions: []
+  - code: STATE_CONFLICT
+    reason: PROVIDER_REJECTED
+    description: "the simulated biller provider refused after the ledger post; compensated by an automatic REVERSAL; persisted FAILED (failureCode PROVIDER_REJECTED); the problem carries `transaction`"
+    operations: ["POST /v1/payments/bill-payment", "POST /v1/payments/recharge"]
+    extensions: [transaction]
 
 problemExtensions:
   - name: transaction
@@ -118,6 +170,8 @@ problemExtensions:
       - "POST /v1/payments/merchant"
       - "POST /v1/payments/merchant-refund"
       - "POST /v1/payments/float-transfer"
+      - "POST /v1/payments/bill-payment"
+      - "POST /v1/payments/recharge"
       - "POST /v1/internal/reversals"
       - "POST /v1/approvals/{id}:approve"
   - name: limitCode
@@ -161,8 +215,10 @@ txnRefPrefixes:
   - {prefix: MR, meaning: "Merchant refund", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
   - {prefix: FT, meaning: "Float transfer", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
   - {prefix: RV, meaning: "Reversal", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: BP, meaning: "Bill payment (MVP)", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: RC, meaning: "Mobile recharge (MVP)", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
 
-productCodes: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]
+productCodes: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, BILL_PAY, RECHARGE]
 
 metrics:
   - {name: bitspay_transaction_requests_total, type: counter, labels: [txn_type, outcome, code]}
@@ -184,3 +240,6 @@ metrics:
   - {name: bitspay_transaction_purpose_unvalidated_total, type: counter, labels: []}
   - {name: bitspay_transaction_quote_usage_unavailable_total, type: counter, labels: []}
   - {name: bitspay_transaction_anomalies_open, type: gauge, labels: [kind]}
+  - {name: bitspay_transaction_provider_confirm_total, type: counter, labels: [txn_type, outcome]}
+  - {name: bitspay_transaction_compensations_total, type: counter, labels: [txn_type, outcome]}
+  - {name: bitspay_transaction_biller_catalogue_errors_total, type: counter, labels: [kind]}

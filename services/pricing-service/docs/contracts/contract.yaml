@@ -2,7 +2,7 @@
 service: pricing-service
 number: "06"
 modules: [pricing, campaign]
-contractVersion: 1.0.0
+contractVersion: 1.1.0
 kernel: "1.0"
 owner: Dev-6            # service lead, module pricing; module campaign: Dev-4
 
@@ -60,7 +60,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-commission-settlement"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: pricing
       purpose: "post a commission settlement (command 13): COMMISSION_PAYABLE -> beneficiary net, AIT leg to AIT_PAYABLE"
       fieldsUsed: ["req.commandId", "req.txnRef", "req.beneficiaryAccountId", "req.grossPoisha", "req.aitPoisha",
@@ -71,7 +71,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-campaign-reward"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "credit a reward from CAMPAIGN_FUNDING (command 12)"
       fieldsUsed: ["req.commandId", "req.txnRef", "req.toAccountId", "req.amountPoisha", "req.constraints.destinationMaxBalancePoisha",
@@ -82,7 +82,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-reversal"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "claw back an own reward (type-12 original only, flags false)"
       fieldsUsed: ["req.commandId", "req.txnRef", "req.originalCommandId", "req.reverseFee", "req.reverseCommission",
@@ -93,7 +93,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/accounts/{id}/balance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "CAMPAIGN_FUNDING (00000000-0000-0000-0000-000000000240) funding check at submit / budget increase and PENDING_FUNDING recheck"
       fieldsUsed: ["path.id", "res.availableBalancePoisha", "res.asOf"]
@@ -103,7 +103,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/wallets/status:batchGet"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "wallet missing from the campaign projection at evaluation; re-check before bulk DRAW/LIST rewards"
       fieldsUsed: ["req.walletIds", "res.items[].walletId", "res.items[].version", "res.items[].status", "res.items[].kycTier",
@@ -114,7 +114,7 @@ consumes:
     - producer: limits-risk-service
       operation: "POST /v1/risk/evaluate:batch"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "receiver limits, max balance and blacklist for rewards (limitsCheck.enabled, default true — OPEN D-09)"
       fieldsUsed: ["req.dryRun", "req.items[].txnId", "req.items[].txnType", "req.items[].channel", "req.items[].amountPoisha",
@@ -126,7 +126,7 @@ consumes:
     - producer: limits-risk-service
       operation: "POST /v1/limits/reservations/{txnId}:release"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: campaign
       purpose: "release the batch reservation of every reward attempt that will not be paid"
       fieldsUsed: ["path.txnId", "req.reasonCode", "res.txnId", "res.released", "res.state"]
@@ -136,7 +136,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/refdata/{type}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: both
       purpose: "start-up bootstrap of SYSTEM_PARAM FEATURE.CAMPAIGN and CUTOFF.EOD before refdata.events catches up"
       fieldsUsed: ["path.type", "query.cursor", "query.limit", "res.items[].type", "res.items[].code", "res.items[].attributes",
@@ -150,7 +150,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.txn
       module: pricing
       purpose: "INLINE accrual, hierarchical SHARE accruals, incentive counters; REVERSAL rows ignored"
@@ -161,7 +161,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REVERSED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.txn
       module: pricing
       purpose: "commission clawback of the original's INLINE and SHARE accruals; incentive counter decrement"
@@ -171,7 +171,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-txn
       module: campaign
       purpose: "activity projection, first-txn, trigger evaluation, rewards, draw entries, points, referral FIRST_TXN qualification"
@@ -182,7 +182,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REVERSED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-txn
       module: campaign
       purpose: "cancel or claw back rewards triggered by the original (partial reversal = reversal)"
@@ -192,7 +192,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REFUNDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-txn
       module: campaign
       purpose: "full or below-minimum partial refund of a trigger merchant payment -> clawback"
@@ -203,7 +203,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.partner
       module: pricing
       purpose: "partner projection, effective-dated hierarchy, default settlement profiles, AIT rate (tinPresent), retry of parked txns"
@@ -214,7 +214,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-partner
       module: campaign
       purpose: "payee filters (category, MCC, partnerId) and underPartner / partnerType segment clauses"
@@ -224,7 +224,7 @@ consumes:
       topic: wallet.events
       eventType: WALLET_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-wallet
       module: campaign
       purpose: "wallet projection for eligibility and segmentation; resolve LIST members by MSISDN hash (MSISDN never stored)"
@@ -234,7 +234,7 @@ consumes:
       topic: customer.events
       eventType: CUSTOMER_REGISTERED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-customer
       module: campaign
       purpose: "customer projection; CUSTOMER_EVENT triggers; referralCode -> referral claim"
@@ -244,7 +244,7 @@ consumes:
       topic: customer.events
       eventType: KYC_APPROVED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-customer
       module: campaign
       purpose: "customer projection; CUSTOMER_EVENT triggers; referral qualification KYC_APPROVED"
@@ -254,7 +254,7 @@ consumes:
       topic: customer.events
       eventType: KYC_TIER_CHANGED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-customer
       module: campaign
       purpose: "customer projection"
@@ -264,7 +264,7 @@ consumes:
       topic: customer.events
       eventType: RISK_GRADE_CHANGED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-customer
       module: campaign
       purpose: "customer projection (riskGrade clause)"
@@ -274,7 +274,7 @@ consumes:
       topic: customer.events
       eventType: CUSTOMER_PROFILE_UPDATED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.campaign-customer
       module: campaign
       purpose: "customer projection (geography, birth year, gender, language)"
@@ -285,7 +285,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: pricing-service.refdata
       module: both
       purpose: "SYSTEM_PARAM FEATURE.CAMPAIGN (product switch) and CUTOFF.EOD (business date); other items ignored"
@@ -297,33 +297,33 @@ consumes:
       topic: notification.requests
       eventType: NOTIFICATION_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       templates: [COMMISSION_NEGATIVE_BALANCE, CAMPAIGN_FUNDING_LOW, CAMPAIGN_BUDGET_EXHAUSTED, REWARD_CLAWBACK_MANUAL_REQUIRED, "EDU_<CODE>"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: provided/codes.yaml#entityTypes
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
 
   data: []

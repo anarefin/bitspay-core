@@ -3,6 +3,8 @@
 
 You are implementing **finance-ops-service** (SVC-12) of Bits Pay: one Spring Boot service with two modules — `reconciliation` (lead, Dev-6: ledger ↔ business matching, projection, EOD close, trial balance, e-money recon, GL tie-out, file recon, exceptions, adjustments) and `reporting` (Dev-7: Kafka → ClickHouse, statements/history, partner data, report catalogue, schedules, analytics, regulatory datasets) — plus a private `common` kernel. This folder is the whole world for this service.
 
+**Release scope:** the whole service is **[R1+]** — not in the MVP release (SRS v1.2, CR-FINANCEOPS-1); every WP in SPEC §10 is tagged [R1+].
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages: WP-1, then WP-A2…A11 and WP-B2…B11).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins, group ids, fieldsUsed).
@@ -29,7 +31,7 @@ You are implementing **finance-ops-service** (SVC-12) of Bits Pay: one Spring Bo
 - Running balances come only from the ledger's balance-after (trust accounts debit-normal). Never sum a stream to get a balance. Exact ClickHouse reads use `FINAL`/`argMax` and prune by `business_date`/`account_id`.
 - `businessDate = localDate(ts@Asia/Dhaka − CUTOFF.EOD)` from `refdata.events` (default 00:00); EOD readiness = cut-off + `CUTOFF.EOD_GRACE_MINUTES` + partition watermarks. EOD never pauses ingestion.
 - Matching is deterministic; ambiguous candidates are never auto-matched.
-- No chart of accounts, GL summary or GL export here — general-ledger-service owns them; reconciliation only ties out `GET /v1/gl/days/{businessDate}/control-totals` (`GL_TIEOUT`).
+- No chart of accounts, GL summaries or financial statements here — general-ledger-service owns them; reconciliation only ties out `GET /v1/gl/days/{businessDate}/control-totals` (`GL_TIEOUT`).
 - Report templates: one `SELECT` on `rpt.*`, `{name:Type}` parameters only, run as `reporting_ro`; never concatenate user input into SQL.
 - Maker ≠ checker (also on `X-Actor-User-Id`); closer ≠ resolver; approvals expire after 72 h; every state change → `audit.events` in the same DB transaction; every staff/partner/service view and every download is audited, holder self-views go to `rpt.access_log`.
 - `recon.events` key is always `runId`; only severity ≥ HIGH exceptions are published; notification variables are int64 poisha, never pre-formatted; `priority`/`language` null.

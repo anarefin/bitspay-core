@@ -4,7 +4,7 @@
 |---|---|
 | Service | `finance-ops-service` (`spring.application.name`) |
 | Number / owner | SVC-12 · Dev-6, service lead (modules: `reconciliation` → Dev-6, lead module · `reporting` → Dev-7) |
-| Layer / release | Back office: independent financial control (reconciliation) and read side / analytics (reporting) · R1 (R2: auto-resolution, settlement dashboard, ad-hoc builder, export feeds, retention TTL, GL-based datasets) |
+| Layer / release | Back office: independent financial control (reconciliation) and read side / analytics (reporting) · **not in MVP — R1+** (SRS v1.2; CR-FINANCEOPS-1) · R1 (R2: auto-resolution, settlement dashboard, ad-hoc builder, export feeds, retention TTL, GL-based datasets) |
 | contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8112 · management 9112 |
@@ -30,6 +30,8 @@ finance-ops-service is the **finance control and read side** of Bits Pay. It has
 
 ### 1.2 In scope
 
+**Out of MVP scope (SRS v1.2):** the whole service (both modules) is **[R1+]**. The MVP release (SRS v1.2, before R1) ships without finance-ops reconciliation and reporting; nothing below is delivered in the MVP. The MVP books are kept by general-ledger-service (GL-R1a).
+
 **reconciliation**
 - Internal recon 1: ledger ↔ business sources by `commandId` (transaction commands 1–7, disbursement 8, treasury 9/10/11/16, campaign 12 and clawback 7, commission settlement 13, own adjustments 11).
 - Per-account balance projection from `ledger.changes` (delta snapshots per business day); projection verification against ledger reads.
@@ -54,8 +56,9 @@ finance-ops-service is the **finance control and read side** of Bits Pay. It has
 | Deferred item | Replacement now |
 |---|---|
 | SFTP / API ingestion from banks, NPSB, schemes, billers, remittance partners (REC-001/002 external parts) | Manual statement upload API; `StatementSource` interface with an `upload` implementation; pull implementations later |
+| Whole service in the MVP release (SRS v1.2) | Out of MVP: finance-ops reconciliation and reporting are R1+ (CR-FINANCEOPS-1) |
 | Settlement instruction files / bank API calls (REC-008) | None this phase (no bank payouts exist) — OPEN D-41 |
-| Chart of accounts, GL summary per GL code, GL journal export file (LED-014, BOM-007 GL part) | Owned by general-ledger-service. This service only ties out the GL's control totals (`GL_TIEOUT`) — OPEN D-26 is resolved this way |
+| Chart of accounts, GL summaries and financial statements (LED-014, BOM-007 GL part) | Owned by general-ledger-service. This service only ties out the GL's control totals (`GL_TIEOUT`) — OPEN D-26 is resolved this way |
 | Real-time GL feed | general-ledger-service |
 | NLQ and predictive analytics (RPT-011/012, R3) | None |
 | E-mail distribution of reports | Secure folder + `notification.requests` (IN_APP to staff) |
@@ -76,7 +79,7 @@ finance-ops-service is the **finance control and read side** of Bits Pay. It has
 6. Expose a raw SQL endpoint, or let a caller-provided string reach ClickHouse unparameterised.
 7. Return unmasked PII to a role that is not entitled to it, or serve a file without an audit record.
 8. Auto-match ambiguous candidates in file reconciliation.
-9. Build or own a chart of accounts or a GL export (general-ledger-service owns them).
+9. Build or own a chart of accounts, GL summaries or financial statements (general-ledger-service owns them).
 10. Let the reconciliation module read ClickHouse, or let the reporting module touch reconciliation tables except through the in-process `ReconciliationFacade`.
 
 ### 1.5 Modules
@@ -90,6 +93,8 @@ finance-ops-service is the **finance control and read side** of Bits Pay. It has
 Application class `com.bracits.bitspay.financeops.FinanceOpsServiceApplication`. Each module uses the traditional layered packages (`controller`, `dto`, `service`, `repository`, `entity`, `mapper`, `exception`, `client`, `messaging`, `config`; kernel K9 "Layout"). Modules talk only through their `<module>.service.<Module>Facade` interface and `<module>.dto` records (kernel K9 "Modular services", enforced by `ArchitectureTest`). The reporting module reads reconciliation results in-process through `reconciliation.service.ReconciliationFacade` (`eodStatus(d)`, `trialBalance(d, rev)`, `closingBalances(d, filter, page)`, `emoney(d, rev)`, `emoneyHistory(from, to)`, `adjustmentByTxnRef(ref)`, `adjustmentByCommandId(id)`); its DTOs are the §5.1 response shapes. Both modules publish through the single outbox `svc_finance_ops.outbox`; each module keeps its own consumer groups and inbox.
 
 ## 2. SRS traceability
+
+Baseline: SRS v1.2 (14 Oct 2026). No row is delivered in the MVP release — the whole service is R1+ (CR-FINANCEOPS-1).
 
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
@@ -105,13 +110,13 @@ Application class `com.bracits.bitspay.financeops.FinanceOpsServiceApplication`.
 | REC-011 | Auto-resolution of known exception types | `auto_resolution_rule` (BR-REC-44, R2); LATE_ARRIVAL baseline rule R1 |
 | LED-013 | EOD snapshot, trial balance, EOD reports without stopping online processing | EOD close (BR-REC-05…09) |
 | LED-012 | Full history and statements PDF/CSV | §5.1.1–5.1.5, BR-RPT-10…19 |
-| LED-014 | CoA mapping + GL export | general-ledger-service; this service provides the GL tie-out (BR-REC-50…53) |
+| LED-014 | Ledger accounts mapped to the Operator's chart of accounts by the General Ledger service (GLD-006, GLD-013); real-time view = GL open-day overlay (GLD-030) | general-ledger-service; this service provides the GL tie-out (BR-REC-50…53) |
 | LED-019 | System balance sheet (consumer cross-check) | LIVE e-money mode (BR-REC-12) |
 | REL-002 | Daily integrity: balance = Σ postings; zero-sum; e-money = trust | TB-1…TB-6, projection verification (BR-REC-27), e-money recon |
 | EMY-004 / 005 | 1:1 backing daily and on demand; per-trust attribution | BR-REC-10…12, `perTrust[]` |
 | EMY-008 | Regulatory e-money datasets | RR-01 from `mart_emoney_daily` + trust interest (BR-RPT-35) |
 | BOM-004/005/006 | Maker-checker, multi-level by amount | `approval_request` (kernel K5), BR-REC-40 |
-| BOM-007 | Accounting exports, recon reports | Recon reports `RPT-RECON-*`; GL export owned by general-ledger-service |
+| BOM-007 | Accounting reports, recon reports | Recon reports `RPT-RECON-*`; GL reports owned by general-ledger-service |
 | AUD-002 | Audit record per state change | `audit.events` outbox in the same DB transaction |
 | PER-004 | History ≤ 300 ms p95 (30 days) | Hot window is transaction-service; mini statement ≤ 300 ms |
 | PER-008 | Search 90 d ≤ 3 s; month report ≤ 60 s | ClickHouse keys §4.4; query limits |
@@ -581,7 +586,7 @@ stateDiagram-v2
 | ADR | Decision | Why | Consequence |
 |---|---|---|---|
 | ADR-FO-01 | One service, two modules (`reconciliation`, `reporting`), one schema, one outbox, one `/v1/approvals` engine | Both consume the same money topics on the same EOD calendar; reporting needs reconciliation results in-process | Module boundaries enforced by the `<Module>Facade` rule (`ArchitectureTest`) and review; separate consumer groups and inboxes per module |
-| ADR-FO-02 | general-ledger-service owns the chart of accounts, GL summaries and the GL export; this service ties out the GL's control totals | Single CoA owner; reconciliation stays an independent check of the GL | No `gl_mapping`, `coa_mapping`, GL export here; `GL_TIEOUT` run type; `summary.glSummaryReady` always `false` |
+| ADR-FO-02 | general-ledger-service owns the chart of accounts, GL summaries and financial statements; this service ties out the GL's control totals | Single CoA owner; reconciliation stays an independent check of the GL | No `gl_mapping`, `coa_mapping` here; `GL_TIEOUT` run type; `summary.glSummaryReady` always `false` |
 | ADR-REC-01 | High-volume streams (`ledger.changes`, `txn.events`) use natural idempotency (upserts guarded by keys / TB timestamps) instead of `processed_event`; low-volume topics use `processed_event` | 3–5 inbox rows per payment would double the write load | Every write on those two streams is idempotent by construction (tested by double delivery) |
 | ADR-REC-02 | Balance projection = `account_day_balance(account, businessDate)` storing the TB cumulative `*BalanceAfter` of the latest-timestamp transfer of that day (guard `last_ts`); a transfer whose `*BalanceAfter` is null (system account, poll fallback) adds its signed delta, deduplicated by `transferId` in `system_transfer_delta` | Exact as-of balances without storing every transfer | Closing balance as of D = latest row ≤ D; absent row = unchanged |
 | ADR-REC-03 | EOD readiness = cut-off + grace **and** every `ledger.changes` partition has a watermark ≥ cut-off or zero lag; late events after close trigger automatic restatement (revision + 1) | Partitions are independent; the CDC bridge may lag | Online processing never pauses |
@@ -6079,56 +6084,58 @@ ORDER BY m.business_date, m.txn_type, m.channel, m.division_code
 
 Every WP builds and tests with the service's own infra only (Postgres, Kafka, ClickHouse, object storage, WireMock on 8099 from `stubs/`, fixtures from `fixtures/events/`). Branches `finance-ops-service/<module>/wp-<n>-<slug>`.
 
-### WP-1 Skeleton and contracts (Dev-6, Dev-7 reviews)
+Scope tag: every WP is **[R1+]** (whole service out of MVP, SRS v1.2). CR-FINANCEOPS-1 is scope tagging only, so there is no WP-CR-1.
+
+### [R1+] WP-1 Skeleton and contracts (Dev-6, Dev-7 reviews)
 - Goal: green standalone project serving the provided contract.
 - Scope: packages `common`, `reconciliation`, `reporting` with the layered sub-packages, `<Module>Facade` interfaces and `docs/MODULES.md`; ActorContext (+ module), `@RequiresActor`, problem model; Flyway `common`/`reconciliation`/`reporting` V1 (+ seeds) with separate history tables; outbox writer + polling relay; inboxes; ShedLock; idempotency store; one maker-checker engine and `/v1/approvals`; ClickHouse migration runner with V1–V3 (apply twice = no-op; checksum drift fails); OpenAPI served and identical to `contracts/provided/openapi.yaml` (all 108 operations answering stub examples); WireMock stubs and event fixtures wired; profiles `api`, `ingest`, `jobs`.
 - Acceptance: `./gradlew check` green; `openApi_driftCheck_green`; `flyway_emptySchema_migratesIdempotently`; `schemaIsolation_cannotReadOtherSchema`; `clickhouseMigrations_applyTwice_noop`; `clickhouseMigrations_checksumDrift_fails`; `approval_checkerEqualsMaker_422`; `allFixtures_deserialiseIntoEnvelope`; `ArchitectureTest` (ArchUnit) green.
 
 ### Reconciliation (Dev-6)
 
-**WP-A2 Ledger ingestion and projection** — `LedgerChangesConsumer` (batch), `account_day_balance` upsert with timestamp guard, `system_transfer_delta` for null balances, registry, watermarks, watched transfers, partition maintenance. Acceptance: replaying the worked-day fixtures shuffled and twice gives identical rows; `ingest_outOfOrderEvents_keepsLatestTs`; `ingest_nullBalanceSystemAccount_accumulatesDelta`; `ingest_nullBalanceWallet_goesToDlq`.
+**[R1+] WP-A2 Ledger ingestion and projection** — `LedgerChangesConsumer` (batch), `account_day_balance` upsert with timestamp guard, `system_transfer_delta` for null balances, registry, watermarks, watched transfers, partition maintenance. Acceptance: replaying the worked-day fixtures shuffled and twice gives identical rows; `ingest_outOfOrderEvents_keepsLatestTs`; `ingest_nullBalanceSystemAccount_accumulatesDelta`; `ingest_nullBalanceWallet_goesToDlq`.
 
-**WP-A3 Ledger ↔ transaction recon** — `txn.events` consumer, expected-leg builder, comparator, AgingJob, exceptions + `RECON_EXCEPTION_RAISED` + `RECON_CRITICAL_EXCEPTION`, reversal mirroring (legs 1..5), items API. Acceptance: P2P / cash-in / cash-out / merchant / refund / float / reversal / partial reversal fixtures MATCH; one test per BR-REC-24 category; late counterpart → AUTO_RESOLVED.
+**[R1+] WP-A3 Ledger ↔ transaction recon** — `txn.events` consumer, expected-leg builder, comparator, AgingJob, exceptions + `RECON_EXCEPTION_RAISED` + `RECON_CRITICAL_EXCEPTION`, reversal mirroring (legs 1..5), items API. Acceptance: P2P / cash-in / cash-out / merchant / refund / float / reversal / partial reversal fixtures MATCH; one test per BR-REC-24 category; late counterpart → AUTO_RESOLVED.
 
-**WP-A4 Other business sources** — mapping-driven consumers for disbursement, treasury (incl. paid-out reference), campaign (LEDGER_REVERSAL vs MANUAL), commission (command 13 MATCH_REQUIRED), own adjustments; multiset comparator; LEDGER_ONLY checks; config APIs with approval. Acceptance: `BATCH_ROW_PAID` + command 8 → MATCHED; issuance → MATCHED; `COMMISSION_SETTLED` + net and AIT legs → MATCHED; command 16 with `TRUST_REBALANCED` → MATCHED; MANUAL clawback raises nothing; mapping change (approved) takes effect without restart.
+**[R1+] WP-A4 Other business sources** — mapping-driven consumers for disbursement, treasury (incl. paid-out reference), campaign (LEDGER_REVERSAL vs MANUAL), commission (command 13 MATCH_REQUIRED), own adjustments; multiset comparator; LEDGER_ONLY checks; config APIs with approval. Acceptance: `BATCH_ROW_PAID` + command 8 → MATCHED; issuance → MATCHED; `COMMISSION_SETTLED` + net and AIT legs → MATCHED; command 16 with `TRUST_REBALANCED` → MATCHED; MANUAL clawback raises nothing; mapping change (approved) takes effect without restart.
 
-**WP-A5 EOD close and trial balance** — readiness, close steps 1–7, TB-1…TB-6, runs, `RECON_RUN_COMPLETED` × 4, EOD / trial-balance / balances APIs, restatement, forced close, `POST /v1/internal/jobs/eod:run`. Acceptance: worked example reproduced exactly (110 150 975, net 0); corrupt projection row → TB break + CRITICAL + `TRIAL_BALANCE_BREAK`; late event after close → revision 2 with `RESTATED`; `eodRun_ignoreCutoff_completes`; 1 M synthetic accounts close ≤ 60 s locally.
+**[R1+] WP-A5 EOD close and trial balance** — readiness, close steps 1–7, TB-1…TB-6, runs, `RECON_RUN_COMPLETED` × 4, EOD / trial-balance / balances APIs, restatement, forced close, `POST /v1/internal/jobs/eod:run`. Acceptance: worked example reproduced exactly (110 150 975, net 0); corrupt projection row → TB break + CRITICAL + `TRIAL_BALANCE_BREAK`; late event after close → revision 2 with `RESTATED`; `eodRun_ignoreCutoff_completes`; 1 M synthetic accounts close ≤ 60 s locally.
 
-**WP-A5b GL tie-out** — `gl.events` consumer, `HttpGeneralLedgerClient` (control totals), `GL_TIEOUT` runs, `gl_tieout_result`, `GL_TIEOUT_BREAK`, retry job, `POST /v1/recon/runs {type: GL_TIEOUT}`. Acceptance: golden-day control totals tie out with the worked example (`MATCHED`); one SYS bucket off by 1 → `BREAK` + one HIGH exception; wallet per-type difference with equal aggregate → `MATCHED`; 409 DAY_NOT_CLOSED → WAITING_FOR_DATA then completes; GL revision 2 → new run.
+**[R1+] WP-A5b GL tie-out** — `gl.events` consumer, `HttpGeneralLedgerClient` (control totals), `GL_TIEOUT` runs, `gl_tieout_result`, `GL_TIEOUT_BREAK`, retry job, `POST /v1/recon/runs {type: GL_TIEOUT}`. Acceptance: golden-day control totals tie out with the worked example (`MATCHED`); one SYS bucket off by 1 → `BREAK` + one HIGH exception; wallet per-type difference with equal aggregate → `MATCHED`; 409 DAY_NOT_CLOSED → WAITING_FOR_DATA then completes; GL revision 2 → new run.
 
-**WP-A6 E-money reconciliation** — `TRUST_BALANCE_CONFIRMED` consumer (CLOSING, greatest `balanceAsOf`), EOD mode, re-run on confirmation, LIVE mode through the system-balance-sheet stub, variance event + notifications, e-money APIs. Acceptance: variance 10 000 produces exactly one `EMONEY_VARIANCE_DETECTED` with all fields; late confirmation turns INCOMPLETE → MATCHED and auto-resolves; INTRADAY ignored; two trust accounts attributed.
+**[R1+] WP-A6 E-money reconciliation** — `TRUST_BALANCE_CONFIRMED` consumer (CLOSING, greatest `balanceAsOf`), EOD mode, re-run on confirmation, LIVE mode through the system-balance-sheet stub, variance event + notifications, e-money APIs. Acceptance: variance 10 000 produces exactly one `EMONEY_VARIANCE_DETECTED` with all fields; late confirmation turns INCOMPLETE → MATCHED and auto-resolves; INTRADAY ignored; two trust accounts attributed.
 
-**WP-A7 Exception workflow and adjustments** — assign / notes / evidence / resolve / close / reopen, proposals, approvals (levels, expiry), `post-adjustment` with retry and outcome resolution, audit. Acceptance: maker approving own proposal → 422; ledger 503 then OK → POSTED with the same commandId; adjustment legs match the proposal (no new exception); close by resolver → 422; parallel approve → one ledger call.
+**[R1+] WP-A7 Exception workflow and adjustments** — assign / notes / evidence / resolve / close / reopen, proposals, approvals (levels, expiry), `post-adjustment` with retry and outcome resolution, audit. Acceptance: maker approving own proposal → 422; ledger 503 then OK → POSTED with the same commandId; adjustment legs match the proposal (no new exception); close by resolver → 422; parallel approve → one ledger call.
 
-**WP-A8 Statement ingestion** — counterparties, file profiles (`:test`), parsers CSV (Commons CSV), XLSX (POI streaming), MT940 (Prowide Core), camt.053 v02/v08 (StAX), upload API, storage, integrity and dedupe, internal items from watched transfers. Acceptance: one golden sample per format parses to identical lines; balance-break file rejected with line errors (400); same file twice → 409 with `existingFileId`; amount `1,000.005` rejected.
+**[R1+] WP-A8 Statement ingestion** — counterparties, file profiles (`:test`), parsers CSV (Commons CSV), XLSX (POI streaming), MT940 (Prowide Core), camt.053 v02/v08 (StAX), upload API, storage, integrity and dedupe, internal items from watched transfers. Acceptance: one golden sample per format parses to identical lines; balance-break file rejected with line errors (400); same file twice → 409 with `existingFileId`; amount `1,000.005` rejected.
 
-**WP-A9 Matching engine** — algorithm BR-REC-35, seed rules, manual match / unmatch / ignore with approval, missing-side exceptions after grace, match runs. Acceptance: worked example reproduced; ambiguity → no auto-match; property tests green; 100k × 100k ≤ 5 min.
+**[R1+] WP-A9 Matching engine** — algorithm BR-REC-35, seed rules, manual match / unmatch / ignore with approval, missing-side exceptions after grace, match runs. Acceptance: worked example reproduced; ambiguity → no auto-match; property tests green; 100k × 100k ≤ 5 min.
 
-**WP-A10 Auto-resolution, settlement dashboard, reports (R2)** — rules + evaluator, settlement dashboard (OPEN D-41), exception CSV report, run reports. Acceptance: `MATCHED_LATER` auto-resolves with audit; dashboard buckets correct for fixture ages.
+**[R1+] WP-A10 Auto-resolution, settlement dashboard, reports (R2)** — rules + evaluator, settlement dashboard (OPEN D-41), exception CSV report, run reports. Acceptance: `MATCHED_LATER` auto-resolves with audit; dashboard buckets correct for fixture ages.
 
-**WP-A11 Integration on the Compose stack** — real ledger, transaction, general-ledger-service; walk scenario S12 by hand (zero-sum, e-money = mirror = confirmed; injected mismatch raises variance); one full day closes with no unexplained exceptions.
+**[R1+] WP-A11 Integration on the Compose stack** — real ledger, transaction, general-ledger-service; walk scenario S12 by hand (zero-sum, e-money = mirror = confirmed; injected mismatch raises variance); one full day closes with no unexplained exceptions.
 
 ### Reporting (Dev-7)
 
-**WP-B2 Ingestion framework + ledger sink** — generic `TopicSink<T>` (envelope validation, mapper, batcher, writer with dedup token, watermark, commit-after-ack, DLQ, metrics), ledger mapper → `ledger_transfers` + MVs, `/v1/internal/ingestion/status`. Acceptance: `ledgerSink_p2pThreeLegs_producesSixPostings`; `ledgerSink_duplicateDelivery_finalHasOneRow`; `ledgerSink_missingBalanceAfterWallet_goesToDlq`; `ledgerSink_pendingAndVoid_deltaZero`; `ledgerSink_trustAccount_debitNormalBalance`; `ledgerSink_reversalLeg5_kept`; `ledgerSink_businessDate_cutoffDhaka`; `sink_clickhouseDown_doesNotCommitOffsets`.
+**[R1+] WP-B2 Ingestion framework + ledger sink** — generic `TopicSink<T>` (envelope validation, mapper, batcher, writer with dedup token, watermark, commit-after-ack, DLQ, metrics), ledger mapper → `ledger_transfers` + MVs, `/v1/internal/ingestion/status`. Acceptance: `ledgerSink_p2pThreeLegs_producesSixPostings`; `ledgerSink_duplicateDelivery_finalHasOneRow`; `ledgerSink_missingBalanceAfterWallet_goesToDlq`; `ledgerSink_pendingAndVoid_deltaZero`; `ledgerSink_trustAccount_debitNormalBalance`; `ledgerSink_reversalLeg5_kept`; `ledgerSink_businessDate_cutoffDhaka`; `sink_clickhouseDown_doesNotCommitOffsets`.
 
-**WP-B3 Business sinks and dimensions** — sinks for `txn.events`, `wallet.events`, `customer.events`, `partner.events`, `fee.rules` (tombstone), `commission.events`, domain sink (treasury, disbursement, campaign, support, case), audit sink (risk, approval, audit), `refdata.events`, `command_ref` extraction (BR-RPT-07); `recon.events` consumer (`reporting_processed_event` + job row). Acceptance: `txnSink_reversedAfterCompleted_finalStatusReversed`; `txnSink_outOfOrder_keepsReversed`; `customerSink_neverStoresNid`; `partnerSink_nullWalletId_recordsVersion`; `feeRulesSink_tombstone_marksDeleted`; `reconConsumer_deliveredTwice_triggersOnce`; `allFixtures_ingestWithoutDlq`.
+**[R1+] WP-B3 Business sinks and dimensions** — sinks for `txn.events`, `wallet.events`, `customer.events`, `partner.events`, `fee.rules` (tombstone), `commission.events`, domain sink (treasury, disbursement, campaign, support, case), audit sink (risk, approval, audit), `refdata.events`, `command_ref` extraction (BR-RPT-07); `recon.events` consumer (`reporting_processed_event` + job row). Acceptance: `txnSink_reversedAfterCompleted_finalStatusReversed`; `txnSink_outOfOrder_keepsReversed`; `customerSink_neverStoresNid`; `partnerSink_nullWalletId_recordsVersion`; `feeRulesSink_tombstone_marksDeleted`; `reconConsumer_deliveredTwice_triggersOnce`; `allFixtures_ingestWithoutDlq`.
 
-**WP-B4 Statements, mini statement, history, reference lookup** — BR-RPT-10…22, EN/BN bundles, CSV, scope checks, logging. Acceptance: `statement_rahimStory_matchesGoldenJson` (closing 22 850, balances 100 000 / 49 425 / 14 425 / 24 425 / 22 850); `statement_runningBalance_equalsLedgerBalanceAfter`; `statement_missingEvent_reportsGap`; `statement_holds_listedNotLines`; `statement_reversal_ownLine`; `statement_disbursementCredit_rowRef`; `statement_otherWallet_403`; `statement_distributorChildAgent_allowedHier`; `statement_pdfOver92Days_400`; `history_failedTxns_listed`; `history_counterpartyMsisdn_resolves`; `lookup_rcaRef_resolvesFromRecon`; `lookup_wcRef_404`.
+**[R1+] WP-B4 Statements, mini statement, history, reference lookup** — BR-RPT-10…22, EN/BN bundles, CSV, scope checks, logging. Acceptance: `statement_rahimStory_matchesGoldenJson` (closing 22 850, balances 100 000 / 49 425 / 14 425 / 24 425 / 22 850); `statement_runningBalance_equalsLedgerBalanceAfter`; `statement_missingEvent_reportsGap`; `statement_holds_listedNotLines`; `statement_reversal_ownLine`; `statement_disbursementCredit_rowRef`; `statement_otherWallet_403`; `statement_distributorChildAgent_allowedHier`; `statement_pdfOver92Days_400`; `history_failedTxns_listed`; `history_counterpartyMsisdn_resolves`; `lookup_rcaRef_resolvesFromRecon`; `lookup_wcRef_404`.
 
-**WP-B5 PDF, exports, files, download audit** — object storage, PDF renderer (Bangla spike, ADR-RPT-08, OPEN D-50), statement export flow, download streaming, `STATEMENT_READY`, purge. Acceptance: `statementPdf_sha256FooterMatchesHeader`; `statementPdf_bn_rendersOrSignalsFallback`; `export_async_notifiesStatementReady`; `exportFile_notReady_409`; `download_emitsAudit`; `purge_expired_audited`.
+**[R1+] WP-B5 PDF, exports, files, download audit** — object storage, PDF renderer (Bangla spike, ADR-RPT-08, OPEN D-50), statement export flow, download streaming, `STATEMENT_READY`, purge. Acceptance: `statementPdf_sha256FooterMatchesHeader`; `statementPdf_bn_rendersOrSignalsFallback`; `export_async_notifiesStatementReady`; `exportFile_notReady_409`; `download_emitsAudit`; `purge_expired_audited`.
 
-**WP-B6 Report catalogue engine** — definitions, validator, binder, row scope, executor, masker and masking admin, renderers, sync/async runs, audit, seeds. Acceptance: `template_tableFunction_rejected`; `template_undeclaredParam_rejected`; `template_piiAlias_rejected`; `param_injection_boundNotConcatenated`; `run_partnerScope_ownAndDescendantsOnly`; `masking_mostPermissiveWins`; `syncRun_overLimit_400`; `asyncRun_twoPerActor_queuesThird`; `definitionActivate_retiresPrevious`; `seededReports_dryRunGreen`.
+**[R1+] WP-B6 Report catalogue engine** — definitions, validator, binder, row scope, executor, masker and masking admin, renderers, sync/async runs, audit, seeds. Acceptance: `template_tableFunction_rejected`; `template_undeclaredParam_rejected`; `template_piiAlias_rejected`; `param_injection_boundNotConcatenated`; `run_partnerScope_ownAndDescendantsOnly`; `masking_mostPermissiveWins`; `syncRun_overLimit_400`; `asyncRun_twoPerActor_queuesThird`; `definitionActivate_retiresPrevious`; `seededReports_dryRunGreen`.
 
-**WP-B7 Marts, daily close, analytics, schedules** — trigger + gate (BR-RPT-40…44), jobs, analytics endpoints (union drill-down), schedules with approval, secure folders, `REPORT_READY`. Acceptance: `dailyClose_rerun_identical`; `dailyClose_nullBalanceSystem_fromDeltas`; `martTxn_lateEvent_fixed`; `martEmoney_walletsPlusSystemEqualsTrust`; `analytics_groupByUnion_matchesRaw`; `schedule_firesInDhaka`; `schedule_rolesRevoked_failsAndNotifies`; `secureFolder_roleNotInAcl_403`.
+**[R1+] WP-B7 Marts, daily close, analytics, schedules** — trigger + gate (BR-RPT-40…44), jobs, analytics endpoints (union drill-down), schedules with approval, secure folders, `REPORT_READY`. Acceptance: `dailyClose_rerun_identical`; `dailyClose_nullBalanceSystem_fromDeltas`; `martTxn_lateEvent_fixed`; `martEmoney_walletsPlusSystemEqualsTrust`; `analytics_groupByUnion_matchesRaw`; `schedule_firesInDhaka`; `schedule_rolesRevoked_failsAndNotifies`; `secureFolder_roleNotInAcl_403`.
 
-**WP-B8 Partner data APIs** — §5.1 partner operations. Acceptance: `partnerTransactions_agentOwnOnly`; `partnerTransactions_distributorDescendantsNotSiblings`; `commissions_fromCommissionFactsOnly` (Salma 400/40/360); `settlements_nirob_24396`; `eodSummary_openingPlusMovementsEqualsClosing`; `performance_uniqueCustomers_distinctPayers`.
+**[R1+] WP-B8 Partner data APIs** — §5.1 partner operations. Acceptance: `partnerTransactions_agentOwnOnly`; `partnerTransactions_distributorDescendantsNotSiblings`; `commissions_fromCommissionFactsOnly` (Salma 400/40/360); `settlements_nirob_24396`; `eodSummary_openingPlusMovementsEqualsClosing`; `performance_uniqueCustomers_distinctPayers`.
 
-**WP-B9 Regulatory datasets** — seeds RR-01…05, RR-10, generation, renderer SPI, status machine, maker-checker, `:markSubmitted`, auto cron, header block. Acceptance: `rr01_walletsPlusSystemEqualsTrustMirror`; `rr01_closingConfirmationOnly`; `rr01_monthlyIncludesInterest`; `regulatory_downloadBeforeApproval_forbidden`; `regulatory_checkerEqualsMaker_422`; `regulatory_submitted_immutable_409`; `regulatory_newRun_supersedes`.
+**[R1+] WP-B9 Regulatory datasets** — seeds RR-01…05, RR-10, generation, renderer SPI, status machine, maker-checker, `:markSubmitted`, auto cron, header block. Acceptance: `rr01_walletsPlusSystemEqualsTrustMirror`; `rr01_closingConfirmationOnly`; `rr01_monthlyIncludesInterest`; `regulatory_downloadBeforeApproval_forbidden`; `regulatory_checkerEqualsMaker_422`; `regulatory_submitted_immutable_409`; `regulatory_newRun_supersedes`.
 
-**WP-B10 R2: ad-hoc builder, feeds, retention TTL, GL sink** — semantic model, compiler, limits; Parquet feeds + manifest + dictionary; `ttl-sync`; optional `gl.events` sink. Acceptance: `adhoc_unknownDimension_400`; `adhoc_noUserLiteralsInSql`; `feeds_rowCountEqualsSource`; `ttlSync_neverBeforeFeedExists`.
+**[R1+] WP-B10 R2: ad-hoc builder, feeds, retention TTL, GL sink** — semantic model, compiler, limits; Parquet feeds + manifest + dictionary; `ttl-sync`; optional `gl.events` sink. Acceptance: `adhoc_unknownDimension_400`; `adhoc_noUserLiteralsInSql`; `feeds_rowCountEqualsSource`; `ttlSync_neverBeforeFeedExists`.
 
-**WP-B11 Integration and hardening** — real topics on the Compose stack; walk scenario S9 (statements) by hand; statement closing = ledger balance for every story character; PII log scan; `docs/TRACEABILITY.md`; `docs/DATA-DICTIONARY.md` generated from DDL comments.
+**[R1+] WP-B11 Integration and hardening** — real topics on the Compose stack; walk scenario S9 (statements) by hand; statement closing = ledger balance for every story character; PII log scan; `docs/TRACEABILITY.md`; `docs/DATA-DICTIONARY.md` generated from DDL comments.
 
 Order: WP-1 → (A2…A11) ∥ (B2…B11). Reporting code that needs reconciliation results mocks `ReconciliationFacade` with Mockito in its service unit tests until WP-A5/A6 are merged.
 
@@ -6162,13 +6169,14 @@ Order: WP-1 → (A2…A11) ∥ (B2…B11). Reporting code that needs reconciliat
 
 | Tag | Topic | Provisional value used | Where used |
 |---|---|---|---|
+| FO-MVP-CERT (decided, MVP decisions 2026-10-14) | Back-certification of MVP GL days | The MVP closes GL days without this service; they stay certification `PENDING` (general-ledger-service GL-Q11). At R1 go-live this service runs `GL_TIEOUT` for every MVP business date (oldest first, current GL revision) before Finance closes the first month. MVP ledger history must stay readable for the tie-out | §1.3, F3 GL tie-out |
 | OPEN D-03 | "Shared" fee bearer | `SHARED` reserved; unknown bearer → fee/VAT debit not verified | §6.2.1, BR-REC-20 table |
 | OPEN D-13 | Human reference of disbursement credits | `rowRef = {batchRef}-{rowNo}`; statement `txnRef` = rowRef, `source DISBURSEMENT` | §6.2.2, §6.7, BR-RPT-07, BR-RPT-22 |
 | OPEN D-21 | Geography vocabulary | GEO refdata codes in dims and marts; names joined from `refdata_dim` | §4.4, §6.5, BR-RPT-08 |
 | OPEN D-22 | Bank reference of redemptions | `EMONEY_REDEMPTION_PAID_OUT.payoutReference` used for trust-statement matching | §6.2.3, BR-REC-34 |
 | OPEN D-23 | Trust interest for RR-01 | `TRUST_INTEREST_RECORDED` → `interest_month_poisha` | §4.4, §6.7, BR-RPT-35 |
 | OPEN D-24 | Online retention of transactions | history age = `RETENTION.FINANCIAL_TXN`; no TTL applied until R2 | §4.6, §5.1, §6.14 |
-| OPEN D-26 | Single chart-of-accounts mapping | resolved by giving the CoA, GL summary and GL export to general-ledger-service (no `gl_mapping`, `coa_mapping`, GL export here); reconciliation ties out the GL's control totals | §1.3, ADR-FO-02, §7.7 |
+| OPEN D-26 | Single chart-of-accounts mapping | resolved by giving the CoA, GL summaries and financial statements to general-ledger-service (no `gl_mapping`, `coa_mapping` here); reconciliation ties out the GL's control totals | §1.3, ADR-FO-02, §7.7 |
 | OPEN D-30 | Consumer group ids | `finance-ops-service.reconciliation-<topic>`, `finance-ops-service.reporting-<purpose>` | §3.3, `contract.yaml` |
 | OPEN D-37 | Owner of the notification-delivery report (RPT-005) | admin-service staff report; reporting offers ad-hoc views via the logs API | §1.3, §6.9 |
 | OPEN D-39 | Trust-confirmation staleness | any confirmation older than D is `stale` | BR-REC-10, §8 |
@@ -6195,3 +6203,5 @@ Order: WP-1 → (A2…A11) ∥ (B2…B11). Reporting code that needs reconciliat
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-12 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit + GL CCRs (GL-04, GL-05, GL-08) |
+| 1.0.0 | 2026-10-14 | CR-FINANCEOPS-1 | MVP scope tagging (SRS v1.2): whole service R1+, not in MVP; every WP tagged [R1+]; §2 baseline SRS v1.2, LED-014 reworded; removed GL export wording (GL owns CoA, summaries and statements). Contract version unchanged |
+| 1.0.0 | 2026-10-14 | — | Kind A (documentation only, MVP decisions 2026-10-14): FO-MVP-CERT recorded (back-certify MVP GL days at R1 go-live). Contract version unchanged |

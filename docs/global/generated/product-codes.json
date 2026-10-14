@@ -28,6 +28,14 @@
     "owner": "transaction-service"
   },
   {
+    "code": "BILL_PAY",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "RECHARGE",
+    "owner": "transaction-service"
+  },
+  {
     "code": "CAMPAIGN",
     "owner": "pricing-service"
   },

@@ -38,7 +38,7 @@ consumes:
     - producer: transaction-service
       operation: "POST /v1/internal/reversals"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "execute an APPROVED reversal request (reversal-executor only); one Idempotency-Key per attempt rev-{reversalRequestId}-{attempt}"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service"
       fieldsUsed:
@@ -64,7 +64,7 @@ consumes:
     - producer: transaction-service
       operation: "GET /v1/transactions/{txnRef}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "dispute / reversal eligibility, pre-execution re-check, 409 reconciliation, enquiry, receipt resend"
       identity: "forwarded caller: STAFF headers, or the CUSTOMER / MERCHANT / AGENT caller's own X-Actor-Type, X-Actor-Id, X-Actor-Wallet-Id; jobs: SERVICE support-service"
       fieldsUsed:
@@ -86,12 +86,12 @@ consumes:
         - res.reversedAmountPoisha
       codesUsed:
         - {set: transactionStatus, values: [INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED]}
-        - {set: txnType, values: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]}
+        - {set: txnType, values: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, BILL_PAY, RECHARGE]}
       resilience: {connectTimeoutMs: 300, timeoutMs: 1000, circuitBreaker: true, onFailure: "503 DEPENDENCY_UNAVAILABLE to the caller (nothing created); executor pre-check stays APPROVED; 404 → history lookup fallback"}
     - producer: transaction-service
       operation: "GET /v1/transactions"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 transactions section and enquiry within the 30-day hot window"
       identity: "forwarded STAFF headers"
       fieldsUsed:
@@ -123,7 +123,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/create-hold"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "command type 14 — dispute / wrong-transfer hold on the counterparty wallet"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service; Idempotency-Key = commandId (informational)"
       fieldsUsed: [req.commandId, req.accountId, req.amountPoisha, req.reasonCode, res.commandId, res.result, res.rejectionCode, res.transferIds, res.postedAt]
@@ -135,7 +135,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/release-hold"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "command type 15 — release a hold created by support (holdCommandId = the create-hold commandId)"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service; Idempotency-Key = commandId (informational)"
       fieldsUsed: [req.commandId, req.holdCommandId, res.commandId, res.result, res.rejectionCode, res.transferIds, res.postedAt]
@@ -146,7 +146,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/accounts/{id}/balance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "hold sizing, reversal funds pre-check, customer 360 balances (never cached)"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service"
       fieldsUsed: [path.id, res.availableBalancePoisha, res.ledgerBalancePoisha, res.heldPoisha, res.asOf, res.closed]
@@ -155,7 +155,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 holds section (passed through) and reconciliation of own holds (createdBy = support-service)"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service"
       fieldsUsed: [query.accountId, res.items, res.totalHeldPoisha]
@@ -165,7 +165,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/lookup"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "resolve an MSISDN to a wallet (ticket linking, 360, enquiry by msisdn)"
       identity: "forwarded STAFF headers (SERVICE support-service from event consumers / jobs)"
       fieldsUsed: [query.msisdn, query.walletType, res.walletId, res.displayNameMasked, res.walletType, res.status]
@@ -174,7 +174,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/{walletId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 wallets section, ticket linking"
       identity: "forwarded STAFF headers (downstream masking per staff roles)"
       fieldsUsed: [path.walletId, res.walletId, res.ownerType, res.ownerId, res.msisdn, res.displayName, res.language, res.status, res.statusReasonCode, res.kycTier, res.walletType, res.flags, res.version]
@@ -183,7 +183,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/customers/{customerId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 profile section"
       identity: "forwarded STAFF headers (downstream masking per staff roles; NID never in clear)"
       fieldsUsed: [path.customerId, res.customerId, res.status, res.msisdn, res.nameEn, res.nidMasked, res.kycTier, res.kycStatus, res.riskGrade, res.language, res.wallets]
@@ -192,7 +192,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/wallets/{walletId}/status-changes"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "BLOCK_WALLET / UNBLOCK_WALLET service actions forwarded with the staff member's own identity (wallet-service runs the maker-checker)"
       identity: "forwarded STAFF headers (X-Actor-Type STAFF, X-Actor-Id staffUserId, X-Actor-Roles); Idempotency-Key sa-{actionId}"
       fieldsUsed: [path.walletId, header.Idempotency-Key, req.targetStatus, req.reasonCode, req.reference, req.comment, res.changeRequestId, res.outcome, res.approvalId, res.walletStatus]
@@ -203,7 +203,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/wallets/{walletId}/flags"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "set flag 8 (HAS_OPEN_LIEN) after a support hold becomes ACTIVE; clear it when the last support hold on the wallet leaves ACTIVE"
       identity: "X-Actor-Type SERVICE, X-Actor-Id support-service (holder = support-service)"
       fieldsUsed: [path.walletId, req.set, req.clear, req.reasonCode, res.flags]
@@ -212,7 +212,7 @@ consumes:
     - producer: wallet-service
       operation: "PATCH /v1/customers/{customerId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "UPDATE_CONTACT service action (contactUpdateMode WALLET_API, default) forwarded with the staff identity; wallet-service runs the maker-checker"
       identity: "forwarded STAFF headers; Idempotency-Key sa-{actionId}"
       fieldsUsed: [path.customerId, header.Idempotency-Key, req.msisdn, req.email, req.presentAddress, req.occupation, req.incomeBand, req.sourceOfFunds, req.purposeOfAccount, req.reason, req.reference, res.changeRequestId, res.outcome, res.approvalId]
@@ -222,7 +222,7 @@ consumes:
     - producer: limits-risk-service
       operation: "GET /v1/limits/wallets/{walletId}/usage"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 limits section (passed through)"
       identity: "forwarded STAFF headers"
       fieldsUsed: [path.walletId, res.walletId, res.asOf, res.userCategory, res.kycTier, res.riskGrade, res.maxBalancePoisha, res.items]
@@ -276,7 +276,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/notifications/logs"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "customer 360 notifications section (last 30 days)"
       identity: "SERVICE support-service with the staff user's forwarded X-Actor-Roles"
       fieldsUsed: [query.walletId, query.from, query.to, query.limit, query.cursor, res.items, res.nextCursor]
@@ -285,7 +285,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/refdata/{type}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "bootstrap HOLIDAY, REASON_CODE and SYSTEM_PARAM items before refdata.events catches up"
       identity: "SYSTEM support-service"
       fieldsUsed: ["path.type", "query.limit", "query.cursor", "res.items[].type", "res.items[].code", "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
@@ -294,7 +294,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/retention/legal-holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "R2: before purging a COMPLAINT record (ticket and its disputes, consents, attachments) skip it while an ACTIVE legal hold exists"
       identity: "SYSTEM support-service"
       fieldsUsed: ["query.subjectType", "query.subjectId", "query.category", "res.items[].holdId", "res.items[].category", "res.items[].subjectType", "res.items[].subjectId", "res.items[].status"]
@@ -306,7 +306,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REVERSED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: support-service
       purpose: "lost-response reconciliation of reversal requests; match reversal_request.original_txn_ref = data.txnRef (never originalTxnRef)"
       filter: "eventType = TRANSACTION_REVERSED; other txn.events types ignored (reason FILTERED)"
@@ -316,7 +316,7 @@ consumes:
       topic: wallet.events
       eventType: WALLET_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: support-service
       purpose: "local wallet_projection (MSISDN search by hash, display); version-guarded, no inbox"
       fieldsUsed: [walletId, version, ownerType, ownerId, walletType, msisdn, displayName, language, status, statusReasonCode]
@@ -335,7 +335,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: support-service
       purpose: "business calendar (HOLIDAY, CALENDAR.*), reason-code validation (REASON_CODE), complaint retention (RETENTION.COMPLAINT)"
       filter: "type ∈ {HOLIDAY, REASON_CODE, SYSTEM_PARAM}; SYSTEM_PARAM code ∈ {CALENDAR.WEEKEND_DAYS, CALENDAR.TIMEZONE, RETENTION.COMPLAINT}"
@@ -345,7 +345,7 @@ consumes:
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: support-service.approvals
       purpose: "complete forwarded wallet service actions (APPROVED → APPLIED; REJECTED / CANCELLED → FAILED)"
       filter: "data.service = wallet-service ∧ data.entityType ∈ {WalletStatusChange, CustomerProfile}; match data.approvalId to service_action.downstream_ref"
@@ -356,7 +356,7 @@ consumes:
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: support-service.approvals
       purpose: "fail forwarded wallet service actions whose wallet-side approval expired"
       filter: "data.service = wallet-service ∧ data.entityType ∈ {WalletStatusChange, CustomerProfile}"
@@ -369,35 +369,35 @@ consumes:
       topic: notification.requests
       eventType: NOTIFICATION_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       templates: [TXN_RECEIPT, FUNDS_HELD_NOTICE, FUNDS_RELEASED_NOTICE, TICKET_UPDATE, SUPPORT_ESCALATION]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [ReversalRequest, HoldExtension, ConfigDocument]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [ReversalRequest, HoldExtension, ConfigDocument]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       entityTypes: [ReversalRequest, HoldExtension, ConfigDocument]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       auditActions: [TICKET_CREATED, TICKET_UPDATED, TICKET_ASSIGNED, TICKET_STATUS_CHANGED, TICKET_ESCALATED, TICKET_REOPENED, TICKET_COMMENTED, ATTACHMENT_UPLOADED, ATTACHMENT_DOWNLOADED, DISPUTE_OPENED, DISPUTE_RESOLVED, CONSENT_RECORDED, HOLD_PLACED, HOLD_RELEASED, HOLD_EXTENSION_REQUESTED, REVERSAL_REQUESTED, REVERSAL_APPROVAL_DECIDED, REVERSAL_EXECUTED, REVERSAL_CANCELLED, REVERSAL_RETRIED, SERVICE_ACTION_BLOCK_WALLET, SERVICE_ACTION_UNBLOCK_WALLET, SERVICE_ACTION_RESEND_RECEIPT, SERVICE_ACTION_PIN_RESET, SERVICE_ACTION_UNBIND_DEVICE, SERVICE_ACTION_UPDATE_CONTACT, CUSTOMER_360_VIEWED, CONFIG_VERSION_PROPOSED, CONFIG_ACTIVATED]
 

@@ -1,9 +1,9 @@
-# ledger-service (SVC-01) provided REST contract. contractVersion 1.0.0. Changes only via CHANGE-PROCESS.
+# ledger-service (SVC-01) provided REST contract. contractVersion 1.1.0. Changes only via CHANGE-PROCESS.
 openapi: 3.1.0
 info:
   title: ledger-service API
-  version: 1.0.0
-  description: 'Provided REST contract of ledger-service (SVC-01), contractVersion 1.0.0, kernel 1.0. The only door to TigerBeetle: business commands, account lifecycle and ledger reads. Headers, errors
+  version: 1.1.0
+  description: 'Provided REST contract of ledger-service (SVC-01), contractVersion 1.1.0, kernel 1.0. The only door to TigerBeetle: business commands, account lifecycle and ledger reads. Headers, errors
     and pagination follow kernel K3. Ledger idempotency is keyed on commandId (kernel K3.3 rule 6 exception); Idempotency-Key is optional and ignored. Money is int64 poisha. Every 128-bit id is canonical
     lower-case UUID text. Request bodies tolerate unknown fields, except the reserved names feeBearer SHARED / payerShareBps and command 13 vatPoisha, which are rejected with 400. x-actors: allowed actor
     types; for SERVICE/SYSTEM the allowed X-Actor-Id values; for STAFF the roles (''*'' = any K7 role).'
@@ -1270,20 +1270,180 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-bill-payment:
+    post:
+      operationId: command_post_bill_payment
+      summary: 'Command 18 post-bill-payment: Bill payment (customer -> biller)'
+      description: 'Ledger command type 18. Guard: from 100 -> to 150. Principal code 1017. Leg pattern of commands 1-6 (principal, FEE 2001, VAT 2002, COMMISSION 2003, AIT 2004, technical bounds legs). Reversible
+        by post-reversal. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type
+        SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 18
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3e2-0000-7000-8000-000000000001
+              txnRef: BP26101400K7M2Q9XA
+              fromAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              toAccountId: 0192f2ee-0000-7000-8000-00000000e006
+              amountPoisha: 120000
+              pricing:
+                feePoisha: 500
+                vatPoisha: 75
+                feeBearer: PAYER
+                commissionPoisha: 0
+                commissionSource: null
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints: null
+              metadata:
+                channel: APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3e2-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 6e842c27-8041-53a9-bf9b-da45f13489ca
+                    - 769b1f8d-9d0e-66f2-8bd6-5ec5a628b60c
+                    - b73d137a-0db5-ac9c-e8b9-75d5d844d8d1
+                    postedAt: '2026-10-14T09:12:40.118Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-recharge:
+    post:
+      operationId: command_post_recharge
+      summary: 'Command 19 post-recharge: Mobile recharge (customer -> operator biller)'
+      description: 'Ledger command type 19. Guard: from 100 -> to 150. Principal code 1018. Leg pattern of commands 1-6 (principal, FEE 2001, VAT 2002, COMMISSION 2003, AIT 2004, technical bounds legs). Reversible
+        by post-reversal. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type
+        SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 19
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3e3-0000-7000-8000-000000000001
+              txnRef: RC26101400H4T8W3ZD
+              fromAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              toAccountId: 0192f2ee-0000-7000-8000-00000000e007
+              amountPoisha: 5000
+              pricing:
+                feePoisha: 0
+                vatPoisha: 0
+                feeBearer: OPERATOR
+                commissionPoisha: 0
+                commissionSource: null
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints: null
+              metadata:
+                channel: APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3e3-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - a847315f-4048-d028-13bd-b433f171cf75
+                    postedAt: '2026-10-14T09:20:05.031Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
   /v1/ledger/accounts:
     post:
       operationId: createAccount
       summary: Create a ledger account (idempotent)
       tags:
       - accounts
-      description: 'Creates a TB account for a wallet (types 100-140) or a TRUST_SETTLEMENT instance (300). Idempotent on accountId: EXISTS when TB answers exists. 201 is never used so retries look identical.
+      description: 'Creates a TB account for a wallet (types 100-140, 150) or a TRUST_SETTLEMENT instance (300). Idempotent on accountId: EXISTS when TB answers exists. 201 is never used so retries look identical.
         Writes ledger_account + audit LEDGER_ACCOUNT_CREATED in one DB transaction after TB ok/exists.'
       x-audience: service
       x-actors:
       - type: SERVICE
         ids:
         - wallet-service
-        rule: wallet types 100-140
+        rule: wallet types 100-140, 150
       - type: SERVICE
         ids:
         - treasury-service
@@ -1837,6 +1997,9 @@ paths:
                 - accountType: INSTITUTION_WALLET
                   balancePoisha: 0
                   source: PROJECTION
+                - accountType: BILLER_WALLET
+                  balancePoisha: 0
+                  source: PROJECTION
                 projectionAsOf: '2026-10-09T08:04:59.870Z'
                 projectionLagMs: 130
                 identityHolds: true
@@ -2247,7 +2410,7 @@ components:
           $ref: '#/components/schemas/Constraints'
         metadata:
           $ref: '#/components/schemas/CommandMetadata'
-      description: Body of commands 1-6 (post-p2p, post-cash-in, post-cash-out, post-merchant-payment, post-merchant-refund, post-float-transfer).
+      description: Body of commands 1-6 (post-p2p, post-cash-in, post-cash-out, post-merchant-payment, post-merchant-refund, post-float-transfer), 18 (post-bill-payment) and 19 (post-recharge).
     ReversalCommandRequest:
       type: object
       additionalProperties: true
@@ -2273,7 +2436,7 @@ components:
           type: string
           format: uuid
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
-          description: Original command; type in {1-6, 8 (row commandId), 12}; other => REJECTED OTHER NOT_REVERSIBLE; unknown => REJECTED ORIGINAL_NOT_FOUND
+          description: Original command; type in {1-6, 8 (row commandId), 12, 18, 19}; other => REJECTED OTHER NOT_REVERSIBLE; unknown => REJECTED ORIGINAL_NOT_FOUND
         reverseFee:
           type: boolean
           description: Mirror original legs 1-2. Must be false when partial and for pricing-service.
@@ -2735,7 +2898,7 @@ components:
           format: date-time
           pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
           description: Null when REJECTED; for EXISTS the original posting time (leg 0)
-      description: Single command response (types 1-7, 9-17), HTTP 200 for OK, EXISTS and REJECTED.
+      description: Single command response (types 1-7, 9-19), HTTP 200 for OK, EXISTS and REJECTED.
     DisbursementBatchResponse:
       type: object
       additionalProperties: true
@@ -2774,6 +2937,7 @@ components:
           - DISTRIBUTOR_WALLET
           - MERCHANT_WALLET
           - INSTITUTION_WALLET
+          - BILLER_WALLET
           - TRUST_SETTLEMENT
         ownerType:
           type: string
@@ -2783,8 +2947,9 @@ components:
           - DISTRIBUTOR
           - MERCHANT
           - INSTITUTION
+          - BILLER
           - SYSTEM
-          description: 'Must match: CUSTOMER<->100, AGENT<->110, DISTRIBUTOR<->120, MERCHANT<->130, INSTITUTION<->140, SYSTEM<->300'
+          description: 'Must match: CUSTOMER<->100, AGENT<->110, DISTRIBUTOR<->120, MERCHANT<->130, INSTITUTION<->140, BILLER<->150, SYSTEM<->300'
     CreateAccountResponse:
       type: object
       additionalProperties: true
@@ -2942,7 +3107,7 @@ components:
           type: integer
           format: int32
           minimum: 1
-          maximum: 17
+          maximum: 19
           description: codes.yaml commandType
         debitAccountId:
           type: string
@@ -3054,7 +3219,7 @@ components:
           type: integer
           format: int32
           minimum: 1
-          maximum: 17
+          maximum: 19
         legIndex:
           type: integer
           format: int32
@@ -3267,7 +3432,7 @@ components:
           description: All wallets + e-money system accounts = trustMirrorTotalPoisha (exact)
         byWalletType:
           type: array
-          description: One per wallet type 100-140; eventually consistent (CDC projection)
+          description: One per wallet type 100-150; eventually consistent (CDC projection)
           items:
             type: object
             additionalProperties: true

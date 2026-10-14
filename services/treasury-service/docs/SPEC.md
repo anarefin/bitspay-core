@@ -4,7 +4,7 @@
 |---|---|
 | Service | `treasury-service` (`spring.application.name`) |
 | Number / owner | SVC-07 · Dev-1 (single module; Dev-1 also owns ledger-service but builds treasury only against the ledger contract and stubs) |
-| Layer / release | Ledger & money control (back office) · R1 (trust rebalance and LIQ-008 liquidity points: R2) |
+| Layer / release | Ledger & money control (back office) · MVP (e-money issuance with its trust-account / confirmation prerequisite, agent float request / approval) · R1 (redemption, manual journals, trust interest, liquidity monitoring, reports and dashboards) · R2 (trust rebalance and LIQ-008 liquidity points) |
 | contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8107 · management 9107 |
@@ -37,6 +37,8 @@ treasury-service is where Finance and Operations control **how e-money enters an
 - E-money regulatory datasets (EMY-008) as STAFF-only APIs backed by a daily snapshot.
 - Local maker-checker (kernel K5) with 8 entity types, `approval.events`, `audit.events`, notifications, encrypted evidence attachments.
 
+**Release split (CR-TREASURY-1, SRS v1.2).** **MVP:** e-money issuance (maker-checker, bank evidence, EMY-009 hard control) together with its prerequisite trust account registry and trust balance confirmations, and agent float requests (TOP_UP / RETURN with the PARENT, TOP_UP from the OPERATOR via issuance) with their approval and execution through `POST /v1/payments/float-transfer` (admin switch `FLOAT_TRANSFER` stays enabled). **R1+:** everything else — redemption and BANK float returns, manual journals, trust interest, trust positions, liquidity monitoring / thresholds / incidents, dashboards, daily snapshot and regulatory reports; trust rebalance stays R2. R1+ operations stay in the contract and answer 501 until their WP is built.
+
 ### 1.3 Out of scope / deferred
 
 | Deferred item | Replacement now |
@@ -50,6 +52,7 @@ treasury-service is where Finance and Operations control **how e-money enters an
 | Settlement-bank cut-off (`CUTOFF.SETTLEMENT_BANK`) | not read; no rule uses it (OPEN D-49) |
 | Customer-wallet redemption / bank closure payout for customers | not available (ledger redeem sources exclude customer wallets) |
 | Consuming `txn.events` for float correlation | not consumed; the synchronous float-transfer answer plus same-key retries and the `GET /v1/transactions` lookup are enough |
+| Everything outside the MVP split of §1.2 (redemption, BANK float return, manual journals, trust interest, liquidity monitoring, dashboards, snapshot, reports) — R1+ | operations stay in the contract and return 501 in the MVP build; no LOW-float alerts in the MVP (agents raise float requests themselves) |
 
 ### 1.4 This service must NEVER
 1. Change a balance itself or talk to TigerBeetle. All money moves through ledger commands or transaction-service float transfers.
@@ -63,28 +66,30 @@ treasury-service is where Finance and Operations control **how e-money enters an
 
 ## 2. SRS traceability
 
+Baseline: SRS v1.2 (14 Oct 2026). "· MVP" marks rows the MVP release delivers; unmarked rows are R1+ (CR-TREASURY-1).
+
 | SRS ID | Requirement (short) | Covered by |
 |---|---|---|
-| EMY-001 | Issue only on confirmed receipt into trust | BR-07-20..26; `POST /v1/treasury/emoney-issuances`; WP-3 |
+| EMY-001 | Issue only on confirmed receipt into trust | BR-07-20..26; `POST /v1/treasury/emoney-issuances`; WP-3 · MVP |
 | EMY-002 | Redemption on withdrawal / settlement / closure | BR-07-30..35; `POST /v1/treasury/emoney-redemptions`, `:mark-paid`; `EMONEY_REDEEMED`, `EMONEY_REDEMPTION_PAID_OUT`; WP-4 |
-| EMY-003 | Maker-checker with bank evidence (auto bank path deferred) | BR-07-23, BR-07-70..72; attachments; WP-1, WP-3 |
-| EMY-004 | 1:1 backing, reconciled daily | BR-07-20/21 hard control; BR-07-80 snapshot; `TRUST_BALANCE_CONFIRMED`; WP-2, WP-7 |
-| EMY-005 | Multiple trust banks, per-account attribution | BR-07-01..03; one ledger trust account per bank account; WP-2 |
+| EMY-003 | Maker-checker with bank evidence (auto bank path deferred) | BR-07-23, BR-07-70..72; attachments; WP-1, WP-3 · MVP |
+| EMY-004 | 1:1 backing, reconciled daily | BR-07-20/21 hard control; BR-07-80 snapshot; `TRUST_BALANCE_CONFIRMED`; WP-2, WP-7 · MVP (hard control; daily snapshot R1+) |
+| EMY-005 | Multiple trust banks, per-account attribution | BR-07-01..03; one ledger trust account per bank account; WP-2 · MVP |
 | EMY-006 | Inter-bank rebalancing (R2) | BR-07-36; `TRUST_REBALANCED`; WP-4 |
-| EMY-007 | Fully auditable issuance / destruction | entity records (maker, checkers, evidence hashes, bank refs, ledger ids); `audit.events`; `EMONEY_*` events |
+| EMY-007 | Fully auditable issuance / destruction | entity records (maker, checkers, evidence hashes, bank refs, ledger ids); `audit.events`; `EMONEY_*` events · MVP |
 | EMY-008 | Regulatory e-money reports (incl. trust interest) | BR-07-80/81; `GET /v1/treasury/reports/*`; `TRUST_INTEREST_RECORDED` (OPEN D-23); WP-7 |
-| EMY-009 | Hard control: liability ≤ confirmed trust (+ tolerance 0) | BR-07-20/22 under per-trust-account lock; WP-3 |
+| EMY-009 | Hard control: liability ≤ confirmed trust (+ tolerance 0) | BR-07-20/22 under per-trust-account lock; WP-3 · MVP |
 | LIQ-001 | Real-time partner float dashboard, hierarchy, map | BR-07-60/61; `/v1/liquidity/positions`, `/hierarchy`, `/territory-summary`; WP-6, WP-7 |
 | LIQ-002 | Low / high thresholds with alerts | BR-07-62..65; `/v1/liquidity/thresholds`; `LIQUIDITY_THRESHOLD_BREACHED`; WP-6 |
-| LIQ-003 | Float top-up workflow | BR-07-41..48; `/v1/float-requests`; WP-5 |
-| LIQ-004 | Float return / redeem to bank | BR-07-45..47 (RETURN to PARENT / BANK); WP-5 |
+| LIQ-003 | Float top-up workflow | BR-07-41..48; `/v1/float-requests`; WP-5 · MVP |
+| LIQ-004 | Float return / redeem to bank | BR-07-45..47 (RETURN to PARENT / BANK); WP-5 · MVP (RETURN to PARENT; BANK return R1+) |
 | LIQ-005 | Settlement (trust) balances in dashboards | `GET /v1/treasury/trust-accounts/positions`; WP-2 |
 | LIQ-006 | Liquidity pattern reports, stock-outs | BR-07-65/66; `float_daily_stat`, incidents, utilisation report; WP-6, WP-7 |
 | LIQ-007 | Shortfall prediction (R3) | deferred |
 | LIQ-008 | Super-agent / liquidity points (R2) | threshold flag `liquidityPoint`; counterparty `LIQUIDITY_POINT` reserved (OPEN D-28) |
-| BOM-004/005 | Maker-checker, multi-level, expiry | BR-07-70..72; `/v1/approvals`; WP-1 |
+| BOM-004/005 | Maker-checker, multi-level, expiry | BR-07-70..72; `/v1/approvals`; WP-1 · MVP |
 | BOM-006 | Manual journals between system accounts, evidence, dual approval | BR-07-50..52; `MANUAL_JOURNAL_POSTED`; WP-4 |
-| AGT-005 | Agent requests float top-up / returns excess | float requests; WP-5 |
+| AGT-005 | Agent requests float top-up / returns excess | float requests; WP-5 · MVP |
 | REC-009 | Daily e-money reconciliation (inputs) | `TRUST_BALANCE_CONFIRMED` (CLOSING), `EMONEY_*`, `TRUST_REBALANCED`, `MANUAL_JOURNAL_POSTED` events |
 
 ## 3. Architecture
@@ -4918,48 +4923,51 @@ See §6.5.1. Product switches: treasury owns no `FEATURE.<PRODUCT>` and reads no
 
 Everything runs against WireMock stubs (`stubs/`) and event fixtures (`fixtures/events/`) with Testcontainers PostgreSQL 18 + Kafka. Each WP ends with `./gradlew check` green, OpenAPI drift check green, `docs/PROGRESS.md` updated.
 
-### WP-1 Skeleton and contracts
+### [MVP] WP-1 Skeleton and contracts
 - Goal: an empty but contract-true service.
 - Scope: Gradle project from the build template; Flyway `V1__init.sql` (§4.1) incl. outbox, `processed_event`, `idempotency_record`; `ActorContext` + `@RequiresActor`; problem model with `reason`; idempotency filter (BR-07-00c); every §5.1 operation served from `contracts/provided/openapi.yaml` (501 until implemented); outbox writer + polling relay; consumer base with retries / DLQ / ignored-metric; `ApprovalEngine` with the policy table §7.7, `/v1/approvals` endpoints, `approval.events`, `audit.events`, expiry and ageing jobs; `ObjectStore` (LocalFs) + `FieldCipher`; attachments upload / download; concrete `Http*Client` classes for ledger, transaction, wallet, admin, pointed at WireMock `stubs/` in tests and profile `local`; refdata consumer + bootstrap.
 - Acceptance: `approval_checkerEqualsMaker_rejected422`, multi-level, expiry tests green; provider contract tests validate `/v1/approvals` and attachments against the OpenAPI; Flyway idempotent; role cannot read another schema.
 - Depends on: —. SRS BOM-004, BOM-005, EMY-007 (foundation).
 
-### WP-2 Trust accounts and balance confirmations
+### [MVP] WP-2 Trust accounts and balance confirmations
 - Scope: trust account create / approve / ledger account creation (BR-07-01..03) + retry job; deactivation; manual confirmations; statement upload with CSV / MT940 / camt.053 parsers (BR-07-11, BR-07-12a); `TRUST_BALANCE_CONFIRMED`; staleness job; positions endpoint (LIQ-005); trust interest (BR-07-53, `TRUST_INTEREST_RECORDED`).
 - Acceptance: trust #01 created (ledger stub called with `…030001`); MT940 golden file closing 1,000,000.00 → `100000000` CLOSING after approval; event validates against its schema; parser golden files pass; interest correction supersedes.
 - Depends on: WP-1. SRS EMY-005, EMY-001 (confirmation), LIQ-005, EMY-008 (interest).
+- MVP part: trust accounts and balance confirmations (the EMY-009 prerequisite of WP-3); the positions endpoint (LIQ-005) and trust interest are R1+ and may stay 501 in the MVP build.
 
-### WP-3 E-money issuance with hard control
+### [MVP] WP-3 E-money issuance with hard control
 - Scope: issuance create / cancel / list, wallet validation, bank-reference uniqueness, statement-line evidence; execution on final approval (lock, `HardControl`, ledger post, outcome mapping, `EMONEY_ISSUED`, notifications); `PostingResolverJob` (ADR-T3, BR-07-25b); BR-07-22 blocking.
 - Acceptance: `issuance_exceedsConfirmed_controlFailed`, `issuance_concurrentTwoApprovals_onlyOnePassesControl`, `issuance_ledgerTimeout_postingUnknown_thenResolvedPosted`, `issuance_ledgerTimeout_notFound_rePostSameCommandId`, `issuance_resolverFindsJournaledRejection_rejectedByLedger` green; cast step 3 (2-level variant) passes against stubs.
 - Depends on: WP-2. SRS EMY-001, EMY-003, EMY-007, EMY-009.
 
-### WP-4 Redemption, manual journals, trust rebalance
+### [R1+] WP-4 Redemption, manual journals, trust rebalance
 - Scope: redemption incl. system-account sources, closure redemption, `:mark-paid` + `EMONEY_REDEMPTION_PAID_OUT`; manual journals (BR-07-50..52); trust rebalance (R2) with two-row locking, control on `to`, `TRUST_REBALANCED`; `emoney-movements` endpoint.
 - Acceptance: redemption `INSUFFICIENT_FUNDS` from stub → `REJECTED_BY_LEDGER`; journal with TRUST account → 400; same checker twice → 422; rebalance posts the correct body; PAID_OUT event emitted once.
 - Depends on: WP-3. SRS EMY-002, EMY-006, BOM-006.
 
-### WP-5 Partner projection and float requests
+### [MVP] WP-5 Partner projection and float requests
 - Scope: `partner.events` consumer → `partner_projection` (version guard, null wallet rule), `partnerWalletSet`; float request API + state machine (BR-07-41..48), allowed pairs, actor capture and forwarding, execution, retries, 24 h / 72 h key rules, STUCK, OPERATOR / BANK paths linked to issuance / redemption; `FLOAT_REQUEST_UPDATED` + notifications.
 - Acceptance: Salma → Padma top-up approved by Padma → float-transfer stub called once with `Idempotency-Key = requestId` and DISTRIBUTOR headers; 503 then 200 → COMPLETED; 400 pair refusal → FAILED; self-approval → 403; OPERATOR top-up completes when the linked issuance is POSTED; > 24 h retry looks up `GET /v1/transactions` first.
 - Depends on: WP-4. SRS LIQ-003, LIQ-004, AGT-005.
+- MVP part: builds on WP-3 (WP-4 is R1+): PARENT top-up / return and OPERATOR top-up via issuance; the BANK return path (linked redemption) lands with WP-4 in R1+.
 
-### WP-6 Liquidity monitoring and thresholds
+### [R1+] WP-6 Liquidity monitoring and thresholds
 - Scope: `ledger.changes` batch consumer, positions with TB-timestamp guard, daily stats, snapshot bootstrap, drift job; thresholds CRUD with maker-checker; evaluator, incidents, events, notifications, re-alerts, stock-out.
 - Acceptance: fixtures take Salma 6,000 → 4,500 Tk → one `LIQUIDITY_THRESHOLD_BREACHED` + 3 notifications; duplicated / out-of-order fixtures leave the highest-timestamp value; 5,400 Tk stays LOW, 5,600 Tk → NORMAL and incident closed; replay test of 200k events sustains the §9 rate on the reference machine.
 - Depends on: WP-5. SRS LIQ-001, LIQ-002, LIQ-006.
 
-### WP-7 Dashboards, reports and daily snapshot
+### [R1+] WP-7 Dashboards, reports and daily snapshot
 - Scope: positions / hierarchy / territory endpoints, utilisation report, incidents list; `EmoneySnapshotJob` (BR-07-80) and daily / monthly reports (BR-07-81); partition maintenance.
 - Acceptance: hierarchy roll-up = Σ descendant positions in a 3-level fixture tree; daily report reproduces the cast numbers; `movement_consistent = false` raised when a stubbed balance sheet shows an unexplained trust movement; a `CUTOFF.EOD = 02:00` fixture shifts business dates correctly.
 - Depends on: WP-6. SRS LIQ-001, LIQ-005, LIQ-006, EMY-008.
 
-### WP-8 Compose integration
+### [MVP] WP-8 Compose integration
 - Scope: switch clients to the real ledger / transaction / wallet / admin services in the Compose stack; subscribe to the real topics; walk by hand: seed step 3 (trust account, 1,000,000 Tk confirmed, issuance to Padma), float Padma → Salma via a float request, a LOW alert for Salma, the daily snapshot.
 - Acceptance: the scenario steps pass on the stack (milestone checklist); `ledger.changes` lag < 5 s during the walk-through.
+- MVP part: the walk-through covers trust account, confirmation, issuance and the Padma → Salma float request; the LOW alert and daily snapshot steps are repeated when WP-6 / WP-7 land (R1+).
 - Depends on: WP-7.
 
-### WP-9 Hardening
+### [MVP] WP-9 Hardening
 - Scope: chaos by hand (ledger down during approval, transaction down during execution, Kafka down), PII log-scan test, review of cipher usage, `docs/TRACEABILITY.md`.
 - Acceptance: §9 behaviours observed; no PII in logs; DoD complete.
 - Depends on: WP-8. SRS EMY-007, EMY-009 (evidence).
@@ -5006,7 +5014,7 @@ Everything runs against WireMock stubs (`stubs/`) and event fixtures (`fixtures/
 | OPEN D-16 | Ledger 400-vs-REJECTED, journaled rejections, account-type guards | applied as the ledger states them | §6.1, ADR-T3 |
 | OPEN D-30 | Consumer group-id pattern | `treasury-service.ledger-changes`, `treasury-service.partner-projection`, `treasury-service.refdata` | §3.3, `contract.yaml` |
 
-**Deferred items (interim behaviour):** bank APIs (manual entry); LIQ-007 prediction (none); incident-close event (STAFF list only); liquidity-point float (R2 change to float transfers needed first); customer bank closure payout (not available).
+**Deferred items (interim behaviour):** MVP release (CR-TREASURY-1): redemption, BANK float return, manual journals, trust interest, trust positions, liquidity monitoring / alerts, dashboards, snapshot and reports are R1+ (501 in the MVP build; agents raise float requests without LOW alerts); bank APIs (manual entry); LIQ-007 prediction (none); incident-close event (STAFF list only); liquidity-point float (R2 change to float transfers needed first); customer bank closure payout (not available).
 
 **Assumptions:**
 1. All approval thresholds, float limits, liquidity thresholds and the tolerance are provisional seeds pending Finance / Operations (SRS Appendix B-05 / B-09); they are configuration only.
@@ -5030,3 +5038,4 @@ Everything runs against WireMock stubs (`stubs/`) and event fixtures (`fixtures/
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-07 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit (§4.6) + GL impact (no change) |
+| 1.0.0 | 2026-10-14 | CR-TREASURY-1 | Kind A (no contract change): MVP scope tagging against SRS v1.2 — e-money issuance (with trust accounts / confirmations) and agent float requests are MVP, everything else R1+ (trust rebalance R2); §2 baseline SRS v1.2 with MVP markers; §10 WPs tagged [MVP] / [R1+] |

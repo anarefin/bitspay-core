@@ -1,11 +1,11 @@
-# general-ledger-service — provided REST contract (v6 pack, contractVersion 1.0.0). OpenAPI 3.1.
+# general-ledger-service — provided REST contract (v6 pack, contractVersion 2.0.0). OpenAPI 3.1.
 # Every operation: x-audience, x-actors, operationId, per-operation problem reasons, request/2xx examples.
 openapi: 3.1.0
 info:
   title: general-ledger-service
-  version: 1.0.0
+  version: 2.0.0
   description: 'Provided REST contract of general-ledger-service (SVC-16): the Operator''s books. Chart of accounts, posting rules, journals,
-    GL days and control totals, periods and fiscal years, reports, ERP export, exceptions and the maker-checker approval API. Kernel rules apply
+    GL days and control totals, periods and fiscal years, reports, exceptions and the maker-checker approval API. Kernel rules apply
     (headers K3.1, idempotency K3.3, pagination K3.4, problem+json K3.6). Every operation carries x-audience and x-actors; x-actors lists the
     allowed actor types with STAFF roles, or the allowed X-Actor-Id values for SERVICE callers. Read-only operations take no Idempotency-Key.
     Every list and report operation that declares text/csv also answers Accept: text/csv.'
@@ -19,7 +19,6 @@ tags:
 - name: Days
 - name: Periods
 - name: Reports
-- name: Exports
 - name: Exceptions
 - name: Approvals
 - name: Internal
@@ -615,7 +614,7 @@ paths:
               $ref: '#/components/schemas/RuleSetRequest'
             example:
               effectiveFrom: '2026-11-01'
-              description: 'Rule set 2: MDR to new account 4108'
+              description: 'Rule set 2: MDR to new account 4110'
               rules:
               - id: W-100
                 priority: 100
@@ -637,7 +636,7 @@ paths:
                 legIndex: null
                 reasonCode: null
                 counterpartyAccountType: null
-                glAccount: '4108'
+                glAccount: '4110'
                 note: MDR income
       responses:
         '202':
@@ -727,7 +726,7 @@ paths:
               $ref: '#/components/schemas/RuleSetRequest'
             example:
               effectiveFrom: '2026-11-01'
-              description: 'Rule set 2: MDR to new account 4108'
+              description: 'Rule set 2: MDR to new account 4110'
               rules:
               - id: W-100
                 priority: 100
@@ -749,7 +748,7 @@ paths:
                 legIndex: null
                 reasonCode: null
                 counterpartyAccountType: null
-                glAccount: '4108'
+                glAccount: '4110'
                 note: MDR income
       responses:
         '200':
@@ -3313,324 +3312,6 @@ paths:
         - FIN_CHECKER
         - AUDITOR
       x-idempotency: none (read-only or naturally idempotent)
-  /v1/gl/exports:
-    get:
-      summary: List ERP exports
-      tags:
-      - Exports
-      parameters:
-      - $ref: '#/components/parameters/XActorType'
-      - $ref: '#/components/parameters/XActorId'
-      - $ref: '#/components/parameters/XActorRoles'
-      - $ref: '#/components/parameters/XChannel'
-      - $ref: '#/components/parameters/XCorrelationId'
-      - name: fromDate
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - name: toDate
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Cursor'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GlExportPage'
-              example:
-                items:
-                - businessDate: '2026-10-09'
-                  exportVersion: 1
-                  glDayRevision: 1
-                  status: GENERATED
-                  format: GENERIC_CSV_V1
-                  fileName: GL_20261009_v1.csv
-                  sha256: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
-                  lineCount: 23
-                  totalDebitPoisha: 110237509
-                  totalCreditPoisha: 110237509
-                  failureReason: null
-                  generatedAt: '2026-10-09T18:16:04.010Z'
-                nextCursor: null
-        '400':
-          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR, RANGE_TOO_LARGE}
-          content:
-            application/problem+json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/Problem'
-                - type: object
-                  properties:
-                    reason:
-                      type:
-                      - string
-                      - 'null'
-                      enum:
-                      - INVALID_CURSOR
-                      - RANGE_TOO_LARGE
-                      - null
-        '403':
-          description: ACTOR_NOT_ALLOWED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '503':
-          description: DEPENDENCY_UNAVAILABLE
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      operationId: listExports
-      x-audience: staff
-      x-actors:
-      - type: STAFF
-        roles:
-        - FIN_MAKER
-        - FIN_CHECKER
-        - AUDITOR
-      x-idempotency: none (read-only or naturally idempotent)
-  /v1/gl/exports/{businessDate}:
-    get:
-      summary: Latest export of a day
-      tags:
-      - Exports
-      parameters:
-      - $ref: '#/components/parameters/XActorType'
-      - $ref: '#/components/parameters/XActorId'
-      - $ref: '#/components/parameters/XActorRoles'
-      - $ref: '#/components/parameters/XChannel'
-      - $ref: '#/components/parameters/XCorrelationId'
-      - name: businessDate
-        in: path
-        required: true
-        schema:
-          type: string
-          format: date
-        description: Asia/Dhaka business date (CUTOFF.EOD)
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GlExport'
-              example:
-                businessDate: '2026-10-09'
-                exportVersion: 1
-                glDayRevision: 1
-                status: GENERATED
-                format: GENERIC_CSV_V1
-                fileName: GL_20261009_v1.csv
-                sha256: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
-                lineCount: 23
-                totalDebitPoisha: 110237509
-                totalCreditPoisha: 110237509
-                failureReason: null
-                generatedAt: '2026-10-09T18:16:04.010Z'
-        '400':
-          description: VALIDATION_FAILED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '403':
-          description: ACTOR_NOT_ALLOWED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '404':
-          description: NOT_FOUND
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '503':
-          description: DEPENDENCY_UNAVAILABLE
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      operationId: getExport
-      x-audience: staff
-      x-actors:
-      - type: STAFF
-        roles:
-        - FIN_MAKER
-        - FIN_CHECKER
-        - AUDITOR
-      x-idempotency: none (read-only or naturally idempotent)
-  /v1/gl/exports/{businessDate}/versions/{n}/file:
-    get:
-      summary: Download an export file
-      tags:
-      - Exports
-      parameters:
-      - $ref: '#/components/parameters/XActorType'
-      - $ref: '#/components/parameters/XActorId'
-      - $ref: '#/components/parameters/XActorRoles'
-      - $ref: '#/components/parameters/XChannel'
-      - $ref: '#/components/parameters/XCorrelationId'
-      - name: businessDate
-        in: path
-        required: true
-        schema:
-          type: string
-          format: date
-        description: Asia/Dhaka business date (CUTOFF.EOD)
-      - name: n
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            text/csv:
-              schema:
-                type: string
-              example: 'journal_date,journal_ref,line_no,gl_account_code,gl_account_name,debit_amount,credit_amount,currency,narration,source_code,transfer_count
-
-                2026-10-09,GLJ-20261009-L-R1,1,4101,Fee income - P2P,,5.00,BDT,P2P FEE,2001,1
-
-                #TRAILER,lines=1,total_debit=0.00,total_credit=5.00,transfers=1,gl_revision=1,certification=CERTIFIED
-
-                '
-        '400':
-          description: VALIDATION_FAILED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '403':
-          description: ACTOR_NOT_ALLOWED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '404':
-          description: NOT_FOUND
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '503':
-          description: DEPENDENCY_UNAVAILABLE
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      operationId: downloadExportFile
-      x-audience: staff
-      x-actors:
-      - type: STAFF
-        roles:
-        - FIN_MAKER
-        - FIN_CHECKER
-        - AUDITOR
-      x-idempotency: none (read-only or naturally idempotent)
-  /v1/gl/exports/{businessDate}:regenerate:
-    post:
-      summary: Regenerate a day's export (maker-checker GlExport)
-      tags:
-      - Exports
-      parameters:
-      - $ref: '#/components/parameters/XActorType'
-      - $ref: '#/components/parameters/XActorId'
-      - $ref: '#/components/parameters/XActorRoles'
-      - $ref: '#/components/parameters/XActorUserId'
-      - $ref: '#/components/parameters/XChannel'
-      - $ref: '#/components/parameters/XCorrelationId'
-      - $ref: '#/components/parameters/IdempotencyKey'
-      - name: businessDate
-        in: path
-        required: true
-        schema:
-          type: string
-          format: date
-        description: Asia/Dhaka business date (CUTOFF.EOD)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReasonRequest'
-            example:
-              reason: ERP import rejected version 1; regenerate after the fix
-      responses:
-        '202':
-          description: Accepted — approval created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApprovalRef'
-              example:
-                approvalId: 0192f701-0000-7000-8000-000000000001
-                entityType: GlExport
-                entityId: '2026-10-09'
-                status: PENDING
-                requiredLevels: 1
-                checkerRoles:
-                - FIN_CHECKER
-                expiresAt: '2026-10-13T09:30:00.120Z'
-        '400':
-          description: VALIDATION_FAILED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '403':
-          description: ACTOR_NOT_ALLOWED
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '404':
-          description: NOT_FOUND
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-        '409':
-          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAY_NOT_CLOSED}; IDEMPOTENCY_CONFLICT when the key was used with another
-            payload
-          content:
-            application/problem+json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/Problem'
-                - type: object
-                  properties:
-                    reason:
-                      type:
-                      - string
-                      - 'null'
-                      enum:
-                      - DAY_NOT_CLOSED
-                      - null
-        '503':
-          description: DEPENDENCY_UNAVAILABLE
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      operationId: regenerateExport
-      x-audience: staff
-      x-actors:
-      - type: STAFF
-        roles:
-        - FIN_MAKER
-      x-idempotency: Idempotency-Key required (kernel K3.3)
   /v1/gl/exceptions:
     get:
       summary: List GL exceptions
@@ -4478,7 +4159,7 @@ components:
         tbAccountType:
           type: integer
           format: int32
-          description: ledger account type code (100..140 wallets, 200..240 and 400..420 system, 300 trust)
+          description: ledger account type code (100..150 wallets, 200..240 and 400..420 system, 300 trust)
         side:
           type:
           - string
@@ -4492,13 +4173,13 @@ components:
           - integer
           - 'null'
           format: int32
-          description: ledger transfer code (1001..1016, 2001..2004)
+          description: ledger transfer code (1001..1018, 2001..2004)
         commandType:
           type:
           - integer
           - 'null'
           format: int32
-          description: 1..17
+          description: 1..19
         legIndex:
           type:
           - integer
@@ -4515,7 +4196,7 @@ components:
           - integer
           - 'null'
           format: int32
-          description: ledger account type code (100..140 wallets, 200..240 and 400..420 system, 300 trust)
+          description: ledger account type code (100..150 wallets, 200..240 and 400..420 system, 300 trust)
         glAccount:
           type: string
           description: postable code or template `1101-{nn}`
@@ -5699,76 +5380,6 @@ components:
       - items
       - nextCursor
       additionalProperties: true
-    GlExport:
-      type: object
-      properties:
-        businessDate:
-          type: string
-          format: date
-        exportVersion:
-          type: integer
-          format: int32
-        glDayRevision:
-          type: integer
-          format: int32
-        status:
-          type: string
-          enum:
-          - GENERATING
-          - GENERATED
-          - FAILED
-          - SUPERSEDED
-        format:
-          type: string
-          description: '`GENERIC_CSV_V1` (ERP-specific formats are added behind the format SPI)'
-        fileName:
-          type:
-          - string
-          - 'null'
-          description: '`GL_{yyyyMMdd}_v{n}.csv`'
-        sha256:
-          type:
-          - string
-          - 'null'
-        lineCount:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        totalDebitPoisha:
-          type:
-          - integer
-          - 'null'
-          format: int64
-        totalCreditPoisha:
-          type:
-          - integer
-          - 'null'
-          format: int64
-        failureReason:
-          type:
-          - string
-          - 'null'
-        generatedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
-      required:
-      - businessDate
-      - exportVersion
-      - glDayRevision
-      - status
-      - format
-      - fileName
-      - sha256
-      - lineCount
-      - totalDebitPoisha
-      - totalCreditPoisha
-      - failureReason
-      - generatedAt
-      additionalProperties: true
     GlException:
       type: object
       properties:
@@ -6138,20 +5749,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FiscalYear'
-        nextCursor:
-          type:
-          - string
-          - 'null'
-    GlExportPage:
-      type: object
-      required:
-      - items
-      - nextCursor
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/GlExport'
         nextCursor:
           type:
           - string

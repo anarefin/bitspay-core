@@ -1,18 +1,18 @@
 service: general-ledger-service
-generatedAt: '2026-10-13T15:47:28Z'
+generatedAt: '2026-10-14T13:05:17Z'
 pins:
 - producer: admin-service
   pinnedContractVersion: 1.0.0
-  producerContractVersionAtSnapshot: 1.0.0
+  producerContractVersionAtSnapshot: 1.1.0
 - producer: finance-ops-service
   pinnedContractVersion: 1.0.0
   producerContractVersionAtSnapshot: 1.0.0
 - producer: ledger-service
-  pinnedContractVersion: 1.0.0
-  producerContractVersionAtSnapshot: 1.0.0
+  pinnedContractVersion: 1.1.0
+  producerContractVersionAtSnapshot: 1.1.0
 - producer: treasury-service
   pinnedContractVersion: 1.0.0
   producerContractVersionAtSnapshot: 1.0.0
 - producer: wallet-service
-  pinnedContractVersion: 1.0.0
-  producerContractVersionAtSnapshot: 1.0.0
+  pinnedContractVersion: 1.1.0
+  producerContractVersionAtSnapshot: 1.1.0

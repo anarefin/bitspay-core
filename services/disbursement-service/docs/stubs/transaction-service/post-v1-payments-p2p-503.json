@@ -45,6 +45,6 @@
   "metadata": {
     "generatedBy": "contracts.py snapshot",
     "producer": "transaction-service",
-    "producerContractVersion": "1.0.0"
+    "producerContractVersion": "1.1.0"
   }
 }

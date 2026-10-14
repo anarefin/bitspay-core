@@ -3,6 +3,8 @@
 
 You are implementing **limits-risk-service** (SVC-05) of Bits Pay: the limits and fraud decision service on the payment hot path. `POST /v1/risk/evaluate` must answer in ≤ 50 ms p95 (limits part ≤ 10 ms). This folder is the whole world for this service.
 
+Release scope (SRS v1.2, CR-LIMITSRISK-1): **MVP** evaluates P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, `BILL_PAY` and `RECHARGE` (to party = biller wallet `B`, user category `BILLER`, no biller limits). `evaluate:batch` callers are R1+; self-limits and simulation R2. SPEC §10 tags each WP `[MVP]` or `[R1+]`.
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins).

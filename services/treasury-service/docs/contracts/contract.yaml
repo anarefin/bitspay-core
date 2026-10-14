@@ -48,7 +48,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/accounts"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "create the TRUST_SETTLEMENT ledger account (…0300nn) when a trust account is approved"
       fieldsUsed: ["req.accountId", "req.accountType", "req.ownerType", "res.accountId", "res.result", "res.createdAt"]
       codesUsed: []
@@ -56,7 +56,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/accounts/{id}/balance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "trust mirror for the EMY-009 hard control, issuance preview, confirmation info, positions; redemption source pre-check"
       fieldsUsed: ["path.id", "res.ledgerBalancePoisha", "res.availableBalancePoisha", "res.heldPoisha", "res.asOf"]
       codesUsed: []
@@ -64,7 +64,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/accounts/balances:batchGet"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "position bootstrap of new partner wallets, drift correction, trust positions"
       fieldsUsed: ["req.accountIds", "res.items[].accountId", "res.items[].ledgerBalancePoisha", "res.items[].availableBalancePoisha", "res.items[].heldPoisha", "res.notFound"]
       codesUsed: []
@@ -72,7 +72,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/system-balance-sheet"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "daily e-money snapshot (closing trust mirrors, wallets total)"
       fieldsUsed: ["res.asOf", "res.trustAccounts[].accountId", "res.trustAccounts[].trustIndex", "res.trustAccounts[].mirrorBalancePoisha", "res.walletsTotalPoisha"]
       codesUsed: []
@@ -80,7 +80,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/commands/{commandId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "resolve POSTING_UNKNOWN (found / journaled rejection / not posted)"
       fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode", "res.transfers[].transferId", "res.transfers[].postedAt"]
       codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
@@ -88,7 +88,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-emoney-issue"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "e-money issuance (command 9); commandId = issuanceId"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.trustAccountId", "req.toAccountId", "req.amountPoisha",
                    "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
@@ -97,7 +97,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-emoney-redeem"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "e-money redemption (command 10); commandId = redemptionId"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.fromAccountId", "req.trustAccountId", "req.amountPoisha",
                    "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
@@ -106,7 +106,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-adjustment"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "manual journal between system accounts (command 11); commandId = journalId"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.debitAccountId", "req.creditAccountId", "req.amountPoisha", "req.reasonCode",
                    "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
@@ -115,7 +115,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-trust-rebalance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "trust rebalance (command 16, R2); commandId = rebalanceId; ledger debits to, credits from"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.fromTrustAccountId", "req.toTrustAccountId", "req.amountPoisha",
                    "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
@@ -125,7 +125,7 @@ consumes:
     - producer: transaction-service
       operation: "POST /v1/payments/float-transfer"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "execute float requests (TOP_UP from PARENT / LIQUIDITY_POINT, RETURN to PARENT). Forwarded actor context (kernel K3.2): the owner of fromWalletId (approving parent for TOP_UP, requester for an unapproved RETURN) or the STAFF approver (OPS_CHECKER); Idempotency-Key = float request id ({id}-r{n} after 72 h); requestId = float request id"
       forwardedActor: true
       fieldsUsed: ["header.Idempotency-Key", "req.fromWalletId", "req.toWalletId", "req.amountPoisha", "req.requestId",
@@ -135,7 +135,7 @@ consumes:
     - producer: transaction-service
       operation: "GET /v1/transactions"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "kernel K3.3 rule 4: resolve the outcome of a float transfer by clientReference (= Idempotency-Key) before retrying an attempt older than 24 h"
       fieldsUsed: ["query.walletId", "query.clientReference", "res.items[].txnRef", "res.items[].status", "res.items[].failureCode"]
       codesUsed: [{set: transactionStatus, values: [INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED]}]
@@ -144,7 +144,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/{walletId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "issuance destination (create + execution), redemption source, float requester sanity"
       fieldsUsed: ["path.walletId", "res.walletType", "res.status", "res.displayName"]
       codesUsed: [{set: walletType, values: [A, D, M, I, C]}, {set: walletStatus, values: "*"}]
@@ -152,7 +152,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/lookup"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "maker convenience lookup behind GET /v1/treasury/wallet-lookup"
       fieldsUsed: ["query.msisdn", "query.walletType", "res.walletId", "res.displayNameMasked", "res.walletType", "res.status"]
       codesUsed: []
@@ -161,7 +161,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/refdata/{type}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "bootstrap of BANK, HOLIDAY and SYSTEM_PARAM items before refdata.events catches up"
       fieldsUsed: ["path.type", "query.limit", "query.cursor", "res.items[].type", "res.items[].code", "res.items[].nameEn",
                    "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
@@ -173,7 +173,7 @@ consumes:
       topic: ledger.changes
       eventType: LEDGER_TRANSFER_POSTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: treasury-service.ledger-changes
       purpose: "partner float positions, daily stats, threshold evaluation (idempotent by TB-timestamp guard per wallet, no inbox)"
       fieldsUsed: ["debitAccountId", "creditAccountId", "amountPoisha", "timestamp",
@@ -184,7 +184,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: treasury-service.partner-projection
       purpose: "partner projection: float requester / parent resolution, hierarchy roll-ups, thresholds, partnerWalletSet"
       fieldsUsed: ["partnerId", "partnerType", "subType", "categoryCode", "walletId", "parentPartnerId", "ancestorPartnerIds", "ancestorWalletIds",
@@ -197,7 +197,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: treasury-service.refdata
       purpose: "BANK and HOLIDAY items, SYSTEM_PARAM CUTOFF.EOD, CALENDAR.WEEKEND_DAYS, CALENDAR.TIMEZONE (businessDate, business-day rule)"
       fieldsUsed: ["type", "code", "nameEn", "attributes", "version", "active"]
@@ -208,7 +208,7 @@ consumes:
       topic: notification.requests
       eventType: NOTIFICATION_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       templates: [FLOAT_LOW_BALANCE, FLOAT_HIGH_BALANCE, FLOAT_STOCK_OUT, FLOAT_REQUEST_RECEIVED, FLOAT_REQUEST_DECIDED,
                   FLOAT_REQUEST_FAILED, EMONEY_ISSUED_PARTNER, TRUST_CONFIRMATION_STALE, HARD_CONTROL_FAILED, APPROVAL_PENDING_AGEING]
@@ -216,25 +216,25 @@ consumes:
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
 
   data: []

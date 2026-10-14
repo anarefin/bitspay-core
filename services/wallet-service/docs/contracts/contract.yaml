@@ -2,7 +2,7 @@
 service: wallet-service
 number: "03"
 modules: [wallet, partner]
-contractVersion: 1.0.0
+contractVersion: 1.2.0
 kernel: "1.0"
 owner: Dev-3
 moduleOwners: {wallet: Dev-3, partner: Dev-4}
@@ -49,6 +49,7 @@ provides:
   inboundTopics: []
   data:
     - {id: wallet-status-cache, version: 1, file: provided/data/wallet-status-cache.v1.md, kind: redis-format}
+    - {id: biller-catalogue-cache, version: 1, file: provided/data/biller-catalogue-cache.v1.md, kind: redis-format}
   codes: provided/codes.yaml
 
 consumes:
@@ -57,7 +58,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/accounts"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "create the wallet's ledger account first (wallet creation, registration, pre-registration, partner activation)"
       fieldsUsed: ["req.accountId", "req.accountType", "req.ownerType", "res.accountId", "res.result"]
@@ -66,7 +67,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/accounts/{id}:close"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "close the wallet's ledger account at the end of a closure"
       fieldsUsed: ["path.id", "res.result", "res.closedAt", "problem.reason"]
@@ -75,7 +76,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/accounts/{id}/balance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: both
       purpose: "closure pre-check / final check (wallet); zero-balance check at partner termination (partner)"
       fieldsUsed: ["path.id", "res.ledgerBalancePoisha", "res.availableBalancePoisha", "res.heldPoisha", "res.closed"]
@@ -84,7 +85,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "closure pre-check: open holds"
       fieldsUsed: ["query.accountId", "res.items[].holdCommandId", "res.items[].amountPoisha", "res.items[].reasonCode", "res.totalHeldPoisha"]
@@ -93,7 +94,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/accounts/balances:batchGet"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "unclaimed-balance report (R2)"
       fieldsUsed: ["req.accountIds", "res.items[].accountId", "res.items[].ledgerBalancePoisha", "res.notFound"]
@@ -102,7 +103,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/post-closure-payout"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "post-closure-payout (command 17): pay a closing wallet's residual balance to a same-person wallet"
       fieldsUsed: ["req.commandId", "req.txnRef", "req.fromAccountId", "req.toAccountId", "req.amountPoisha",
@@ -112,7 +113,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/commands/{commandId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "resolve an unknown closure-payout outcome"
       fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode"]
@@ -122,7 +123,7 @@ consumes:
     - producer: limits-risk-service
       operation: "GET /v1/blacklist/check"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: both
       purpose: "blacklist checks at registration / KYC submit (wallet) and key person / bank account / submit / MSISDN change (partner); always valueHash"
       fieldsUsed: ["query.type", "query.valueHash", "res.listed", "res.entries[].entryId", "res.entries[].type", "res.entries[].reasonCode", "res.entries[].expiresAt"]
@@ -131,7 +132,7 @@ consumes:
     - producer: limits-risk-service
       operation: "GET /v1/limits/wallets/{walletId}/usage"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "closure payout: destination maxBalancePoisha for command 17 constraints"
       fieldsUsed: ["path.walletId", "res.maxBalancePoisha"]
@@ -141,7 +142,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/retention/legal-holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: wallet
       purpose: "R2: skip KYC anonymisation of an entity under legal hold"
       fieldsUsed: ["query.subjectType", "query.subjectId", "query.category", "res.items"]
@@ -150,7 +151,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/refdata/{type}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       module: both
       purpose: "bootstrap the GEO / MCC / REASON_CODE / BANK / SYSTEM_PARAM projections when empty"
       fieldsUsed: ["path.type", "res.items[].type", "res.items[].code", "res.items[].parentCode", "res.items[].nameEn", "res.items[].nameBn",
@@ -258,7 +259,7 @@ consumes:
       topic: blacklist.events
       eventType: BLACKLIST_ENTRY_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service
       module: wallet
       purpose: "re-check open submissions and live customers (NID, MSISDN, WALLET)"
@@ -268,7 +269,7 @@ consumes:
       topic: blacklist.events
       eventType: BLACKLIST_ENTRY_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service.partner-blacklist-events
       module: partner
       purpose: "partner blacklist projection and matches (MSISDN, NID, BANK_ACCOUNT, WALLET, PARTNER)"
@@ -279,7 +280,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service
       module: wallet
       purpose: "dormancy activity projection (REVERSAL rows ignored)"
@@ -290,7 +291,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service
       module: wallet
       purpose: "GEO and REASON_CODE validation; SYSTEM_PARAM RETENTION.CUSTOMER_KYC"
@@ -300,7 +301,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service.partner-refdata-events
       module: partner
       purpose: "GEO (chain, riskFlag, qrCity), MCC (group, riskLevel), REASON_CODE, BANK"
@@ -311,7 +312,7 @@ consumes:
       topic: wallet.events
       eventType: WALLET_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: wallet-service.status-cache-loader
       module: wallet
       purpose: "cache loader: Lua CAS into ws:{bucket} (rebuild / follow)"
@@ -323,7 +324,7 @@ consumes:
       topic: notification.requests
       eventType: NOTIFICATION_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       templates: [WALLET_CLOSURE_REQUESTED, WALLET_CLOSURE_APPROVED, WALLET_CLOSURE_COMPLETED, WALLET_CLOSURE_REVERTED,
                   WALLET_DORMANCY_WARNING, KYC_REVIEW_DUE, KYC_REVIEW_OVERDUE,
@@ -334,25 +335,25 @@ consumes:
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
 
   data: []

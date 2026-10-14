@@ -2613,7 +2613,7 @@
   {
     "code": "TXN_FAILED",
     "category": "TRANSACTIONAL",
-    "trigger": "R-TXN-FAILED · txn.events TRANSACTION_FAILED, channel ne SYSTEM",
+    "trigger": "R-TXN-FAILED · txn.events TRANSACTION_FAILED, channel ne SYSTEM, txnType nin [BILL_PAY, RECHARGE]",
     "recipient": "FROM_WALLET",
     "channels": [
       "IN_APP"
@@ -2636,6 +2636,208 @@
         "type": "TEXT",
         "req": true,
         "notes": "failureCode enum; the template maps it to a localised reason"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← createdAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "BILL_PAYMENT_SUCCESS",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-BILLPAY-CUST · COMPLETED BILL_PAY (MVP, CR-ADMIN-1)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) when feeBearer = PAYER"
+      },
+      {
+        "name": "billerName",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← contact(toWalletId).name (biller settlement wallet, type B)"
+      },
+      {
+        "name": "billReference",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← billReference"
+      },
+      {
+        "name": "providerReceipt",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← providerReceipt (e.g. SIM-BP-<txnRef>)"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "BILL_PAYMENT_FAILED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-BILLPAY-FAILED · txn.events TRANSACTION_FAILED, txnType = BILL_PAY, channel ne SYSTEM (MVP, CR-ADMIN-1)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "billReference",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← billReference"
+      },
+      {
+        "name": "failureCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "failureCode enum (incl. PROVIDER_REJECTED); the template maps it to a localised reason"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← createdAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "RECHARGE_SUCCESS",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-RECHARGE-CUST · COMPLETED RECHARGE (MVP, CR-ADMIN-1)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) when feeBearer = PAYER"
+      },
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← msisdn (recharged number)"
+      },
+      {
+        "name": "operatorName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(toWalletId).name (MNO biller wallet)"
+      },
+      {
+        "name": "providerReceipt",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← providerReceipt (e.g. SIM-RC-<txnRef>)"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "RECHARGE_FAILED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-RECHARGE-FAILED · txn.events TRANSACTION_FAILED, txnType = RECHARGE, channel ne SYSTEM (MVP, CR-ADMIN-1)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": false,
+        "notes": "← msisdn"
+      },
+      {
+        "name": "failureCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "failureCode enum (incl. PROVIDER_REJECTED); the template maps it to a localised reason"
       },
       {
         "name": "txnRef",
@@ -3677,77 +3879,6 @@
         "type": "MONEY",
         "req": true,
         "notes": "int64 poisha, signed"
-      }
-    ],
-    "sender": "general-ledger-service"
-  },
-  {
-    "code": "GL_EXPORT_READY",
-    "category": "INTERNAL",
-    "recipient": "recipient.role FIN_MAKER",
-    "trigger": "an ERP export version is generated",
-    "variables": [
-      {
-        "name": "businessDate",
-        "type": "DATE",
-        "req": true
-      },
-      {
-        "name": "exportVersion",
-        "type": "INT",
-        "req": true
-      },
-      {
-        "name": "fileName",
-        "type": "TEXT",
-        "req": true
-      },
-      {
-        "name": "lineCount",
-        "type": "INT",
-        "req": true
-      },
-      {
-        "name": "totalDebitPoisha",
-        "type": "MONEY",
-        "req": true
-      },
-      {
-        "name": "superseded",
-        "type": "TEXT",
-        "req": false,
-        "notes": "boolean flag sent as TEXT \"true\"/\"false\" (template variable types have no boolean); \"true\" when it replaces an earlier export of the same date"
-      }
-    ],
-    "sender": "general-ledger-service"
-  },
-  {
-    "code": "GL_EXPORT_FAILED",
-    "category": "INTERNAL",
-    "recipient": "recipient.role FIN_MAKER",
-    "trigger": "an ERP export build fails (unbalanced or technical error)",
-    "variables": [
-      {
-        "name": "businessDate",
-        "type": "DATE",
-        "req": true
-      },
-      {
-        "name": "exportVersion",
-        "type": "INT",
-        "req": true
-      },
-      {
-        "name": "variant",
-        "type": "TEXT",
-        "req": true,
-        "notes": "enum{FAILED, RESTATED}; general-ledger-service sends FAILED (a restatement regenerates and sends GL_EXPORT_READY with superseded=true)"
-      },
-      {
-        "name": "errorCode",
-        "type": "TEXT",
-        "req": true,
-        "notes": "UNBALANCED or a technical error code"
       }
     ],
     "sender": "general-ledger-service"

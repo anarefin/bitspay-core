@@ -1,6 +1,6 @@
 service: ledger-service
-generatedAt: '2026-10-13T15:47:27Z'
+generatedAt: '2026-10-14T13:05:16Z'
 pins:
 - producer: admin-service
-  pinnedContractVersion: 1.0.0
-  producerContractVersionAtSnapshot: 1.0.0
+  pinnedContractVersion: 1.1.0
+  producerContractVersionAtSnapshot: 1.1.0

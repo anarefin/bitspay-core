@@ -1,4 +1,4 @@
-# pricing-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# pricing-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.1.0, kernel 1.0.
 # Adding a value is additive (minor); removing or renaming one is breaking for consumers that list it.
 
 codeSets:
@@ -12,6 +12,8 @@ codeSets:
       - {code: MERCHANT_PAYMENT, name: MERCHANT_PAYMENT, description: "customer to merchant (MDR plans, bearer PAYEE)"}
       - {code: MERCHANT_REFUND, name: MERCHANT_REFUND, description: "merchant to customer"}
       - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "distributor/agent float"}
+      - {code: BILL_PAY, name: BILL_PAY, description: "customer to biller (internal biller catalogue; seed plan PLN-BILL-STD) — added 1.1.0 (CR-PRICING-1, MVP)"}
+      - {code: RECHARGE, name: RECHARGE, description: "customer to mobile operator biller (MNO; seed plan PLN-RECHARGE-NONE) — added 1.1.0 (CR-PRICING-1, MVP)"}
       - {code: REVERSAL, name: REVERSAL, description: "accepted in plans; no seed plan uses it"}
   planWalletType:
     description: "Wallet-type letters used in PlanJson.match.payerWalletType / payeeWalletType and quote parties"
@@ -21,6 +23,7 @@ codeSets:
       - {code: D, name: DISTRIBUTOR}
       - {code: M, name: MERCHANT}
       - {code: I, name: INSTITUTION}
+      - {code: B, name: BILLER, description: "biller settlement wallet (payee of BILL_PAY / RECHARGE) — added 1.1.0 (CR-PRICING-1, MVP)"}
   planStatus:
     description: "PlanJson.status on fee.rules (consumers keep only ACTIVE)"
     values:

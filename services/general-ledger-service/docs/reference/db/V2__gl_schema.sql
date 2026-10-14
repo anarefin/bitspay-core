@@ -54,7 +54,7 @@ CREATE TABLE gl_posting_rule (
   tb_account_type           int  NOT NULL,
   side                      text CHECK (side IN ('DEBIT','CREDIT')),
   transfer_code             int,
-  command_type              int CHECK (command_type BETWEEN 1 AND 17),
+  command_type              int CHECK (command_type BETWEEN 1 AND 19),
   leg_index                 int CHECK (leg_index BETWEEN 0 AND 5),
   reason_code               text CHECK (reason_code IS NULL OR length(reason_code) BETWEEN 1 AND 40),
   counterparty_account_type int,
@@ -68,7 +68,7 @@ CREATE TABLE gl_ledger_account (
   account_id      uuid PRIMARY KEY,
   tb_account_type int  NOT NULL,
   bucket          text NOT NULL,                 -- 'WALLET:C' · 'SYS:FEE_INCOME' · 'TRUST:01'
-  wallet_type     char(1) CHECK (wallet_type IN ('C','A','D','M','I')),
+  wallet_type     char(1) CHECK (wallet_type IN ('C','A','D','M','I','B')),
   trust_index     smallint CHECK (trust_index BETWEEN 1 AND 99),
   source          text NOT NULL CHECK (source IN ('FIXED','WALLET_EVENT','LEDGER_LOOKUP')),
   source_version  bigint,                        -- wallet.events version
@@ -251,24 +251,6 @@ CREATE TABLE gl_control_total (
   PRIMARY KEY (business_date, revision, bucket, trust_index)
 );
 
--- ===================================================================== 7. Exports (§8.10) — files are small; kept in Postgres
-CREATE TABLE gl_export (
-  business_date     date NOT NULL,
-  export_version    int  NOT NULL,
-  gl_day_revision   int  NOT NULL,
-  status            text NOT NULL CHECK (status IN ('GENERATING','GENERATED','FAILED','SUPERSEDED')),
-  format            text NOT NULL DEFAULT 'GENERIC_CSV_V1',
-  file_name         text,
-  content           text,
-  sha256            text,
-  line_count        int,
-  total_debit_poisha  bigint,
-  total_credit_poisha bigint,
-  failure_reason    text,
-  generated_at      timestamptz,
-  PRIMARY KEY (business_date, export_version)
-);
-
 -- ===================================================================== 8. Exceptions (§8.11)
 CREATE TABLE gl_exception (
   id            uuid PRIMARY KEY,
@@ -297,7 +279,7 @@ CREATE TABLE approval_request (
   id              uuid PRIMARY KEY,
   entity_type     text NOT NULL CHECK (entity_type IN ('GlAccount','PostingRuleSet','GlManualJournal','GlJournalReversal',
                                                        'GlOpeningBalance','GlDayForceClose','GlDayRestatement','GlPeriodClose',
-                                                       'GlPeriodReopen','GlYearClose','GlExport')),
+                                                       'GlPeriodReopen','GlYearClose')),
   entity_id       text NOT NULL,
   action          text NOT NULL,
   payload         jsonb NOT NULL,

@@ -84,6 +84,8 @@
         "MERCHANT_PAYMENT",
         "MERCHANT_REFUND",
         "FLOAT_TRANSFER",
+        "BILL_PAY",
+        "RECHARGE",
         "REVERSAL",
         null
       ],

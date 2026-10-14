@@ -1,0 +1,31 @@
+{
+  "name": "POST /v1/ledger/commands/post-bill-payment → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-bill\\-payment(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3e2-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "6e842c27-8041-53a9-bf9b-da45f13489ca",
+        "769b1f8d-9d0e-66f2-8bd6-5ec5a628b60c",
+        "b73d137a-0db5-ac9c-e8b9-75d5d844d8d1"
+      ],
+      "postedAt": "2026-10-14T09:12:40.118Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.1.0"
+  }
+}

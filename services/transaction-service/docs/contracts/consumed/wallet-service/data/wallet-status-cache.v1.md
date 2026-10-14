@@ -1,6 +1,6 @@
 # Data contract `wallet-status-cache` v1 — Redis format of the wallet status cache
 
-Owner: wallet-service (writer). Kind: redis-format. contractVersion 1.0.0. Readers pin this file (`consumes.data`); a change that is not additive is a new version (`wallet-status-cache.v2.md`) served alongside v1.
+Owner: wallet-service (writer). Kind: redis-format. contractVersion 1.1.0. Readers pin this file (`consumes.data`); a change that is not additive is a new version (`wallet-status-cache.v2.md`) served alongside v1.
 
 ## 1. Location
 
@@ -23,7 +23,7 @@ value  = version ":" statusCode ":" kycTier ":" walletTypeCode ":" categoryCode 
 | `version` | decimal int64, 1 ≤ v < 2^53 | wallet row version = `WALLET_UPSERTED.version`; strictly increasing per wallet |
 | `statusCode` | one of `P A D X C F Q Z` | effective wallet status (codes.yaml `walletStatus`, incl. debit / credit permissions) |
 | `kycTier` | `0` `1` `2` | KYC tier |
-| `walletTypeCode` | one of `C A D M I` | codes.yaml `walletType` |
+| `walletTypeCode` | one of `C A D M I B` | codes.yaml `walletType` (`B` = BILLER settlement wallet, CR-WALLET-1) |
 | `categoryCode` | decimal int32 0..99999 | codes.yaml `categoryCode` (never an MCC) |
 | `flags` | decimal int32 0..31 | codes.yaml `walletFlag` bitmask |
 
@@ -65,10 +65,11 @@ return 1
 | `01929a3c-0000-7000-8000-000000000001` | `d0e6c737` | 50999 | `ws:50999` | `AZKaPAAAcACAAAAAAAAAAQ` |
 | `00000000-0000-0000-0000-000000000200` (a ledger system account, never a wallet) | `514cd28e` | 53902 | `ws:53902` | `AAAAAAAAAAAAAAAAAAACAA` |
 
-Example values: `8813:A:2:C:0:0` (customer, tier 2, active), `8813:F:1:C:0:0` (customer frozen), `9002:A:2:M:3101:0` (MICRO grocery merchant).
+Example values: `8813:A:2:C:0:0` (customer, tier 2, active), `8813:F:1:C:0:0` (customer frozen), `9002:A:2:M:3101:0` (MICRO grocery merchant), `3:A:2:B:501:0` (DESCO biller wallet; partner-wallet tier 2, category 501 BILLER_UTILITY).
 
 ## 6. Changelog
 
 | Version | Date | Change |
 |---|---|---|
 | 1 | 2026-10-13 | v6 baseline |
+| 1 (contract 1.1.0) | 2026-10-14 | Additive (CR-WALLET-1): `walletTypeCode` may be `B` (BILLER); `categoryCode` 501..505 for biller wallets. Format, key, CAS and read rules unchanged; readers already treat unknown type codes safely (§4.5). |

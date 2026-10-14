@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: transaction-service (SVC-02)
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Payment orchestrator of Bits Pay. Every operation served by transaction-service, including staff,
     internal and local-test operations. Kernel 1.0 rules apply (headers K3.1, idempotency K3.3,
@@ -13,8 +13,12 @@ info:
     - `x-audience` = primary audience; `x-actors` = allowed `X-Actor-Type` values with roles / `X-Actor-Id` values and binding rules.
     - Problem extension members owned by this service: `transaction`, `limitCode`, `limitParty`, `remainingPoisha`,
       `remainingCount`, `resetsAt`, `walletId`, `walletStatus` (see `codes.yaml → problemExtensions`).
+    - Problem `reason` values owned by this service are listed in `codes.yaml → problemReasons` (CR-TRANSACTION-1 adds the
+      biller reasons of bill payment, recharge and bill enquiry).
+    - MVP (CR-TRANSACTION-1, contractVersion 1.1.0): BILL_PAY and RECHARGE against the internal biller catalogue, fulfilled by
+      the in-process simulated biller provider (no outbound biller or telco call, SRS A-41).
   x-service: transaction-service
-  x-contract-version: 1.0.0
+  x-contract-version: 1.1.0
   x-kernel: "1.0"
 servers:
   - url: http://localhost:8102
@@ -22,6 +26,7 @@ servers:
 tags:
   - {name: payments, description: Money-moving payment APIs}
   - {name: quote, description: Read-only fee quote}
+  - {name: bills, description: Bill enquiry against the internal biller catalogue (simulated provider)}
   - {name: reversals, description: Internal reversal executor}
   - {name: transactions, description: Transaction queries}
   - {name: merchant-refund-requests, description: Merchant refund maker-checker requests}
@@ -50,9 +55,12 @@ paths:
         monthly count from limits-risk usage (300 ms, no retry) and evaluates the pricing algorithm.
         If the count cannot be read, evaluates without the free allowance and returns `feeIsUpperBound: true` (OPEN D-17).
         No risk evaluation, no reservation. p99 30 ms (+ <= 300 ms usage call).
+        BILL_PAY / RECHARGE (CR-TRANSACTION-1): send `billerId` instead of `toWalletId`; the biller's settlement wallet is
+        the catalogue's `walletId` (biller-catalogue-cache) and is echoed as `toWalletId`. The biller's amount rules apply
+        (400 BILL_AMOUNT_OUT_OF_RANGE); no bill enquiry and no provider call is made by a quote.
       x-audience: customer
       x-actors:
-        - {type: CUSTOMER, rule: "txnType P2P, CASH_OUT, MERCHANT_PAYMENT; X-Actor-Wallet-Id = fromWalletId"}
+        - {type: CUSTOMER, rule: "txnType P2P, CASH_OUT, MERCHANT_PAYMENT, BILL_PAY, RECHARGE; X-Actor-Wallet-Id = fromWalletId"}
         - {type: AGENT, rule: "txnType CASH_IN, FLOAT_TRANSFER; X-Actor-Wallet-Id = fromWalletId"}
         - {type: DISTRIBUTOR, rule: "txnType FLOAT_TRANSFER; X-Actor-Wallet-Id = fromWalletId"}
         - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER], rule: "txnType FLOAT_TRANSFER"}
@@ -65,6 +73,8 @@ paths:
             examples:
               cashOut:
                 value: {txnType: CASH_OUT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 50000}
+              billPay:
+                value: {txnType: BILL_PAY, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, billerId: 0192f9b0-0000-7000-8000-0000000000e1, amountPoisha: 125000}
       responses:
         '200':
           description: Quote
@@ -74,9 +84,18 @@ paths:
               examples:
                 cashOut:
                   value: {txnType: CASH_OUT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 50000, feePoisha: 750, vatPoisha: 112, feeBearer: PAYER, totalDebitPoisha: 50862, creditToPayeePoisha: 50000, commissionPoisha: 300, aitPoisha: 30, pricingPlanId: PLN-CASHOUT-STD, pricingPlanVersion: 2, feeIsUpperBound: false, currency: BDT, quotedAt: '2026-10-09T08:03:20.002Z'}
-        '400': {$ref: '#/components/responses/BadRequest'}
+                billPay:
+                  value: {txnType: BILL_PAY, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f9b1-0000-7000-8000-0000000000e1, billerId: 0192f9b0-0000-7000-8000-0000000000e1, amountPoisha: 125000, feePoisha: 500, vatPoisha: 75, feeBearer: PAYER, totalDebitPoisha: 125575, creditToPayeePoisha: 125000, commissionPoisha: 0, aitPoisha: 0, pricingPlanId: PLN-BILL-STD, pricingPlanVersion: 1, feeIsUpperBound: false, currency: BDT, quotedAt: '2026-10-14T09:00:00.002Z'}
+        '400': {$ref: '#/components/responses/BillBadRequest'}
         '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '404': {$ref: '#/components/responses/BillNotFound'}
+        '409':
+          description: "STATE_CONFLICT reason BILLER_INACTIVE (BILL_PAY / RECHARGE quotes only). Never carries `transaction`."
+          x-codes: [STATE_CONFLICT]
+          x-reasons: [BILLER_INACTIVE]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemBase'}
         '422':
           description: "WALLET_NOT_TRANSACTABLE (ext walletId, walletStatus) or SERVICE_DISABLED. Never carries `transaction`."
           x-codes: [WALLET_NOT_TRANSACTABLE, SERVICE_DISABLED]
@@ -307,6 +326,146 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/bills:enquire:
+    parameters: *commonHeaders
+    post:
+      operationId: enquireBill
+      tags: [bills]
+      summary: Bill enquiry against the internal biller catalogue (simulated provider, read-only)
+      description: |
+        MVP (CR-TRANSACTION-1, SRS BIL-005 partial, BIL-011). Reads the biller from the `biller-catalogue-cache` data contract
+        (wallet-service) and asks the in-process simulated biller provider (`bitspay.billers.mode = SIMULATED`; no outbound call,
+        SRS A-41). For amountMode ENQUIRY returns a synthetic customer name, a due amount derived deterministically from a hash of
+        the reference (within the biller's min..max, stable for the Dhaka calendar month), a due date and an `enquiryRef`.
+        For OPEN / FIXED returns the biller's amount rules with the enquiry fields null. No persistence, no Idempotency-Key,
+        no risk, no pricing. Product switch FEATURE.BILL_PAY applies.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id required (the customer wallet that will pay)"}
+      x-idempotency: none (read-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BillEnquiryRequest'}
+            examples:
+              desco:
+                value: {billerId: 0192f9b0-0000-7000-8000-0000000000e1, billReference: '1234567890'}
+      responses:
+        '200':
+          description: Enquiry result (ENQUIRY) or the biller's amount rules (OPEN / FIXED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BillEnquiryResult'}
+              examples:
+                desco:
+                  value: {billerId: 0192f9b0-0000-7000-8000-0000000000e1, billerCode: DESCO, billReference: '1234567890', amountMode: ENQUIRY, customerName: SIM CUSTOMER 7890, dueAmountPoisha: 125000, dueDate: '2026-11-15', enquiryRef: SIM-ENQ-3F9A0C7B21D4E856, fixedAmountPoisha: null, minAmountPoisha: 1000, maxAmountPoisha: 5000000}
+                open:
+                  value: {billerId: 0192f9b0-0000-7000-8000-0000000000e5, billerCode: BTCL-INT, billReference: 'BTCL-0042117', amountMode: OPEN, customerName: null, dueAmountPoisha: null, dueDate: null, enquiryRef: null, fixedAmountPoisha: null, minAmountPoisha: 1000, maxAmountPoisha: 5000000}
+        '400': {$ref: '#/components/responses/BillBadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BillNotFound'}
+        '409':
+          description: "STATE_CONFLICT reason BILLER_INACTIVE (biller not ACTIVE)."
+          x-codes: [STATE_CONFLICT]
+          x-reasons: [BILLER_INACTIVE]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemBase'}
+        '422':
+          description: "SERVICE_DISABLED (FEATURE.BILL_PAY off or channel not allowed)."
+          x-codes: [SERVICE_DISABLED]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemBase'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/payments/bill-payment:
+    parameters: *commonHeaders
+    post:
+      operationId: payBill
+      tags: [payments]
+      summary: Bill payment to an internal-catalogue biller (customer to biller wallet; simulated provider)
+      description: |
+        MVP (CR-TRANSACTION-1, SRS BIL-003, BIL-008, BIL-011). Customer-initiated only. Pipeline: validate + catalogue (biller ACTIVE,
+        reference matches referencePattern, amount rules, enquiry match) -> idempotency -> wallet status (customer C, biller
+        settlement wallet B) -> risk evaluate (BILL_PAY) -> pricing (BILL_PAY) -> intent -> ledger command 18 post-bill-payment
+        (customer -> biller wallet) -> simulated provider confirm (synchronous, in-process, only after ledger OK/EXISTS) -> outcome
+        + outbox. Provider rejection (reserved test references ending 0000) -> automatic compensating post-reversal (reason
+        SYSTEM_ERROR) and final status FAILED with failureCode PROVIDER_REJECTED (409 STATE_CONFLICT reason PROVIDER_REJECTED
+        with `transaction`). No PENDING state in MVP. The Idempotency-Key is the client reference (clientReference, OPEN D-13).
+        p99 300 ms.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = customerWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key); retained >= 7 days (OPEN D-01)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BillPaymentRequest'}
+            examples:
+              rahimPaysDesco:
+                value: {customerWalletId: 0192f2aa-0001-7000-8000-00000000a001, billerId: 0192f9b0-0000-7000-8000-0000000000e1, billReference: '1234567890', amountPoisha: 125000, enquiryRef: SIM-ENQ-3F9A0C7B21D4E856}
+      responses:
+        '200':
+          description: COMPLETED (PaymentResult + billerId, billReference, providerReceipt, token)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: BP26101400K7M2QX9D, txnId: 0192fa10-0000-7000-8000-000000000001, txnType: BILL_PAY, status: COMPLETED, failureCode: null, amountPoisha: 125000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 125575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f9b1-0000-7000-8000-0000000000e1, createdAt: '2026-10-14T09:00:01.101Z', completedAt: '2026-10-14T09:00:01.170Z', billerId: 0192f9b0-0000-7000-8000-0000000000e1, billReference: '1234567890', msisdn: null, providerReceipt: SIM-BP-BP26101400K7M2QX9D, token: null}
+        '400': {$ref: '#/components/responses/BillBadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BillNotFound'}
+        '409': {$ref: '#/components/responses/BillPaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/recharge:
+    parameters: *commonHeaders
+    post:
+      operationId: payRecharge
+      tags: [payments]
+      summary: Mobile recharge (top-up) via the operator catalogue (customer to operator biller wallet; simulated provider)
+      description: |
+        MVP (CR-TRANSACTION-1, SRS BIL-012). Customer-initiated only. The operator is derived from the MSISDN prefix through
+        `biller:mno-prefix:{prefix}`; when `operatorBillerId` is sent it must equal the derived operator (else 400 OPERATOR_MISMATCH).
+        Pipeline as bill payment with risk/pricing txnType RECHARGE and ledger command 19 post-recharge. Provider rejection
+        (reserved test MSISDNs ending 0000) -> compensating post-reversal and FAILED PROVIDER_REJECTED. p99 300 ms.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = customerWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key); retained >= 7 days (OPEN D-01)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RechargeRequest'}
+            examples:
+              rahimTopsUpGp:
+                value: {customerWalletId: 0192f2aa-0001-7000-8000-00000000a001, msisdn: '01712345678', operatorBillerId: null, rechargeType: PREPAID, amountPoisha: 10000}
+      responses:
+        '200':
+          description: COMPLETED (PaymentResult + billerId, msisdn, providerReceipt)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: RC26101400P4N8W2ZA, txnId: 0192fa20-0000-7000-8000-000000000001, txnType: RECHARGE, status: COMPLETED, failureCode: null, amountPoisha: 10000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 10000, feeBearer: OPERATOR, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f9b1-0000-7000-8000-0000000000e7, createdAt: '2026-10-14T09:05:00.101Z', completedAt: '2026-10-14T09:05:00.160Z', billerId: 0192f9b0-0000-7000-8000-0000000000e7, billReference: null, msisdn: '01712345678', providerReceipt: SIM-RC-RC26101400P4N8W2ZA, token: null}
+        '400': {$ref: '#/components/responses/BillBadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BillNotFound'}
+        '409': {$ref: '#/components/responses/BillPaymentConflict'}
         '422': {$ref: '#/components/responses/PaymentUnprocessable'}
         '503': {$ref: '#/components/responses/PaymentUnavailable'}
 
@@ -1254,6 +1413,43 @@ components:
           examples:
             afterIntent:
               value: {type: about:blank, title: Dependency unavailable, status: 503, code: DEPENDENCY_UNAVAILABLE, retryable: true, instance: /v1/payments/p2p, correlationId: c-0f3e9d, transaction: {txnRef: PP26100900W2X7K4QB, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0f77, txnType: P2P, status: INITIATED, failureCode: null, amountPoisha: 50000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 50575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:07:00.101Z', completedAt: null}}
+    BillBadRequest:
+      description: |
+        VALIDATION_FAILED (errors[] present). Never carries `transaction`. Biller reasons (CR-TRANSACTION-1):
+        BILL_REFERENCE_INVALID (reference does not match the biller's referencePattern), BILL_AMOUNT_MISMATCH (amount differs
+        from the enquired due amount, or a stale / foreign enquiryRef), BILL_AMOUNT_OUT_OF_RANGE (outside min..max, or not the
+        fixed amount), MSISDN_INVALID (not 01[3-9]XXXXXXXX, or no operator for its prefix), OPERATOR_MISMATCH (operatorBillerId
+        differs from the prefix operator, or the biller is not an MNO for a recharge).
+      x-codes: [VALIDATION_FAILED]
+      x-reasons: [BILL_REFERENCE_INVALID, BILL_AMOUNT_MISMATCH, BILL_AMOUNT_OUT_OF_RANGE, MSISDN_INVALID, OPERATOR_MISMATCH]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+          examples:
+            amountMismatch:
+              value: {type: about:blank, title: Validation failed, status: 400, code: VALIDATION_FAILED, reason: BILL_AMOUNT_MISMATCH, correlationId: c-7a1b20, instance: /v1/payments/bill-payment, errors: [{field: amountPoisha, message: must equal the enquired due amount}]}
+    BillNotFound:
+      description: NOT_FOUND (unknown wallet; reason BILLER_NOT_FOUND for an unknown billerId / operatorBillerId).
+      x-codes: [NOT_FOUND]
+      x-reasons: [BILLER_NOT_FOUND]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+    BillPaymentConflict:
+      description: |
+        IDEMPOTENCY_CONFLICT (same key, different body; no transaction). STATE_CONFLICT reason BILLER_INACTIVE (biller not ACTIVE;
+        not persisted; no transaction). STATE_CONFLICT reason PROVIDER_REJECTED (provider refused after the ledger post; the money
+        was returned by an automatic compensating reversal; persisted FAILED with failureCode PROVIDER_REJECTED; carries
+        `transaction`). STATE_CONFLICT from a ledger REJECTED OTHER / INVALID_AMOUNT or ledger HTTP 400/403 (persisted FAILED;
+        carries `transaction`).
+      x-codes: [IDEMPOTENCY_CONFLICT, STATE_CONFLICT]
+      x-reasons: [BILLER_INACTIVE, PROVIDER_REJECTED]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemPayment'}
+          examples:
+            providerRejected:
+              value: {type: about:blank, title: Provider rejected, status: 409, code: STATE_CONFLICT, reason: PROVIDER_REJECTED, detail: The biller refused the payment; the amount was returned, instance: /v1/payments/bill-payment, correlationId: c-7a1b21, transaction: {txnRef: BP26101400R2T6WQ8M, txnId: 0192fa10-0000-7000-8000-000000000002, txnType: BILL_PAY, status: FAILED, failureCode: PROVIDER_REJECTED, amountPoisha: 125000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 125575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f9b1-0000-7000-8000-0000000000e1, createdAt: '2026-10-14T09:10:00.101Z', completedAt: '2026-10-14T09:10:00.205Z', billerId: 0192f9b0-0000-7000-8000-0000000000e1, billReference: '1234560000', msisdn: null, providerReceipt: null, token: null}}
     UnavailableNoTxn:
       description: DEPENDENCY_UNAVAILABLE, retryable true, no `transaction`.
       x-codes: [DEPENDENCY_UNAVAILABLE]
@@ -1281,13 +1477,13 @@ components:
       maximum: 10000000000000
     TxnType:
       type: string
-      enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]
+      enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, BILL_PAY, RECHARGE]
     TransactionStatus:
       type: string
       enum: [INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED]
     FailureCode:
       type: string
-      enum: [WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, LEDGER_ORIGINAL_NOT_FOUND, LEDGER_ALREADY_REVERSED, LEDGER_HOLD_NOT_FOUND, LEDGER_INVALID_AMOUNT, LEDGER_OTHER, LEDGER_NOT_POSTED]
+      enum: [WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, LEDGER_ORIGINAL_NOT_FOUND, LEDGER_ALREADY_REVERSED, LEDGER_HOLD_NOT_FOUND, LEDGER_INVALID_AMOUNT, LEDGER_OTHER, LEDGER_NOT_POSTED, PROVIDER_REJECTED]
     FeeBearer:
       type: string
       description: "SHARED is reserved and never produced (OPEN D-03)"
@@ -1301,7 +1497,7 @@ components:
     TxnRef:
       type: string
       description: "18 chars {prefix}{yyMMdd}00{8 Crockford}. Consumers treat it as opaque 1..32 [A-Z0-9-] (OPEN D-10)."
-      pattern: '^(PP|CI|CO|MP|MR|FT|RV)\d{6}00[0-9A-HJKMNP-TV-Z]{8}$'
+      pattern: '^(PP|CI|CO|MP|MR|FT|RV|BP|RC)\d{6}00[0-9A-HJKMNP-TV-Z]{8}$'
     OpaqueRef:
       type: string
       minLength: 1
@@ -1343,24 +1539,31 @@ components:
         toWalletId: {$ref: '#/components/schemas/Uuid', description: "internal to"}
         createdAt: {$ref: '#/components/schemas/Timestamp', description: "= UUIDv7 time of txnId"}
         completedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}], description: "null while INITIATED"}
+        billerId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "BILL_PAY: the biller; RECHARGE: the operator biller (partnerId). Present on BILL_PAY / RECHARGE results only (CR-TRANSACTION-1)"}
+        billReference: {type: ['string', 'null'], maxLength: 64, description: "BILL_PAY only: the bill / account reference as validated against the biller's referencePattern"}
+        msisdn: {type: ['string', 'null'], pattern: '^01[3-9][0-9]{8}$', description: "RECHARGE only: the recharged mobile number (11 digits); never logged in full"}
+        providerReceipt: {type: ['string', 'null'], maxLength: 64, description: "BILL_PAY / RECHARGE: simulated provider receipt SIM-BP-<txnRef> / SIM-RC-<txnRef>; non-null only when status = COMPLETED"}
+        token: {type: ['string', 'null'], pattern: '^[0-9]{20}$', description: "BILL_PAY only: 20-digit electricity token for a prepaid UTILITY_ELECTRICITY biller (amountMode OPEN or FIXED), else null; never logged, never on txn.events"}
 
     QuoteRequest:
       type: object
       additionalProperties: false
-      required: [txnType, fromWalletId, toWalletId, amountPoisha]
+      required: [txnType, fromWalletId, amountPoisha]
       properties:
-        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER], description: "MERCHANT_REFUND, REVERSAL -> 400"}
-        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "debited side (agent for CASH_IN, customer for CASH_OUT/MERCHANT_PAYMENT)"}
-        toWalletId: {$ref: '#/components/schemas/Uuid', description: "!= fromWalletId"}
+        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE], description: "MERCHANT_REFUND, REVERSAL -> 400"}
+        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "debited side (agent for CASH_IN, customer for CASH_OUT/MERCHANT_PAYMENT/BILL_PAY/RECHARGE)"}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "!= fromWalletId. Required for every txnType except BILL_PAY / RECHARGE (absent there; 400 if sent together with billerId)"}
+        billerId: {$ref: '#/components/schemas/Uuid', description: "BILL_PAY / RECHARGE only, and then required: the biller (operator biller for RECHARGE); other txnTypes -> 400"}
         amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
     QuoteResult:
       type: object
       additionalProperties: false
       required: [txnType, fromWalletId, toWalletId, amountPoisha, feePoisha, vatPoisha, feeBearer, totalDebitPoisha, creditToPayeePoisha, commissionPoisha, aitPoisha, pricingPlanId, pricingPlanVersion, feeIsUpperBound, currency, quotedAt]
       properties:
-        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER]}
+        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE]}
         fromWalletId: {$ref: '#/components/schemas/Uuid'}
-        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "echo; BILL_PAY / RECHARGE: the resolved biller settlement wallet (type B)"}
+        billerId: {$ref: '#/components/schemas/Uuid', description: "echo; present on BILL_PAY / RECHARGE quotes only"}
         amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
         feePoisha: {$ref: '#/components/schemas/Poisha', description: "0 when no plan or feeBearer = OPERATOR"}
         vatPoisha: {$ref: '#/components/schemas/Poisha'}
@@ -1385,6 +1588,56 @@ components:
         amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
         purposeCode: {type: ['string', 'null'], maxLength: 32, description: "an active PURPOSE_CODE when that list is non-empty"}
         note: {type: ['string', 'null'], maxLength: 140, description: "control characters stripped; never logged"}
+    RechargeType:
+      type: string
+      enum: [PREPAID, POSTPAID]
+    BillerAmountMode:
+      type: string
+      description: "Biller profile amountMode (wallet-service biller catalogue)"
+      enum: [ENQUIRY, FIXED, OPEN]
+    BillEnquiryRequest:
+      type: object
+      additionalProperties: false
+      required: [billerId, billReference]
+      properties:
+        billerId: {$ref: '#/components/schemas/Uuid', description: "partnerId of a BILLER (not MNO); unknown -> 404 BILLER_NOT_FOUND"}
+        billReference: {type: string, minLength: 1, maxLength: 64, description: "must match the biller's referencePattern (else 400 BILL_REFERENCE_INVALID)"}
+    BillEnquiryResult:
+      type: object
+      additionalProperties: false
+      required: [billerId, billerCode, billReference, amountMode, customerName, dueAmountPoisha, dueDate, enquiryRef, fixedAmountPoisha, minAmountPoisha, maxAmountPoisha]
+      properties:
+        billerId: {$ref: '#/components/schemas/Uuid'}
+        billerCode: {type: string, maxLength: 32}
+        billReference: {type: string, maxLength: 64}
+        amountMode: {$ref: '#/components/schemas/BillerAmountMode'}
+        customerName: {type: ['string', 'null'], maxLength: 100, description: "ENQUIRY only: synthetic name from the simulated provider; else null"}
+        dueAmountPoisha: {oneOf: [{$ref: '#/components/schemas/AmountPoisha'}, {type: 'null'}], description: "ENQUIRY only: deterministic from the reference and the Dhaka month, within min..max, whole taka"}
+        dueDate: {type: ['string', 'null'], format: date, description: "ENQUIRY only: the 15th of the next Dhaka month"}
+        enquiryRef: {type: ['string', 'null'], pattern: '^SIM-ENQ-[0-9A-F]{16}$', description: "ENQUIRY only; echo it on the bill payment; valid for the Dhaka month of the enquiry"}
+        fixedAmountPoisha: {oneOf: [{$ref: '#/components/schemas/AmountPoisha'}, {type: 'null'}], description: "FIXED only"}
+        minAmountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        maxAmountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+    BillPaymentRequest:
+      type: object
+      additionalProperties: false
+      required: [customerWalletId, billerId, billReference, amountPoisha]
+      properties:
+        customerWalletId: {$ref: '#/components/schemas/Uuid', description: "type C; from"}
+        billerId: {$ref: '#/components/schemas/Uuid', description: "partnerId of an ACTIVE non-MNO BILLER; to = its settlement wallet (type B)"}
+        billReference: {type: string, minLength: 1, maxLength: 64, description: "must match the biller's referencePattern; never logged in full"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha', description: "FIXED: = fixedAmountPoisha; OPEN: min..max; ENQUIRY: = the enquired due amount"}
+        enquiryRef: {type: ['string', 'null'], pattern: '^SIM-ENQ-[0-9A-F]{16}$', description: "ENQUIRY billers: the enquiryRef of POST /v1/bills:enquire (optional; when absent the amount is checked against a fresh in-process enquiry)"}
+    RechargeRequest:
+      type: object
+      additionalProperties: false
+      required: [customerWalletId, msisdn, rechargeType, amountPoisha]
+      properties:
+        customerWalletId: {$ref: '#/components/schemas/Uuid', description: "type C; from"}
+        msisdn: {type: string, pattern: '^01[3-9][0-9]{8}$', description: "11-digit Bangladesh mobile number 01XXXXXXXXX; else 400 MSISDN_INVALID; never logged in full"}
+        operatorBillerId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "optional; derived from the MSISDN prefix when absent; when present must match (else 400 OPERATOR_MISMATCH)"}
+        rechargeType: {$ref: '#/components/schemas/RechargeType'}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha', description: "within the operator's min..max (seed 1,000..100,000), else 400 BILL_AMOUNT_OUT_OF_RANGE"}
     CashInRequest:
       type: object
       additionalProperties: false
@@ -1479,6 +1732,11 @@ components:
         reversalTxnRef: {oneOf: [{$ref: '#/components/schemas/TxnRef'}, {type: 'null'}], description: "non-null only when status = REVERSED"}
         reversedAmountPoisha: {oneOf: [{$ref: '#/components/schemas/AmountPoisha'}, {type: 'null'}], description: "non-null only when status = REVERSED"}
         refundedTotalPoisha: {$ref: '#/components/schemas/Poisha', description: "0 unless refunded (MERCHANT_PAYMENT)"}
+        billerId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "BILL_PAY / RECHARGE only (CR-TRANSACTION-1); absent on other types"}
+        billReference: {type: ['string', 'null'], maxLength: 64, description: "BILL_PAY only"}
+        msisdn: {type: ['string', 'null'], pattern: '^01[3-9][0-9]{8}$', description: "RECHARGE only"}
+        providerReceipt: {type: ['string', 'null'], maxLength: 64, description: "BILL_PAY / RECHARGE; non-null only when the provider confirmed (COMPLETED, or REVERSED afterwards)"}
+        token: {type: ['string', 'null'], pattern: '^[0-9]{20}$', description: "BILL_PAY prepaid electricity token; shown to party wallet holders only"}
     TransactionListItem:
       allOf:
         - $ref: '#/components/schemas/TransactionView'
@@ -1717,7 +1975,7 @@ components:
         version: {type: integer, format: int64, minimum: 1}
         status: {type: string, enum: [P, A, D, X, C, F, Q, Z]}
         kycTier: {type: integer, format: int32, minimum: 0, maximum: 2}
-        walletType: {type: string, enum: [C, A, D, M, I]}
+        walletType: {type: string, enum: [C, A, D, M, I, B]}
         categoryCode: {type: integer, format: int32, minimum: 0, maximum: 99999}
         flags: {type: integer, format: int32, minimum: 0, maximum: 31}
 

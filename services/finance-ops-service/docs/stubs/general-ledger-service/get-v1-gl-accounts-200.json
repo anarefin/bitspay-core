@@ -63,6 +63,6 @@
   "metadata": {
     "generatedBy": "contracts.py snapshot",
     "producer": "general-ledger-service",
-    "producerContractVersion": "1.0.0"
+    "producerContractVersion": "2.0.0"
   }
 }

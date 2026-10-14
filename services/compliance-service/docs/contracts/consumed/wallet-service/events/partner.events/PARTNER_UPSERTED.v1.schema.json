@@ -13,7 +13,7 @@
     },
     "partnerCode": {
       "type": "string",
-      "pattern": "^[AMDI][0-9]{9}$",
+      "pattern": "^[AMDIB][0-9]{9}$",
       "description": "type prefix + 8-digit sequence + Luhn digit"
     },
     "partnerType": {
@@ -22,7 +22,8 @@
         "AGENT",
         "MERCHANT",
         "DISTRIBUTOR",
-        "INSTITUTION"
+        "INSTITUTION",
+        "BILLER"
       ]
     },
     "subType": {
@@ -42,16 +43,21 @@
         "EMPLOYER",
         "GOVERNMENT",
         "NGO",
-        "OTHER"
+        "OTHER",
+        "UTILITY",
+        "EDUCATION",
+        "GOVT_FEE",
+        "INTERNET_TV",
+        "MNO"
       ],
-      "description": "AGENT RETAIL|SUPER_AGENT|MERCHANT_AGENT|BANK_AGENT; MERCHANT MICRO|SMALL|ENTERPRISE|ONLINE; DISTRIBUTOR MASTER|DISTRIBUTOR|SUB; INSTITUTION EMPLOYER|GOVERNMENT|NGO|OTHER"
+      "description": "AGENT RETAIL|SUPER_AGENT|MERCHANT_AGENT|BANK_AGENT; MERCHANT MICRO|SMALL|ENTERPRISE|ONLINE; DISTRIBUTOR MASTER|DISTRIBUTOR|SUB; INSTITUTION EMPLOYER|GOVERNMENT|NGO|OTHER; BILLER UTILITY|EDUCATION|GOVT_FEE|INTERNET_TV|MNO"
     },
     "categoryCode": {
       "type": "integer",
       "format": "int32",
       "minimum": 0,
       "maximum": 99999,
-      "description": "codes.yaml categoryCode; same as the partner wallet's"
+      "description": "codes.yaml categoryCode; same as the partner wallet's (BILLER 501..505)"
     },
     "mcc": {
       "type": [
@@ -246,11 +252,193 @@
           "dob"
         ]
       },
-      "description": "may be [] (e.g. INSTITUTION/GOVERNMENT)"
+      "description": "may be [] (e.g. INSTITUTION/GOVERNMENT, BILLER)"
     },
     "tinPresent": {
       "type": "boolean",
       "description": "additive; partner has a TIN on file"
+    },
+    "biller": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "description": "Additive (CR-WALLET-1, contract 1.1.0). Biller profile; present (non-null) only when partnerType = BILLER, absent otherwise. billerId = partnerId, status / walletId / subType / categoryCode are the top-level fields.",
+      "properties": {
+        "billerCode": {
+          "type": "string",
+          "pattern": "^[A-Z0-9-]{2,16}$",
+          "description": "short unique code, e.g. DESCO, GP; immutable after activation"
+        },
+        "nameEn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "nameBn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "UTILITY_ELECTRICITY",
+            "UTILITY_GAS",
+            "UTILITY_WATER",
+            "INTERNET",
+            "TV",
+            "EDUCATION",
+            "GOVT_FEE",
+            "MOBILE_PREPAID",
+            "MOBILE_POSTPAID"
+          ],
+          "description": "codes.yaml billerCategory (allowed per subType)"
+        },
+        "logoKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200,
+          "description": "object-store key of the logo"
+        },
+        "referenceLabelEn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "referenceLabelBn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "referencePattern": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Java-compatible regex the whole bill reference must match"
+        },
+        "amountMode": {
+          "type": "string",
+          "enum": [
+            "ENQUIRY",
+            "FIXED",
+            "OPEN"
+          ],
+          "description": "codes.yaml billerAmountMode"
+        },
+        "fixedAmountPoisha": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "minimum": 1,
+          "description": "set iff amountMode = FIXED"
+        },
+        "minAmountPoisha": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "maxAmountPoisha": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "description": ">= minAmountPoisha"
+        },
+        "feeBearer": {
+          "type": "string",
+          "enum": [
+            "PAYER",
+            "BILLER"
+          ],
+          "description": "codes.yaml billerFeeBearer"
+        },
+        "msisdnPrefixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^01[3-9]$"
+          },
+          "maxItems": 10,
+          "description": "MNO only; [] otherwise"
+        },
+        "rechargeTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "PREPAID",
+              "POSTPAID"
+            ]
+          },
+          "maxItems": 2,
+          "description": "MNO only; [] otherwise"
+        },
+        "denominationsPoisha": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "maxItems": 20,
+          "description": "MNO quick picks, ascending; may be []"
+        }
+      },
+      "required": [
+        "billerCode",
+        "nameEn",
+        "nameBn",
+        "category",
+        "logoKey",
+        "referenceLabelEn",
+        "referenceLabelBn",
+        "referencePattern",
+        "amountMode",
+        "fixedAmountPoisha",
+        "minAmountPoisha",
+        "maxAmountPoisha",
+        "feeBearer",
+        "msisdnPrefixes",
+        "rechargeTypes",
+        "denominationsPoisha"
+      ],
+      "examples": [
+        {
+          "billerCode": "GP",
+          "nameEn": "Grameenphone",
+          "nameBn": "গ্রামীণফোন",
+          "category": "MOBILE_PREPAID",
+          "logoKey": "billers/gp.png",
+          "referenceLabelEn": "Mobile number",
+          "referenceLabelBn": "মোবাইল নম্বর",
+          "referencePattern": "^01[3-9][0-9]{8}$",
+          "amountMode": "OPEN",
+          "fixedAmountPoisha": null,
+          "minAmountPoisha": 1000,
+          "maxAmountPoisha": 100000,
+          "feeBearer": "PAYER",
+          "msisdnPrefixes": [
+            "017",
+            "013"
+          ],
+          "rechargeTypes": [
+            "PREPAID",
+            "POSTPAID"
+          ],
+          "denominationsPoisha": [
+            2000,
+            5000,
+            10000,
+            20000,
+            50000
+          ]
+        }
+      ]
     }
   },
   "required": [

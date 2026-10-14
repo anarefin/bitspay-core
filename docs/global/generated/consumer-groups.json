@@ -5,7 +5,7 @@
     "topic": "fee.rules",
     "eventType": "PRICING_PLAN_UPSERTED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "planId",
       "version",
@@ -28,7 +28,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "partnerType",
@@ -48,7 +48,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -213,7 +213,7 @@
     "topic": "blacklist.events",
     "eventType": "BLACKLIST_ENTRY_UPSERTED",
     "producer": "limits-risk-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "entryId",
       "type",
@@ -229,7 +229,7 @@
     "topic": "blacklist.events",
     "eventType": "BLACKLIST_ENTRY_UPSERTED",
     "producer": "limits-risk-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "entryId",
       "type",
@@ -245,7 +245,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnRef",
       "txnType",
@@ -260,7 +260,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -278,7 +278,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -296,7 +296,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -313,7 +313,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnType",
@@ -330,7 +330,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_FAILED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "fromWalletId",
@@ -343,7 +343,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnType",
@@ -359,7 +359,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnType",
@@ -375,7 +375,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnType",
@@ -463,7 +463,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -485,7 +485,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_REGISTERED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -541,7 +541,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "walletId",
@@ -568,7 +568,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -589,7 +589,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -609,7 +609,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -635,7 +635,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -649,7 +649,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -664,7 +664,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "partnerType",
@@ -686,7 +686,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "walletId",
@@ -706,7 +706,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -728,7 +728,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_REGISTERED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -750,7 +750,7 @@
     "topic": "customer.events",
     "eventType": "KYC_APPROVED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -770,7 +770,7 @@
     "topic": "customer.events",
     "eventType": "KYC_TIER_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -783,7 +783,7 @@
     "topic": "customer.events",
     "eventType": "RISK_GRADE_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -796,7 +796,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_PROFILE_UPDATED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -814,7 +814,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -829,7 +829,7 @@
     "topic": "ledger.changes",
     "eventType": "LEDGER_TRANSFER_POSTED",
     "producer": "ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "debitAccountId",
       "creditAccountId",
@@ -849,7 +849,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "partnerType",
@@ -876,7 +876,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -892,7 +892,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -910,7 +910,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnRef",
       "txnId",
@@ -927,7 +927,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -965,7 +965,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -980,7 +980,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_DECIDED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "approvalId",
       "service",
@@ -996,7 +996,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_EXPIRED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "approvalId",
       "service",
@@ -1010,7 +1010,7 @@
     "topic": "customer.events",
     "eventType": "KYC_SUBMITTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -1036,7 +1036,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_REGISTERED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -1060,7 +1060,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_PROFILE_UPDATED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -1084,7 +1084,7 @@
     "topic": "customer.events",
     "eventType": "KYC_APPROVED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "kycTier",
@@ -1099,7 +1099,7 @@
     "topic": "customer.events",
     "eventType": "KYC_REJECTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "kycTier",
@@ -1114,7 +1114,7 @@
     "topic": "customer.events",
     "eventType": "KYC_TIER_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "kycTier",
@@ -1129,7 +1129,7 @@
     "topic": "customer.events",
     "eventType": "RISK_GRADE_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "riskGrade",
@@ -1142,7 +1142,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "partnerType",
@@ -1168,7 +1168,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -1192,7 +1192,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1216,7 +1216,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1231,7 +1231,7 @@
     "topic": "risk.alerts",
     "eventType": "RISK_ALERT_RAISED",
     "producer": "limits-risk-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "alertId",
       "txnId",
@@ -1256,7 +1256,7 @@
     "topic": "blacklist.events",
     "eventType": "BLACKLIST_ENTRY_UPSERTED",
     "producer": "limits-risk-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "entryId",
       "type",
@@ -1272,7 +1272,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -1290,7 +1290,7 @@
     "topic": "ledger.changes",
     "eventType": "LEDGER_TRANSFER_POSTED",
     "producer": "ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "transferId",
       "commandId",
@@ -1313,7 +1313,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1341,7 +1341,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_FAILED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1358,7 +1358,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1375,7 +1375,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnId",
       "txnRef",
@@ -1516,7 +1516,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_GRANTED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "commandId",
       "rewardPoisha",
@@ -1530,7 +1530,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_CLAWED_BACK",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "commandId",
       "clawbackCommandId",
@@ -1546,7 +1546,7 @@
     "topic": "commission.events",
     "eventType": "COMMISSION_SETTLED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "ledgerCommandId",
       "beneficiaryWalletId",
@@ -1561,7 +1561,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -1576,7 +1576,7 @@
     "topic": "gl.events",
     "eventType": "GL_DAY_CLOSED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "businessDate",
       "revision",
@@ -1590,7 +1590,7 @@
     "topic": "ledger.changes",
     "eventType": "LEDGER_TRANSFER_POSTED",
     "producer": "ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1601,7 +1601,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1612,7 +1612,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_FAILED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1623,7 +1623,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1634,7 +1634,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1645,7 +1645,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1656,7 +1656,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_REGISTERED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1667,7 +1667,7 @@
     "topic": "customer.events",
     "eventType": "KYC_SUBMITTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1678,7 +1678,7 @@
     "topic": "customer.events",
     "eventType": "KYC_APPROVED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1689,7 +1689,7 @@
     "topic": "customer.events",
     "eventType": "KYC_REJECTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1700,7 +1700,7 @@
     "topic": "customer.events",
     "eventType": "KYC_TIER_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1711,7 +1711,7 @@
     "topic": "customer.events",
     "eventType": "RISK_GRADE_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1722,7 +1722,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_PROFILE_UPDATED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1733,7 +1733,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1744,7 +1744,7 @@
     "topic": "fee.rules",
     "eventType": "PRICING_PLAN_UPSERTED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1755,7 +1755,7 @@
     "topic": "commission.events",
     "eventType": "COMMISSION_ACCRUED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1766,7 +1766,7 @@
     "topic": "commission.events",
     "eventType": "COMMISSION_SETTLED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1975,7 +1975,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_GRANTED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -1986,7 +1986,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_CLAWED_BACK",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2151,7 +2151,7 @@
     "topic": "risk.alerts",
     "eventType": "RISK_ALERT_RAISED",
     "producer": "limits-risk-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2162,7 +2162,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_REQUESTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2173,7 +2173,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_DECIDED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2184,7 +2184,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_EXPIRED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2195,7 +2195,7 @@
     "topic": "audit.events",
     "eventType": "AUDIT_RECORDED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2206,7 +2206,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2217,7 +2217,7 @@
     "topic": "gl.events",
     "eventType": "GL_DAY_CLOSED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2228,7 +2228,7 @@
     "topic": "gl.events",
     "eventType": "GL_DAY_CERTIFIED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2239,7 +2239,7 @@
     "topic": "gl.events",
     "eventType": "GL_PERIOD_STATUS_CHANGED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2250,7 +2250,7 @@
     "topic": "gl.events",
     "eventType": "GL_JOURNAL_POSTED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2261,7 +2261,7 @@
     "topic": "gl.events",
     "eventType": "GL_ACCOUNT_UPSERTED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2272,7 +2272,7 @@
     "topic": "gl.events",
     "eventType": "GL_EXCEPTION_RAISED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2283,7 +2283,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2294,7 +2294,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_FAILED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2305,7 +2305,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2316,7 +2316,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2327,7 +2327,7 @@
     "topic": "audit.events",
     "eventType": "AUDIT_RECORDED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -2338,7 +2338,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_REQUESTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "approvalId",
       "service",
@@ -2366,7 +2366,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_DECIDED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "approvalId",
       "service",
@@ -2394,7 +2394,7 @@
     "topic": "approval.events",
     "eventType": "APPROVAL_EXPIRED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "approvalId",
       "service",
@@ -2422,7 +2422,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_COMPLETED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnType",
       "txnRef",
@@ -2438,7 +2438,11 @@
       "merchantReference",
       "reasonCode",
       "originalTxnRef",
-      "completedAt"
+      "completedAt",
+      "billerId",
+      "billReference",
+      "msisdn",
+      "providerReceipt"
     ]
   },
   {
@@ -2447,7 +2451,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_FAILED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "txnType",
       "txnRef",
@@ -2455,7 +2459,10 @@
       "fromWalletId",
       "amountPoisha",
       "failureCode",
-      "createdAt"
+      "createdAt",
+      "billerId",
+      "billReference",
+      "msisdn"
     ]
   },
   {
@@ -2464,7 +2471,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REVERSED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": []
   },
   {
@@ -2473,7 +2480,7 @@
     "topic": "txn.events",
     "eventType": "TRANSACTION_REFUNDED",
     "producer": "transaction-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": []
   },
   {
@@ -2482,7 +2489,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "version",
@@ -2504,7 +2511,7 @@
     "topic": "customer.events",
     "eventType": "KYC_SUBMITTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2519,7 +2526,7 @@
     "topic": "customer.events",
     "eventType": "KYC_APPROVED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2534,7 +2541,7 @@
     "topic": "customer.events",
     "eventType": "KYC_REJECTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2549,7 +2556,7 @@
     "topic": "customer.events",
     "eventType": "KYC_TIER_CHANGED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2564,7 +2571,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_REGISTERED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2578,7 +2585,7 @@
     "topic": "customer.events",
     "eventType": "CUSTOMER_PROFILE_UPDATED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "customerId",
       "walletIds",
@@ -2592,7 +2599,7 @@
     "topic": "partner.events",
     "eventType": "PARTNER_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "partnerId",
       "partnerType",
@@ -2607,7 +2614,7 @@
     "topic": "commission.events",
     "eventType": "COMMISSION_SETTLED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "beneficiaryWalletId",
       "period",
@@ -2710,7 +2717,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_GRANTED",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "rewardPoisha",
@@ -2725,7 +2732,7 @@
     "topic": "campaign.events",
     "eventType": "REWARD_CLAWED_BACK",
     "producer": "pricing-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "rewardPoisha",
@@ -2972,7 +2979,7 @@
     "topic": "gl.events",
     "eventType": "GL_DAY_CLOSED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -2981,7 +2988,7 @@
     "topic": "gl.events",
     "eventType": "GL_DAY_CERTIFIED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -2990,7 +2997,7 @@
     "topic": "gl.events",
     "eventType": "GL_PERIOD_STATUS_CHANGED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -2999,7 +3006,7 @@
     "topic": "gl.events",
     "eventType": "GL_JOURNAL_POSTED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -3008,7 +3015,7 @@
     "topic": "gl.events",
     "eventType": "GL_ACCOUNT_UPSERTED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -3017,7 +3024,7 @@
     "topic": "gl.events",
     "eventType": "GL_EXCEPTION_RAISED",
     "producer": "general-ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "2.0.0",
     "fieldsUsed": []
   },
   {
@@ -3026,7 +3033,7 @@
     "topic": "notification.requests",
     "eventType": "NOTIFICATION_REQUESTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -3037,7 +3044,7 @@
     "topic": "notification.requests",
     "eventType": "NOTIFICATION_REMINDER_CANCELLED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "*"
     ]
@@ -3048,7 +3055,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",
@@ -3065,7 +3072,7 @@
     "topic": "ledger.changes",
     "eventType": "LEDGER_TRANSFER_POSTED",
     "producer": "ledger-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "transferId",
       "commandId",
@@ -3091,7 +3098,7 @@
     "topic": "wallet.events",
     "eventType": "WALLET_UPSERTED",
     "producer": "wallet-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "walletId",
       "walletType",
@@ -3161,7 +3168,7 @@
     "topic": "refdata.events",
     "eventType": "REFDATA_UPSERTED",
     "producer": "admin-service",
-    "pinned": "1.0.0",
+    "pinned": "1.1.0",
     "fieldsUsed": [
       "type",
       "code",

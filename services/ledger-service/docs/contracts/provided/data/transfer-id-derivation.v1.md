@@ -21,7 +21,7 @@ transferId(commandId, legIndex) = first 16 bytes of SHA-256( uuidBytes(commandId
 
 | Command | Leg indexes |
 |---|---|
-| 1–6 payments | 0 principal · 1 fee · 2 VAT · 3 commission · 4 AIT · 5–8 technical balance-bounds legs (only when `destinationMaxBalancePoisha` is set). A skipped leg (amount 0) keeps its index; later legs never shift |
+| 1–6, 18, 19 payments | 0 principal · 1 fee · 2 VAT · 3 commission · 4 AIT · 5–8 technical balance-bounds legs (only when `destinationMaxBalancePoisha` is set). A skipped leg (amount 0) keeps its index; later legs never shift |
 | 7 reversal | 0 void of `releaseHoldCommandId`'s hold (only if present) · `1 + i` = mirror of original leg `i` (i = 0..4). All legs 0–5 are business legs |
 | 8 disbursement row | 0 principal · 5–8 technical when the row has constraints |
 | 9, 10, 11, 16 | 0 |

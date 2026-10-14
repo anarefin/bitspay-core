@@ -4,13 +4,13 @@
 |---|---|
 | Service | `wallet-service` (`spring.application.name`) |
 | Number / owner | SVC-03 · Dev-3 (service lead) · modules: `wallet` → Dev-3, `partner` → Dev-4 |
-| Layer / release | Core · R1 (onboarding, KYC, wallets, lifecycle, status cache, partners, QR) + R2 (dormancy, re-KYC, pre-registration, unclaimed report, distributor hierarchy, outlets, agreements) |
-| contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
+| Layer / release | Core · **MVP** (onboarding + basic KYC with compliance screening, wallets of every type incl. `B` BILLER, lifecycle and closure, status cache, partners: agents / merchants / distributors / billers, on-us Bangla QR, internal biller catalogue — CR-WALLET-1) · R1+ (off-us QR, merchant / biller bank settlement, partner logins) · R2 (dormancy, re-KYC, pre-registration, unclaimed report, effective-dated distributor hierarchy changes, outlets, partner users, agreements) |
+| contractVersion | 1.1.0 (see `contracts/contract.yaml`; CR-WALLET-1) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8103 · management 9103 |
 | Schema / role | `svc_wallet` (both modules; one outbox `svc_wallet.outbox`) |
 | Depends on (pins) | ledger-service@1 (contract 1.0.0) · limits-risk-service@1 (1.0.0) · compliance-service@1 (1.0.0) · support-service@1 (1.0.0) · transaction-service@1 (1.0.0) · admin-service@1 (1.0.0; `refdata.events`, legal holds, inbound topics `notification.requests`, `approval.events`, `audit.events`) |
-| Open decisions | OPEN D-06, D-11, D-16, D-19, D-20, D-21, D-29, D-30, D-32, D-35, D-42, D-51 (§13) |
+| Open decisions | OPEN D-06, D-11, D-16, D-19, D-20, D-21, D-29, D-30, D-32, D-35, D-42, D-51, B-25, B-26 (§13) |
 
 ## 1. Mission and boundaries
 
@@ -19,33 +19,37 @@
 wallet-service is the system of record for **every party that holds a wallet** and for **whether each wallet may move money**. It has two business modules:
 
 - **wallet** registers customers, captures their KYC data and documents, runs a manual back-office KYC review (no e-KYC in this phase), assigns KYC tier and risk grade, creates wallets for every owner type, owns the wallet lifecycle (pending KYC → active → dormant / blocked → closure) and publishes a complete, versioned copy of every wallet's status into the Redis **cache** cluster, so a payment service can check "may Rahim send, may Karim receive?" in one Redis round trip.
-- **partner** is the system of record for every **non-customer** wallet holder: agents, merchants, distributors and institutions. It runs onboarding applications through configurable approval chains, gets applicants screened, activates partners (wallet, static Bangla QR), owns the effective-dated 5-level distribution hierarchy, the partner lifecycle and Bangla QR (EMVCo MPM) generation and on-us decoding.
+- **partner** is the system of record for every **non-customer** wallet holder: agents, merchants, distributors, institutions and **billers** (MVP, CR-WALLET-1). It runs onboarding applications through configurable approval chains, gets applicants screened, activates partners (wallet, static Bangla QR), owns the effective-dated 5-level distribution hierarchy, the partner lifecycle and Bangla QR (EMVCo MPM) generation and on-us decoding. It also owns the **internal biller catalogue**: each biller is a partner of type `BILLER` with a biller profile and one settlement wallet of type `B`, published into the Redis cache cluster (data contract `biller-catalogue-cache`) so the payment service can validate a bill payment or a mobile recharge in one round trip.
 
 Every partner **is** a wallet holder, so both modules live in one service and call each other in-process (§1.5).
 
 **Worked example (the cast).**
 1. Agent **Salma** (Salma Telecom, Mirpur) is onboarded by a sales officer under the Mirpur sub-distributor. Her application passes SALES → COMPLIANCE → OPERATIONS; on the last approval the partner module calls the wallet module in-process to create her `AGENT` wallet (ledger account first), generates her static QR, sets her status `ACTIVE` and publishes `PARTNER_UPSERTED` (version 5) and `WALLET_UPSERTED`.
-2. **Rahim** registers at Salma's shop (`X-Actor-Type: AGENT`): customer `REGISTERED`, CUSTOMER wallet `P`, tier 0. He submits KYC for tier 2; compliance screens the `KYC_SUBMITTED` event and answers `SCREENING_COMPLETED CLEAR`; an `OPS_MAKER` proposes APPROVE, an `OPS_CHECKER` approves. In one transaction Rahim becomes tier 2, risk LOW (score 5), his wallet `P → A` (version 8813), and the status cache field for his wallet becomes `8813:A:2:C:0:0`.
+2. **Rahim** registers at Salma's shop (`X-Actor-Type: AGENT`): customer `REGISTERED`, CUSTOMER wallet `P`, tier 0. He submits KYC for tier 2; compliance screens the `KYC_SUBMITTED` event and answers `SCREENING_COMPLETED CLEAR`; an `OPS_MAKER` decides APPROVE (MVP single step, BR-W-25; in R1 an `OPS_CHECKER` approves the proposal). In one transaction Rahim becomes tier 2, risk LOW (score 5), his wallet `P → A` (version 8813), and the status cache field for his wallet becomes `8813:A:2:C:0:0`.
 3. **Karim** (tier 1) asks to close his wallet at a service point with 425.75 Tk left. The closure waits in `AWAITING_ZERO_BALANCE` until he cashes out at Salma; after re-check, approval and a 15-minute settle window the ledger account is closed, the wallet becomes `Z` and his MSISDN cools for 180 days.
 4. **Nirob Store** self-registers as a MICRO grocery merchant (`categoryCode 3101`). Rahim scans its dynamic QR for 350 Tk; `POST /v1/qr/decode` answers `payable: true` with the merchant wallet and `qrPayloadId`, which the channel passes to the payment service.
+5. **DESCO** (MVP biller catalogue) is a seeded DRAFT `BILLER / UTILITY` application. A `PARTNER_OPS_MAKER` uploads the service agreement and submits it; compliance screens `PARTNER_UPSERTED` (PENDING_SCREENING, with the `biller` object) CLEAR; the `BILLER_STD` chain is approved; activation creates its `B` wallet (ledger account type 150 `BILLER_WALLET`, owner type 6 `BILLER`, category 501) exactly like a merchant's 130 wallet, skips the QR step, and after commit writes `biller:{billerId}`. Rahim's bill payment to DESCO is then validated by the payment service from that key and credited to the DESCO wallet.
 
 ### 1.2 In scope
 
 **Module `wallet`**
 - Customer profile: BN/EN names, NID (encrypted + HMAC), DOB, addresses (GEO codes), occupation, source of funds, income band, purpose, e-mail, language, nominees, versioned consents, referral code at registration.
 - KYC submissions with save/resume, document upload to an encrypted object store, de-duplication, synchronous blacklist check, screening hand-off via `customer.events`, manual review queue with maker-checker, exception queue, tier assignment / upgrade, risk grading by configurable matrix, EDD routing for HIGH risk / PEP.
-- Wallets for `CUSTOMER`, `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION` owners; ledger account first, with a provisioning retry job; category and flag maintenance (per-holder flags).
+- Wallets for `CUSTOMER`, `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION`, `BILLER` owners; ledger account first, with a provisioning retry job; category and flag maintenance (per-holder flags).
 - Lifecycle: restrictions (debit / credit / full block) with maker-checker, immediate service freezes, closure workflow with pre-checks and same-person closure payout, dormancy (R2), KYC review / re-KYC (R2), reactivation, MSISDN cooling, unclaimed-balance dataset (R2), bulk pre-registration (R2).
 - Wallet status cache writer (write-through Lua CAS), cache loader role (`cache-loader` profile), sampler / consistency checker, display-data cache.
 
 **Module `partner`**
-- Partner types AGENT (RETAIL, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT), MERCHANT (MICRO, SMALL, ENTERPRISE, ONLINE + MCC), DISTRIBUTOR (MASTER, DISTRIBUTOR, SUB), INSTITUTION (EMPLOYER, GOVERNMENT, NGO, OTHER).
+- Partner types AGENT (RETAIL, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT), MERCHANT (MICRO, SMALL, ENTERPRISE, ONLINE + MCC), DISTRIBUTOR (MASTER, DISTRIBUTOR, SUB), INSTITUTION (EMPLOYER, GOVERNMENT, NGO, OTHER), BILLER (UTILITY, EDUCATION, GOVT_FEE, INTERNET_TV, MNO — MVP, CR-WALLET-1).
+- Internal biller catalogue (MVP, BIL-008 / BIL-011 / BIL-012): biller profile (`partner_biller_profile`, 1:1 with the partner), onboarding through the normal application / screening / approval-chain path, a `B` settlement wallet per biller, MNO MSISDN-prefix index, read APIs `GET /v1/billers` and `GET /v1/billers/{billerId}`, Redis data contract `biller-catalogue-cache` (write-through + refresh job), seed catalogue of 11 billers (§4.1.3).
 - Onboarding applications: per-type form, document checklist, key persons, linked bank accounts (records), site visits, self-registration of micro-merchants, assisted onboarding by staff and distributors.
 - Configurable approval chains with SLA tracking, return for resubmission, rejection reasons, auto-stage for low-risk micro-merchants, EDD stage for HIGH risk.
 - Blacklist check (sync) and re-check on `blacklist.events`; screening via `partner.events` → `case.events`; partner risk grade (scoring rules).
 - Activation saga (wallet, category, static QR, notification); effective-dated hierarchy with maker-checker and scheduled application; lifecycle (suspend, reactivate, category / territory / profile changes, terminate after zero balance); distributor suspension of downstream agents (DST-008); risk flags.
 - Bangla QR: static and dynamic payloads, CRC-16/CCITT-FALSE, PNG/SVG rendering, revoke / reprint, on-us decode.
 - Merchant outlets and partner users as records (R2); agreements and trade-licence expiry alerts (R2).
+
+**MVP vs R1+ (SRS v1.2).** The MVP release (before R1) uses everything above except: off-us QR (MER-002 off-us / MER-003), merchant and biller bank settlement (MER-006 BANK, biller payout), partner portal credentials, biller API / aggregator adapters (BIL-001 ekPay, BIL-002), assisted bill pay / recharge by agents (AGT-002 part) — all R1+; and the R2 items (dormancy, re-KYC, pre-registration, unclaimed report, effective-dated hierarchy changes, outlets, partner users, agreements, KYC anonymisation). No OTP / step-up in the MVP: actor context comes from trusted `X-Actor-*` headers (A-43). Billers are partners, not actors: they have no login and no KYC tier.
 
 **Shared (service-level)**: one maker-checker engine and `/v1/approvals`, `approval.events`, `audit.events`, `notification.requests`, one outbox, one idempotency store, ShedLock job leadership, field cipher, HMAC hasher, document store.
 
@@ -62,6 +66,9 @@ Every partner **is** a wallet holder, so both modules live in one service and ca
 | NID reveal to staff (`?reveal=nid`) | Not available; `nidMasked` only (OPEN D-20). |
 | Off-us Bangla QR (MER-002 off-us, MER-003) | Decoder parses any EMVCo payload and answers `onUs=false, payable=false`. |
 | Merchant bank settlement (MER-006 BANK) | `settlementMode` is always `WALLET`; `BANK` → `422 SERVICE_DISABLED` (OPEN D-42). |
+| Biller bank settlement / payout of a `B` wallet's balance (R1+) | Biller collections accumulate in the biller's `B` wallet in the MVP; settlement to the biller is R1+ (§13 deferred items). Ledger 150 is not in the guards of holds (14/15) or closure payout (17) in the MVP. |
+| Biller API / aggregator integration (BIL-001 ekPay, BIL-002 adapters), biller logins (R1+) | Internal catalogue only; bill enquiry and fulfilment are simulated by transaction-service (A-41). Billers are not actors. |
+| Biller logo upload | `logoKey` is an object-store key set by staff; no upload operation in the MVP. |
 | Geo-fencing enforcement (AGT-006) | GPS / territory stored and published only. |
 | Float levels, volumes, commissions, dashboards (DST-004/005/007, AGT-004/005/007, PRT-002..005) | Owned by other services; this service provides the hierarchy, `categoryCode` and partner data. |
 | Portal credential issuance (PON-007) | Activation records `credentialsIssued=false`. |
@@ -71,7 +78,7 @@ Every partner **is** a wallet holder, so both modules live in one service and ca
 ### 1.4 This service must NEVER
 
 1. Talk to TigerBeetle or change a balance itself. Ledger calls are limited to account create / close, balance / holds reads, batch balances, the closure payout command (17) and its outcome lookup.
-2. Read another service's schema, or write Redis keys other than `ws:*`, `wd:*`, `wlk:*`, `wsmeta:*` and `DEL wsn:*`.
+2. Read another service's schema, or write Redis keys other than `ws:*`, `wd:*`, `wlk:*`, `wsmeta:*`, `biller:*` (CR-WALLET-1) and `DEL wsn:*`.
 3. Publish `WALLET_UPSERTED` for a wallet whose ledger account does not exist yet (`provisioning_state ≠ READY`).
 4. Publish any eventType other than `PARTNER_UPSERTED` on `partner.events` (compacted topic: a second type would overwrite partner state).
 5. Approve KYC without screening CLEAR (or decided CLEAR), blacklist done and no open exception; activate a partner whose screening is not CLEAR or whose blacklist check is not clean.
@@ -86,7 +93,7 @@ Every partner **is** a wallet holder, so both modules live in one service and ca
 | Module | Responsibility | Package root | Owner | Tables | Inbox | Flyway (location · history table) |
 |---|---|---|---|---|---|---|
 | `wallet` (service lead) | Customers, KYC, wallets, lifecycle, closure, status cache (writer + loader), config documents; also hosts the shared-kernel tables | `com.bracits.bitspay.wallet` | Dev-3 | unprefixed (`customer`, `wallet`, …) + shared kernel (`outbox`, `processed_event`, `approval_request`, `idempotency_record`, `shedlock`, `job_run`) | `processed_event` | `db/migration/wallet` · `flyway_history_wallet` (runs first) |
-| `partner` | Agents, merchants, distributors, institutions: onboarding, approval chains, activation, hierarchy, lifecycle, Bangla QR, outlets, users, agreements | `com.bracits.bitspay.partner` | Dev-4 | prefix `partner_` (`partner`, `partner_application`, …) | `partner_processed_event` | `db/migration/partner` · `flyway_history_partner` (runs second) |
+| `partner` | Agents, merchants, distributors, institutions, billers: onboarding, approval chains, activation, hierarchy, lifecycle, Bangla QR, biller catalogue (profile, `biller:*` cache writer), outlets, users, agreements | `com.bracits.bitspay.partner` | Dev-4 | prefix `partner_` (`partner`, `partner_application`, `partner_biller_profile`, …) | `partner_processed_event` | `db/migration/partner` · `flyway_history_partner` (runs second) |
 | shared kernel (service-private) | ActorContext filter, `@RequiresActor`, problem+json mapper, outbox writer + polling relay, inbox helper, DLQ handling, idempotency store, maker-checker engine, ShedLock jobs, `FieldCipher`, `HmacHasher`, `DocumentStore`, PII log masking, `HttpLedgerClient`, `HttpLimitsRiskClient`, `HttpAdminClient` (`common.client`) | `com.bracits.bitspay.common` | Dev-3 (Dev-4 reviews) | — | — | — |
 
 Application class `com.bracits.bitspay.WalletServiceApplication` (component scan covers the three packages). Each module has the full layer set `controller` / `dto` / `service` / `repository` / `entity` / `mapper` / `exception` / `client` / `messaging` / `config` (kernel K9); `common` holds the shared config, exception, messaging and clients. There is no Spring Modulith.
@@ -113,79 +120,88 @@ Application class `com.bracits.bitspay.WalletServiceApplication` (component scan
 
 ## 2. SRS traceability
 
+Baseline: **SRS v1.2 (14 Oct 2026)**. `· MVP` at the end of the Covered-by column marks a row the MVP release (before R1) delivers; unmarked rows are R1+, R2 or deferred. Withdrawn in v1.2 (no row of this service affected): GLD-031, INT-01, B-18.
+
 | SRS ID | Requirement (short) | Covered by (BR / WP / API / event) |
 |---|---|---|
-| ONB-001 | Self-onboarding with OTP | `POST /v1/customers` (CUSTOMER, APP/USSD); OTP upstream — partial (OTP deferred) · W-WP-5 |
-| ONB-002 | Assisted onboarding, assisting user recorded | `assistedBy` from `X-Actor-*` (AGENT/STAFF) on customer + submission · W-WP-5 |
-| ONB-003 | NID capture + OCR | NID front/back upload + manual entry; OCR SPI absent · W-WP-6 |
-| ONB-004 | EC NID verification | `KycVerificationProvider` manual: reviewer checklist stored as verification result · W-WP-6 |
-| ONB-005 | Selfie liveness / face match | SELFIE document + manual comparison; `FaceMatchProvider` none · W-WP-6 |
+| ONB-001 | Self-onboarding with OTP | `POST /v1/customers` (CUSTOMER, APP/USSD); OTP upstream — partial (OTP deferred) · W-WP-5 · MVP |
+| ONB-002 | Assisted onboarding, assisting user recorded | `assistedBy` from `X-Actor-*` (AGENT/STAFF) on customer + submission · W-WP-5 · MVP |
+| ONB-003 | NID capture + OCR | NID front/back upload + manual entry; OCR SPI absent · W-WP-6 · MVP |
+| ONB-004 | EC NID verification | `KycVerificationProvider` manual: reviewer checklist stored as verification result · W-WP-6 · MVP |
+| ONB-005 | Selfie liveness / face match | SELFIE document + manual comparison; `FaceMatchProvider` none · W-WP-6 · MVP |
 | ONB-006 | Fingerprint (R2) | Deferred |
-| ONB-007 | De-dup NID / MSISDN, exception queue | Partial unique indexes + submit-time checks → exception items (BR-W-20) · W-WP-6 |
-| ONB-008 | Screening before activation | `KYC_SUBMITTED` → `case.events` correlated by `sourceEventId`; review gate BR-W-23 · W-WP-6 |
-| ONB-009 | Nominee details | `PUT /v1/customers/{customerId}/nominees` (Σ shares = 10000) · W-WP-5 |
-| ONB-010 | Occupation, source of funds, income, purpose | Customer / submission fields (configured lists) · W-WP-5 |
-| ONB-011 | Risk grade matrix, EDD for HIGH | `RISK_MATRIX` + calculator (BR-W-31); HIGH / PEP → 2-level approval · W-WP-6, W-WP-7 |
-| ONB-012 | Tier assignment, configurable tiers | `KYC_TIERS` config; tier set on approval · W-WP-6, W-WP-7 |
-| ONB-013 | Tier upgrade, same wallet | New submission with higher `targetTier` (BR-W-29); `KYC_TIER_CHANGED KYC_UPGRADE` · W-WP-6 |
+| ONB-007 | De-dup NID / MSISDN, exception queue | Partial unique indexes + submit-time checks → exception items (BR-W-20) · W-WP-6 · MVP |
+| ONB-008 | Screening before activation | `KYC_SUBMITTED` → `case.events` correlated by `sourceEventId`; review gate BR-W-23 · W-WP-6 · MVP |
+| ONB-009 | Nominee details | `PUT /v1/customers/{customerId}/nominees` (Σ shares = 10000) · W-WP-5 · MVP |
+| ONB-010 | Occupation, source of funds, income, purpose | Customer / submission fields (configured lists) · W-WP-5 · MVP |
+| ONB-011 | Risk grade matrix, EDD for HIGH | `RISK_MATRIX` + calculator (BR-W-31); HIGH / PEP → EDD fields mandatory; 2-level approval in R1 (`MAKER_CHECKER`), single step in the MVP (BR-W-25) · W-WP-6, W-WP-7, WP-CR-2 · MVP |
+| ONB-012 | Tier assignment, configurable tiers | `KYC_TIERS` config; tier set on approval · W-WP-6, W-WP-7 · MVP |
+| ONB-013 | Tier upgrade, same wallet | New submission with higher `targetTier` (BR-W-29); `KYC_TIER_CHANGED KYC_UPGRADE` · W-WP-6 · MVP |
 | ONB-014 | PIN set | Deferred (edge) |
-| ONB-015 | T&C / privacy consent with version | `consent_record`; TERMS + PRIVACY mandatory · W-WP-5 |
-| ONB-016 | Bangla-first journey | BN fields and `language` in APIs and events — partial (no UI) |
-| ONB-017 | Save & resume (7 days) | DRAFT submissions, `resume_expires_at`, draft-expiry job (BR-W-30) · W-WP-6 |
-| ONB-018 | Review queue, maker-checker, reason codes | `GET /v1/kyc/review-queue`, `:decide` → approval (BR-W-25) · W-WP-6 |
-| ONB-019 | Notify approval / rejection / pending | `customer.events` (`KYC_SUBMITTED`, `KYC_APPROVED`, `KYC_REJECTED`) drive admin-service rules · W-WP-6 |
+| ONB-015 | T&C / privacy consent with version | `consent_record`; TERMS + PRIVACY mandatory · W-WP-5 · MVP |
+| ONB-016 | Bangla-first journey | BN fields and `language` in APIs and events — partial (no UI) · MVP |
+| ONB-017 | Save & resume (7 days) | DRAFT submissions, `resume_expires_at`, draft-expiry job (BR-W-30) · W-WP-6 · MVP |
+| ONB-018 | Review queue, maker-checker, reason codes | `GET /v1/kyc/review-queue`, `:decide` (BR-W-25): single step in the MVP, maker-checker in R1 ([CR-WALLET-2](changes/CR-WALLET-2.md)) · W-WP-6, WP-CR-2 · MVP |
+| ONB-019 | Notify approval / rejection / pending | `customer.events` (`KYC_SUBMITTED`, `KYC_APPROVED`, `KYC_REJECTED`) drive admin-service rules · W-WP-6 · MVP |
 | ONB-020 | Bulk pre-registration (R2) | `POST /v1/customers:preRegister` → wallet `D` + flag 4 (BR-W-36) · W-WP-9 |
 | ONB-021 | KYC expiry & periodic review (R2) | `kyc_review_due_at`, daily job, `KYC_EXPIRED` debit block (BR-W-35) · W-WP-9 |
-| ONB-022 | KYC artefacts encrypted & retrievable | Envelope encryption; `GET …/documents/{documentId}` audited · W-WP-6 |
-| ONB-023 | Profile update maker-checker; NID fields locked | `PATCH /v1/customers/{customerId}` → approval; `FIELD_LOCKED` · W-WP-5 |
+| ONB-022 | KYC artefacts encrypted & retrievable | Envelope encryption; `GET …/documents/{documentId}` audited · W-WP-6 · MVP |
+| ONB-023 | Profile update maker-checker; NID fields locked | `PATCH /v1/customers/{customerId}` → approval; `FIELD_LOCKED` · W-WP-5 · MVP |
 | ONB-024 | Minors (R3) | Deferred; age < 18 rejected |
-| ONB-025 | Onboarding audit trail | `kyc_submission_event` + `audit.events` (device, geo, channel, assisting actor) · W-WP-6 |
-| ACL-001 | Wallet statuses | Status codes (codes.yaml `walletStatus`); base status + restriction overlay (BR-W-01..04) · W-WP-2 |
-| ACL-002 | Deactivation triggers with reason | Reason code on every restriction · W-WP-4 |
-| ACL-003 | Automatic + manual deactivation | Jobs apply directly; staff via maker-checker (BR-W-11) · W-WP-4, W-WP-9 |
-| ACL-004 | Customer-initiated closure with ID verification | `POST /v1/wallets/{walletId}/closures` with `identityVerification` · W-WP-8 |
-| ACL-005 | Closure pre-checks | Disputes projection, ledger holds, freezes, approvals, balance (BR-W-40) · W-WP-8 |
-| ACL-006 | Remaining balance settlement | Same-person payout via ledger command 17, else drain by cash-out (BR-W-44) · W-WP-8 |
-| ACL-007 | Closure maker-checker + notifications | `WalletClosure / CLOSE` approval + closure templates · W-WP-8 |
-| ACL-008 | Reactivation with compliance checks | `REACTIVATE` (BR-W-33) · W-WP-4 |
-| ACL-009 | Data retention; MSISDN cooling | `msisdn_release`, `msisdnCoolingDays` (BR-W-43); KYC retention (BR-W-46, R2) · W-WP-8 |
-| ACL-010 | Audit of all status changes | `wallet_status_history` + `audit.events` + `wallet.events` with identical version · W-WP-4 |
-| LED-005 | Holds (status side) | Flag `HAS_OPEN_LIEN` per-holder model; holds read for closure · W-WP-2, W-WP-8 |
+| ONB-025 | Onboarding audit trail | `kyc_submission_event` + `audit.events` (device, geo, channel, assisting actor) · W-WP-6 · MVP |
+| ACL-001 | Wallet statuses | Status codes (codes.yaml `walletStatus`); base status + restriction overlay (BR-W-01..04) · W-WP-2 · MVP |
+| ACL-002 | Deactivation triggers with reason | Reason code on every restriction · W-WP-4 · MVP |
+| ACL-003 | Automatic + manual deactivation | Jobs apply directly; staff via maker-checker (BR-W-11) · W-WP-4, W-WP-9 · MVP |
+| ACL-004 | Customer-initiated closure with ID verification | `POST /v1/wallets/{walletId}/closures` with `identityVerification` · W-WP-8 · MVP |
+| ACL-005 | Closure pre-checks | Disputes projection, ledger holds, freezes, approvals, balance (BR-W-40) · W-WP-8 · MVP |
+| ACL-006 | Remaining balance settlement | Same-person payout via ledger command 17, else drain by cash-out (BR-W-44) · W-WP-8 · MVP |
+| ACL-007 | Closure maker-checker + notifications | `WalletClosure / CLOSE` approval + closure templates · W-WP-8 · MVP |
+| ACL-008 | Reactivation with compliance checks | `REACTIVATE` (BR-W-33) · W-WP-4 · MVP |
+| ACL-009 | Data retention; MSISDN cooling | `msisdn_release`, `msisdnCoolingDays` (BR-W-43); KYC retention (BR-W-46, R2) · W-WP-8 · MVP |
+| ACL-010 | Audit of all status changes | `wallet_status_history` + `audit.events` + `wallet.events` with identical version · W-WP-4 · MVP |
+| LED-005 | Holds (status side) | Flag `HAS_OPEN_LIEN` per-holder model; holds read for closure · W-WP-2, W-WP-8 · MVP |
 | LED-016 | Dormancy (R2) | Activity projection from `txn.events`; daily job (BR-W-34) · W-WP-9 |
 | LED-017 | Unclaimed balances (R2) | `GET /v1/wallets/reports/unclaimed` dataset — partial (account OPEN D-35) · W-WP-9 |
-| CX-013 | Profile: KYC status / tier, language | `GET /v1/customers/{customerId}` (CUSTOMER own) · W-WP-5 |
-| DAT-002 | Validation at capture | Jakarta Validation + cross-field rules (BR-W-60..64) · W-WP-5 |
-| DAT-004 | Central geography master | GEO codes on every contract; validated against the refdata projection · W-WP-5, P-WP-2 |
-| PRV-002 | Consent capture / withdraw | Consent APIs · W-WP-5 |
-| PRV-006 | PII masked in logs | Log masking + log-scan test · WP-1, X-WP-2 |
-| PON-001 | Partner onboarding workflow per type | Applications, checklists, chains (BR-PAR-01..12) · P-WP-2..5 |
-| PON-002 | Identity + business verification with documents | Key persons, documents, manual verification — partial (e-KYC deferred) · P-WP-3 |
-| PON-003 | Self-registration of micro-merchants; assisted onboarding | CUSTOMER (MICRO, flag), STAFF, DISTRIBUTOR actors (BR-PAR-01) · P-WP-3 |
-| PON-004 | PEP / sanctions / blacklist screening | Sync blacklist; `PARTNER_UPSERTED` PENDING_SCREENING (with key persons) → `case.events` · P-WP-4 |
-| PON-005 | Risk grade, EDD, site visit | Risk rules, EDD stage, site-visit API · P-WP-3, P-WP-4 |
-| PON-006 | Multi-level approval with SLA, reasons, resubmission | Stage approvals, SLA monitor, `:return` / resubmit · P-WP-5 |
-| PON-007 | Activation: wallet, limits/fees via category, QR, notify | Activation saga (BR-PAR-20..25) — credentials deferred · P-WP-7 |
-| PON-008 | Blacklisted entities blocked from onboarding / transacting | Checks at key person / bank account / submit / MSISDN change + `blacklist.events` · P-WP-3, P-WP-9 |
-| PON-009 | Suspend, reactivate, change category / hierarchy, terminate | Partner status, category, hierarchy APIs; termination (BR-PAR-40..53) · P-WP-8, P-WP-9 |
+| CX-013 | Profile: KYC status / tier, language | `GET /v1/customers/{customerId}` (CUSTOMER own) · W-WP-5 · MVP |
+| DAT-002 | Validation at capture | Jakarta Validation + cross-field rules (BR-W-60..64) · W-WP-5 · MVP |
+| DAT-004 | Central geography master | GEO codes on every contract; validated against the refdata projection · W-WP-5, P-WP-2 · MVP |
+| PRV-002 | Consent capture / withdraw | Consent APIs · W-WP-5 · MVP |
+| PRV-006 | PII masked in logs | Log masking + log-scan test · WP-1, X-WP-2 · MVP |
+| PON-001 | Partner onboarding workflow per type | Applications, checklists, chains (BR-PAR-01..12) · P-WP-2..5 · MVP |
+| PON-002 | Identity + business verification with documents | Key persons, documents, manual verification — partial (e-KYC deferred) · P-WP-3 · MVP |
+| PON-003 | Self-registration of micro-merchants; assisted onboarding | CUSTOMER (MICRO, flag), STAFF, DISTRIBUTOR actors (BR-PAR-01) · P-WP-3 · MVP |
+| PON-004 | PEP / sanctions / blacklist screening | Sync blacklist; `PARTNER_UPSERTED` PENDING_SCREENING (with key persons) → `case.events` · P-WP-4 · MVP |
+| PON-005 | Risk grade, EDD, site visit | Risk rules, EDD stage, site-visit API · P-WP-3, P-WP-4 · MVP |
+| PON-006 | Multi-level approval with SLA, reasons, resubmission | Stage approvals, SLA monitor, `:return` / resubmit · P-WP-5 · MVP |
+| PON-007 | Activation: wallet, limits/fees via category, QR, notify | Activation saga (BR-PAR-20..25) — credentials deferred · P-WP-7 · MVP |
+| PON-008 | Blacklisted entities blocked from onboarding / transacting | Checks at key person / bank account / submit / MSISDN change + `blacklist.events` · P-WP-3, P-WP-9 · MVP |
+| PON-009 | Suspend, reactivate, change category / hierarchy, terminate | Partner status, category, hierarchy APIs; termination (BR-PAR-40..53) · P-WP-8, P-WP-9 · MVP |
 | PON-010 | Agreements, validity, expiry alerts (R2) | Agreements + expiry alert job · P-WP-10 |
 | DST-001 | Hierarchy up to 5 levels (R2) | Level definitions, rules, depth check (BR-PAR-30..32) · P-WP-8 |
 | DST-002 | Distributor onboarding, KYB, bank accounts (R2) | Same application flow, chain `DISTRIBUTOR_STD` (FINANCE stage) · P-WP-3, P-WP-10 |
 | DST-003 | Effective-dated (re)assignment with maker-checker (R2) | `partner_hierarchy_assignment` + apply job (BR-PAR-33..36) · P-WP-8 |
 | DST-004..007 | Limits, monitoring, commission sharing, dashboards (R2) | Data only (hierarchy, `categoryCode`, descendants API, `PARTNER_UPSERTED` ancestors) |
 | DST-008 | Distributor suspends a downstream agent (R2) | Ancestor suspension with `until` + expiry job (BR-PAR-43) · P-WP-9 |
-| AGT-001 / AGT-002 | Agent types with type-specific rules | subType → `categoryCode` published to wallet, limits, pricing · P-WP-2 |
+| AGT-001 / AGT-002 | Agent types with type-specific rules | subType → `categoryCode` published to wallet, limits, pricing · P-WP-2 (assisted bill pay / recharge R1+) · MVP |
 | AGT-006 | Agent geo-fencing (R2) | Deferred (data stored) |
-| AGT-008 | Performance / risk monitoring with suspension | Risk flags API; compliance suspension via partner status-changes · P-WP-9 |
-| MER-001 | Bangla QR static + dynamic | EMVCo encoder / decoder (BR-PAR-70..79), `/v1/qr/**` · P-WP-6 |
-| MER-002 / MER-003 | Pay any Bangla QR / off-us acquiring | Deferred (`onUs=false`) |
-| MER-004 | Instant payment notification to merchant | Merchant wallet and contact published (`wallet.events`, `partner.events`) — data only |
-| MER-005 | MCC, merchant types, category-specific fees / limits | subType × MCC group → `categoryCode` · P-WP-2 |
-| MER-006 | Settlement to wallet or bank | `WALLET` only (OPEN D-42) |
+| AGT-008 | Performance / risk monitoring with suspension | Risk flags API; compliance suspension via partner status-changes · P-WP-9 · MVP |
+| MER-001 | Bangla QR static + dynamic | EMVCo encoder / decoder (BR-PAR-70..79), `/v1/qr/**` · P-WP-6 · MVP |
+| MER-002 / MER-003 | Pay any Bangla QR / off-us acquiring | On-us payment via `POST /v1/qr/decode` (F8, A-42); off-us deferred (`onUs=false`, R1+) · P-WP-6 · MVP |
+| MER-004 | Instant payment notification to merchant | Merchant wallet and contact published (`wallet.events`, `partner.events`) — data only · MVP |
+| MER-005 | MCC, merchant types, category-specific fees / limits | subType × MCC group → `categoryCode` · P-WP-2 · MVP |
+| MER-006 | Settlement to wallet or bank | `WALLET` only (OPEN D-42) · MVP |
 | MER-007 | Merchant – store – cashier (R2) | Outlets and partner users (records); outlet code in QR tag 62.07 · P-WP-10 |
-| MER-010 / PRT-006 | QR management | QR list / download / reprint / dynamic APIs · P-WP-6 |
-| PRT-009 | Profile updates routed for approval | Profile changes with per-field policy · P-WP-9 |
+| MER-010 / PRT-006 | QR management | QR list / download / reprint / dynamic APIs · P-WP-6 · MVP |
+| PRT-009 | Profile updates routed for approval | Profile changes with per-field policy · P-WP-9 · MVP |
 | PRT-010 | Partner-side user management (R2) | Partner users (records) · P-WP-10 |
 | PRT-011 | Hierarchy-scoped data access | Scope rule BR-PAR-60 (`ancestor_ids`) · P-WP-8 |
+| BIL-003 | Bill enquiry where supported, else amount entry with validation | Biller profile `amountMode` (ENQUIRY / FIXED / OPEN), min / max, `referencePattern` published for the payment service (BR-PAR-80); the enquiry itself is simulated by transaction-service · WP-CR-1 · MVP |
+| BIL-004 | Mobile recharge for all Bangladeshi MNOs | Five MNO billers seeded (GP, ROBI, AIRTEL, BANGLALINK, TELETALK) with prefixes, recharge types, denominations — partial (no data / talk-time packs, no aggregator) · WP-CR-1 · MVP |
+| BIL-008 | Configurable biller list, categories, logos, fee bearer, limits | `partner_biller_profile` (category, `logoKey`, `feeBearer`, min / max) maintained through applications and profile changes with maker-checker (BR-PAR-80..84); `GET /v1/billers` (BR-PAR-89); fee values live in pricing-service and customer limits in limits-risk-service · WP-CR-1 · MVP |
+| BIL-011 | Internal biller catalogue and simulated biller settlement (MVP) | Partner type `BILLER`, wallet type `B` (ledger 150 `BILLER_WALLET`, owner type 6) created at activation (BR-PAR-85, BR-PAR-86); `PARTNER_UPSERTED.biller`; data contract `biller-catalogue-cache` (BR-PAR-87, BR-PAR-88); seed catalogue (§4.1.3) · WP-CR-1 · MVP |
+| BIL-012 | Mobile recharge via the operator catalogue with MSISDN / prefix validation (MVP) | MNO `msisdnPrefixes` unique across live operators (BR-PAR-83); key `biller:mno-prefix:{prefix}`; `GET /v1/billers?msisdnPrefix=` · WP-CR-1 · MVP |
+| UC-16 / UC-17 | Bill payment (internal catalogue) / mobile recharge | Catalogue, biller wallets and cache read by transaction-service; this service provides the data only · WP-CR-1 · MVP |
+| A-41 | No external biller or telco calls in the MVP | No biller adapter here; catalogue only (§13) · MVP |
 
 ## 3. Architecture
 
@@ -206,19 +222,19 @@ flowchart LR
   LR["limits-risk-service"]
   AD["admin-service"]
   RC[("Redis cache cluster")]
-  TX -->|"GET /v1/wallets/{walletId}/status v1"| W
+  TX -->|"GET /v1/wallets/{walletId}/status v1 · GET /v1/billers/{billerId} v1"| W
   DS -->|"POST /v1/customers:preRegister v1 · POST /v1/wallets/lookup:batch v1 · status:batchGet v1"| W
   PR -->|"POST /v1/wallets/status:batchGet v1"| W
   SP -->|"POST /v1/wallets/{walletId}/status-changes v1 · flags v1 · PATCH /v1/customers/{customerId} v1"| W
   CO -->|"status-changes v1 · POST /v1/partners/{partnerId}/status-changes v1 · GET /v1/customers/{customerId} v1"| W
-  CH -->|"customer, KYC, closure, partner, QR APIs v1 · POST /v1/qr/decode v1"| W
+  CH -->|"customer, KYC, closure, partner, QR APIs v1 · POST /v1/qr/decode v1 · GET /v1/billers v1"| W
   W -->|"wallet.events v1 · customer.events v1 · partner.events v1"| TX
   W -->|"wallet.events v1 · customer.events v1 · partner.events v1"| CO
   W -->|"partner.events v1 · customer.events v1 · wallet.events v1"| PR
   W -->|"partner.events v1"| TR
   W -->|"wallet.events v1 · customer.events v1 · partner.events v1"| FO
-  W -->|"wallet-status-cache v1 (writer)"| RC
-  RC -->|"wallet-status-cache v1 (reader)"| TX
+  W -->|"wallet-status-cache v1 · biller-catalogue-cache v1 (writer)"| RC
+  RC -->|"wallet-status-cache v1 · biller-catalogue-cache v1 (reader)"| TX
   W -->|"POST /v1/ledger/accounts v1 · :close v1 · balance v1 · holds v1 · balances:batchGet v1 · POST /v1/ledger/commands/post-closure-payout v1"| LD
   W -->|"GET /v1/blacklist/check v1 · GET /v1/limits/wallets/{walletId}/usage v1"| LR
   LR -->|"blacklist.events v1"| W
@@ -248,7 +264,7 @@ flowchart TB
     WF["service.WalletFacade + wallet.dto"]
   end
   subgraph PARTNER["module partner"]
-    PA["service: onboarding, activation saga, hierarchy, lifecycle, qr"]
+    PA["service: onboarding, activation saga, hierarchy, lifecycle, qr, biller catalogue"]
     PR["service rules: EmvQrEncoder, EmvQrDecoder, Crc16Ccitt"]
     PD["entity: Partner, Application, Stage, HierarchyAssignment"]
     PF["service.PartnerFacade + partner.dto"]
@@ -261,13 +277,14 @@ flowchart TB
   end
   subgraph INFRA["repository, client, messaging - module and common"]
     DB[("Postgres svc_wallet via Spring Data JPA repositories")]
-    RD[("Redis cache: ws, wd, wlk, wsmeta")]
+    RD[("Redis cache: ws, wd, wlk, wsmeta, biller")]
     S3[("object store bitspay-docs")]
     KC["Kafka consumers: case, support, blacklist, txn, refdata, wallet.events loader"]
     HL["HttpLedgerClient"]
     HR["HttpLimitsRiskClient"]
     HA["HttpAdminClient"]
     LUA["RedisStatusCacheWriter (Lua CAS)"]
+    BLUA["BillerCacheWriter (Lua CAS)"]
   end
   JOBS["ShedLock jobs - module services"]
   WC --> WA
@@ -296,6 +313,8 @@ flowchart TB
   WA --> HA
   WA --> LUA
   LUA --> RD
+  PA --> BLUA
+  BLUA --> RD
   WA --> CR
   PA --> CR
   CR --> S3
@@ -308,7 +327,7 @@ flowchart TB
 | Item | Value |
 |---|---|
 | Compose service | `wallet-service`, ports 8103 / 9103, `mem_limit` 448 MB, profiles `dev,api,cache-loader` (all roles in one container locally); `depends_on`: postgres, kafka-init, redis-cache, object-store |
-| Roles | `api`: REST of both modules, Kafka consumers of both modules, scheduled jobs (ShedLock leader, `bitspay.jobs.enabled=true`). `cache-loader`: `wallet.events` loader + sampler. Production may split jobs into their own deployment (`api` pods with `bitspay.jobs.enabled=false`, a `jobs` deployment with `true`) so a 50,000-descendant republish never competes with hot reads |
+| Roles | `api`: REST of both modules, Kafka consumers of both modules, scheduled jobs (ShedLock leader, `bitspay.jobs.enabled=true`). `cache-loader`: `wallet.events` loader + sampler + `biller-cache-refresh` (CR-WALLET-1). Production may split jobs into their own deployment (`api` pods with `bitspay.jobs.enabled=false`, a `jobs` deployment with `true`) so a 50,000-descendant republish never competes with hot reads |
 | Replicas (prod guidance) | api ≥ 3 · jobs 2 (one active per job via ShedLock) · cache-loader 2 (one active per partition via the consumer group) |
 | Schema / role | `svc_wallet` (login role `svc_wallet`); `spring.flyway.schemas=svc_wallet`, two Flyway configurations (wallet then partner); `create-schemas=false` in the stack, `true` in Testcontainers |
 | Redis | cache cluster only (`BITSPAY_REDIS_CACHE_URL`); keys §4.2. The critical cluster is not used |
@@ -353,6 +372,7 @@ Scheduled jobs (ShedLock, one instance each; cron in Asia/Dhaka where a time is 
 | `kyc-anonymisation` (R2, off) | wallet | daily 04:00 | retention end action (BR-W-46) |
 | `activity-flush` | wallet | every 1 s | batch upsert of `wallet_activity` |
 | `cache-sampler` | wallet (cache-loader) | every 60 s | consistency sampler (BR-W-55) |
+| `biller-cache-refresh` (MVP) | partner (cache-loader) | at start-up, then every 60 s | full rewrite of `biller:*` from the database with the CAS (BR-PAR-88) |
 | `ActivationRetryJob` | partner | every 30 s | activation saga steps |
 | `HierarchyApplyJob` | partner | every 60 s | SCHEDULED assignments due |
 | `SlaMonitorJob` | partner | every 5 min | stage SLA breach (notify once) |
@@ -547,6 +567,34 @@ sequenceDiagram
   P-->>CO: 200 partner detail status SUSPENDED
 ```
 
+**F10 — Biller onboarding and catalogue cache (DESCO, MVP, CR-WALLET-1).**
+
+```mermaid
+sequenceDiagram
+  participant S as Staff (PARTNER_OPS_MAKER / checkers)
+  participant P as wallet-service (partner)
+  participant W as wallet module (in-process)
+  participant L as ledger-service
+  participant K as Kafka
+  participant C as compliance-service
+  participant RC as Redis cache
+  participant T as transaction-service
+  S->>P: upload AGREEMENT, POST /v1/partner-applications/{applicationId}:submit (seeded BILLER / UTILITY draft)
+  P->>P: biller profile checks (billerCode, prefixes), partner B000000018 PENDING_SCREENING, partner_biller_profile row
+  P->>K: PARTNER_UPSERTED PENDING_SCREENING with biller object
+  K->>C: partner.events
+  C->>K: case.events SCREENING_COMPLETED CLEAR
+  S->>P: stage approvals of chain BILLER_STD via /v1/approvals/{id}:approve
+  P->>W: createWallet(BILLER, partnerId, B, msisdn, categoryCode 501, DESCO)
+  W->>L: POST /v1/ledger/accounts (BILLER_WALLET 150, ownerType BILLER)
+  L-->>W: OK
+  W-->>P: walletId, status A
+  P->>P: FINALISE (no QR step): partner ACTIVE, version + 1
+  P->>K: PARTNER_UPSERTED ACTIVE (biller object), WALLET_UPSERTED B
+  P->>RC: after commit, EVALSHA biller CAS biller:{billerId} version 3
+  T->>RC: GET biller:{billerId} on a bill payment
+```
+
 ### 3.5 State machines
 
 **Wallet base status** (effective code from BR-W-02):
@@ -732,6 +780,7 @@ stateDiagram-v2
 | ADR-17 | Documents through `common.client.DocumentStore` (S3 / filesystem implementations) with envelope encryption; SHA-256 recorded | No plaintext at rest | Download endpoints are audited |
 | ADR-18 | Job leadership with ShedLock (`shedlock` table) for both modules | One mechanism | Jobs run in any `api` pod with `bitspay.jobs.enabled=true` |
 | ADR-19 | One idempotency store (7-day retention) for both modules | Kernel K3.3 | Cleanup daily |
+| ADR-20 | Billers (MVP, CR-WALLET-1) are partners of type `BILLER` with a 1:1 `partner_biller_profile`, onboarded through the existing application / screening / approval-chain path, each with one `B` wallet; the payable catalogue is published as a Redis data contract (`biller-catalogue-cache`) written by the partner module (write-through + DB refresh), not via a consumed topic | Reuses screening, maker-checker, activation saga and the ledger-first wallet path; transaction-service validates in one Redis round trip without calling this service | `PARTNER_UPSERTED` gains an optional `biller` object; the catalogue is rebuildable from the database at any time |
 
 ### 3.7 Latency and throughput budget
 
@@ -792,6 +841,8 @@ erDiagram
   PARTNER ||--o{ PARTNER_USER : users
   PARTNER ||--o{ PARTNER_AGREEMENT : agreements
   PARTNER ||--o{ PARTNER_BLACKLIST_MATCH : matches
+  PARTNER ||--o| PARTNER_BILLER_PROFILE : "biller profile (BILLER only)"
+  PARTNER_BILLER_PROFILE ||--o{ PARTNER_BILLER_MSISDN_PREFIX : "MNO prefixes"
   PARTNER }o--o| PARTNER : parent
 ```
 
@@ -1080,12 +1131,12 @@ CREATE UNIQUE INDEX ux_exception_source ON exception_item (item_type, source_ref
 -- ===================== wallets =====================
 CREATE TABLE wallet (
   wallet_id             uuid PRIMARY KEY,                    -- = ledger account id (UUIDv7)
-  owner_type            text NOT NULL CHECK (owner_type IN ('CUSTOMER','AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION')),
+  owner_type            text NOT NULL CHECK (owner_type IN ('CUSTOMER','AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION','BILLER')),   -- BILLER: CR-WALLET-1
   owner_id              uuid NOT NULL,
-  wallet_type           char(1) NOT NULL CHECK (wallet_type IN ('C','A','D','M','I')),
+  wallet_type           char(1) NOT NULL CHECK (wallet_type IN ('C','A','D','M','I','B')),        -- B = BILLER (ledger 150)
   msisdn                varchar(13) NOT NULL,
   msisdn_hash           bytea NOT NULL,
-  msisdn_scope          char(1) NOT NULL,                    -- 'G' (global) or wallet_type, from config at insert
+  msisdn_scope          char(1) NOT NULL,                    -- 'G' (global) or wallet_type, from config at insert; always 'B' for B wallets (BR-PAR-86)
   display_name          text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 100),
   language              text NOT NULL DEFAULT 'bn',
   base_status           text NOT NULL CHECK (base_status IN ('PENDING_KYC','ACTIVE','DORMANT','PENDING_CLOSURE','CLOSED')),
@@ -1370,8 +1421,8 @@ CREATE SEQUENCE partner_code_seq START 1;
 
 CREATE TABLE partner (
   id                       uuid PRIMARY KEY,                    -- UUIDv7 = partnerId
-  partner_code             text NOT NULL UNIQUE CHECK (partner_code ~ '^[AMDI][0-9]{9}$'),
-  partner_type             text NOT NULL CHECK (partner_type IN ('AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION')),
+  partner_code             text NOT NULL UNIQUE CHECK (partner_code ~ '^[AMDIB][0-9]{9}$'),
+  partner_type             text NOT NULL CHECK (partner_type IN ('AGENT','MERCHANT','DISTRIBUTOR','INSTITUTION','BILLER')),
   sub_type                 text NOT NULL,
   legal_name               text NOT NULL,
   display_name             text NOT NULL CHECK (display_name ~ '^[A-Z0-9 .&''-]{1,25}$'),   -- QR tag 59
@@ -1615,9 +1666,84 @@ CREATE TABLE partner_blacklist_match (
 
 `db/migration/partner/V2__seed_config.sql` inserts the seeds of §8.3 (config params, category map, levels, rules, chains, checklists, risk rules). `V3__seed_refdata_dev.sql` (location added only in `local` / `dev` profiles) inserts a small GEO / MCC / BANK set (Dhaka division `30`, district `3026`, upazila `302648`; MCC 5411, 5812, 6011; bank `DBBL`) so the module works before `refdata.events` arrives.
 
+#### 4.1.3 `db/migration/partner/V4__biller_catalogue.sql` (CR-WALLET-1, MVP)
+
+Biller profile tables, biller configuration seeds and the MVP seed catalogue. Runs after V2 (V3 exists only in `local` / `dev`; Flyway accepts the gap). The `partner_type` / `partner_code` CHECKs of V1 and the `wallet` CHECKs of wallet V1 already include `BILLER` / `B` (nothing has been migrated yet, so V1 is edited in place).
+
+```sql
+-- ---------- biller profile (1:1 with a BILLER partner; created at first submit, BR-PAR-81) ----------
+CREATE TABLE partner_biller_profile (
+  partner_id            uuid PRIMARY KEY REFERENCES partner(id),     -- = billerId
+  biller_code           text NOT NULL CHECK (biller_code ~ '^[A-Z0-9-]{2,16}$'),
+  name_en               text NOT NULL CHECK (length(name_en) BETWEEN 1 AND 100),
+  name_bn               text NOT NULL CHECK (length(name_bn) BETWEEN 1 AND 100),
+  category              text NOT NULL CHECK (category IN ('UTILITY_ELECTRICITY','UTILITY_GAS','UTILITY_WATER','INTERNET','TV','EDUCATION','GOVT_FEE','MOBILE_PREPAID','MOBILE_POSTPAID')),
+  logo_key              text CHECK (logo_key IS NULL OR length(logo_key) <= 200),
+  reference_label_en    text NOT NULL CHECK (length(reference_label_en) BETWEEN 1 AND 60),
+  reference_label_bn    text NOT NULL CHECK (length(reference_label_bn) BETWEEN 1 AND 60),
+  reference_pattern     text NOT NULL CHECK (length(reference_pattern) BETWEEN 1 AND 200),   -- compiled and checked by BR-PAR-80
+  amount_mode           text NOT NULL CHECK (amount_mode IN ('ENQUIRY','FIXED','OPEN')),
+  fixed_amount_poisha   bigint,
+  min_amount_poisha     bigint NOT NULL CHECK (min_amount_poisha >= 1),
+  max_amount_poisha     bigint NOT NULL,
+  fee_bearer            text NOT NULL CHECK (fee_bearer IN ('PAYER','BILLER')),
+  recharge_types        text[] NOT NULL DEFAULT '{}',                -- MNO only: subset of {PREPAID,POSTPAID}
+  denominations_poisha  bigint[] NOT NULL DEFAULT '{}',              -- MNO only, ascending
+  live                  boolean NOT NULL DEFAULT true,               -- false once the partner is REJECTED or TERMINATED (releases the code)
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), version bigint NOT NULL DEFAULT 0,
+  CHECK (max_amount_poisha >= min_amount_poisha),
+  CHECK ((amount_mode = 'FIXED') = (fixed_amount_poisha IS NOT NULL)),
+  CHECK (fixed_amount_poisha IS NULL OR fixed_amount_poisha BETWEEN min_amount_poisha AND max_amount_poisha),
+  CHECK (recharge_types <@ ARRAY['PREPAID','POSTPAID']::text[])
+);
+CREATE UNIQUE INDEX partner_biller_code_live ON partner_biller_profile (biller_code) WHERE live;
+CREATE INDEX partner_biller_category ON partner_biller_profile (category);
+
+CREATE TABLE partner_biller_msisdn_prefix (            -- MNO prefix index (BR-PAR-83); a row exists only while the biller is live
+  prefix      char(3) PRIMARY KEY CHECK (prefix ~ '^01[3-9]$'),
+  partner_id  uuid NOT NULL REFERENCES partner_biller_profile(partner_id),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX partner_biller_msisdn_prefix_partner ON partner_biller_msisdn_prefix (partner_id);
+
+-- ---------- biller configuration seeds (mirrored in §8.3) ----------
+INSERT INTO partner_category_code_map (partner_type, sub_type, mcc_group, category_code, description) VALUES
+  ('BILLER','UTILITY','*',501,'BILLER_UTILITY'), ('BILLER','EDUCATION','*',502,'BILLER_EDUCATION'),
+  ('BILLER','GOVT_FEE','*',503,'BILLER_GOVT_FEE'), ('BILLER','INTERNET_TV','*',504,'BILLER_INTERNET_TV'),
+  ('BILLER','MNO','*',505,'BILLER_MNO');
+INSERT INTO partner_hierarchy_rule VALUES ('BILLER','*','OPERATOR','*');
+INSERT INTO partner_approval_chain_def (chain_code, partner_type, sub_type, channel_kind) VALUES ('BILLER_STD','BILLER','*','ASSISTED');
+INSERT INTO partner_approval_chain_stage VALUES
+  ('BILLER_STD',1,'SALES','{PARTNER_OPS_MAKER}',24,NULL,'ALWAYS',false),
+  ('BILLER_STD',2,'COMPLIANCE','{COMPLIANCE_OFFICER}',48,NULL,'ALWAYS',true),
+  ('BILLER_STD',3,'EDD','{CAMLCO}',72,NULL,'HIGH_RISK_ONLY',true),
+  ('BILLER_STD',4,'OPERATIONS','{PARTNER_OPS_CHECKER}',24,NULL,'ALWAYS',true);
+INSERT INTO partner_document_checklist VALUES
+  ('BILLER','*','AGREEMENT',true), ('BILLER','*','TRADE_LICENCE',false),
+  ('BILLER','*','INCORPORATION_CERT',false), ('BILLER','*','BANK_PROOF',false);
+```
+
+**Seed catalogue (MVP, provisional until OPEN B-25).** The same migration inserts one `DRAFT` `partner_application` per biller below (`channel_kind = 'ASSISTED'`, `initiated_by_type = 'SYSTEM'`, `initiated_by_id = 'system-seed'`, `proposed_parent_id = NULL`, `expires_at = NULL` — seed drafts never expire, `form_data` = PartnerForm with the `biller` object). Seeds are **not** active billers: billers go through compliance screening like every partner, so staff upload the agreement and submit each draft; the normal path (BR-PAR-03..18, chain `BILLER_STD`) and the activation saga (BR-PAR-85) create the partner, its `partner_biller_profile`, its `B` wallet and its cache entry. Seed application ids are fixed: `0192f500-b000-7000-8000-0000000000NN` (NN = row number 01..11). Common form values: territory Dhaka (`30` / `3026`), `addressLine` "Head office, Dhaka", `settlementMode WALLET`, `feeBearer PAYER`, `logoKey` `billers/<code lower-case>.png`, contact MSISDN placeholder `88013000000NN` (B wallets use their own MSISDN scope, BR-PAR-86).
+
+| NN | billerCode | subType | category | amountMode | nameEn / displayName | nameBn | Reference label (en / bn) | referencePattern | min..max poisha | MNO prefixes · recharge types · denominations |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 01 | `DESCO` | UTILITY | UTILITY_ELECTRICITY | ENQUIRY | Dhaka Electric Supply Company (DESCO) / `DESCO` | ঢাকা ইলেকট্রিক সাপ্লাই কোম্পানি (ডেসকো) | Account number / হিসাব নম্বর | `^[0-9]{8,12}$` | 1,000..5,000,000 | — |
+| 02 | `DPDC` | UTILITY | UTILITY_ELECTRICITY | ENQUIRY | Dhaka Power Distribution Company (DPDC) / `DPDC` | ঢাকা পাওয়ার ডিস্ট্রিবিউশন কোম্পানি (ডিপিডিসি) | Customer number / গ্রাহক নম্বর | `^[0-9]{8,12}$` | 1,000..5,000,000 | — |
+| 03 | `TITAS` | UTILITY | UTILITY_GAS | ENQUIRY | Titas Gas Transmission and Distribution / `TITAS GAS` | তিতাস গ্যাস | Customer code / গ্রাহক কোড | `^[0-9]{6,12}$` | 1,000..5,000,000 | — |
+| 04 | `WASA` | UTILITY | UTILITY_WATER | ENQUIRY | Dhaka WASA / `DHAKA WASA` | ঢাকা ওয়াসা | Account number / হিসাব নম্বর | `^[0-9]{6,12}$` | 1,000..5,000,000 | — |
+| 05 | `BTCL-INT` | INTERNET_TV | INTERNET | OPEN | BTCL Internet / `BTCL INTERNET` | বিটিসিএল ইন্টারনেট | Customer ID / গ্রাহক আইডি | `^[A-Z0-9]{6,15}$` | 1,000..5,000,000 | — |
+| 06 | `SCHOOL-DEMO` | EDUCATION | EDUCATION | OPEN | Demo School (pilot) / `DEMO SCHOOL` | ডেমো স্কুল (পাইলট) | Student ID / শিক্ষার্থী আইডি | `^[A-Z0-9-]{4,20}$` | 1,000..5,000,000 | — |
+| 07 | `GP` | MNO | MOBILE_PREPAID | OPEN | Grameenphone / `GRAMEENPHONE` | গ্রামীণফোন | Mobile number / মোবাইল নম্বর | `^01[3-9][0-9]{8}$` | 1,000..100,000 | `017`, `013` · PREPAID, POSTPAID · 2,000 / 5,000 / 10,000 / 20,000 / 50,000 |
+| 08 | `ROBI` | MNO | MOBILE_PREPAID | OPEN | Robi / `ROBI` | রবি | Mobile number / মোবাইল নম্বর | `^01[3-9][0-9]{8}$` | 1,000..100,000 | `018` · PREPAID, POSTPAID · same |
+| 09 | `AIRTEL` | MNO | MOBILE_PREPAID | OPEN | Airtel / `AIRTEL` | এয়ারটেল | Mobile number / মোবাইল নম্বর | `^01[3-9][0-9]{8}$` | 1,000..100,000 | `016` · PREPAID, POSTPAID · same |
+| 10 | `BANGLALINK` | MNO | MOBILE_PREPAID | OPEN | Banglalink / `BANGLALINK` | বাংলালিংক | Mobile number / মোবাইল নম্বর | `^01[3-9][0-9]{8}$` | 1,000..100,000 | `019`, `014` · PREPAID, POSTPAID · same |
+| 11 | `TELETALK` | MNO | MOBILE_PREPAID | OPEN | Teletalk / `TELETALK` | টেলিটক | Mobile number / মোবাইল নম্বর | `^01[3-9][0-9]{8}$` | 1,000..100,000 | `015` · PREPAID, POSTPAID · same |
+
+Bill references ending in `0000` are reserved by transaction-service's simulated provider as rejection test references; they are valid against the patterns above on purpose.
+
 ### 4.2 Redis keys (cache cluster)
 
-The format of `ws:*` and `wsn:*` is a provided data contract: `contracts/provided/data/wallet-status-cache.v1.md` (§5.4). Readers depend on it.
+The format of `ws:*` and `wsn:*` is a provided data contract: `contracts/provided/data/wallet-status-cache.v1.md` (§5.4); the format of `biller:*` is the data contract `contracts/provided/data/biller-catalogue-cache.v1.md` (CR-WALLET-1). Readers depend on them.
 
 | Key | Type | TTL | Writer | Content |
 |---|---|---|---|---|
@@ -1626,8 +1752,11 @@ The format of `ws:*` and `wsn:*` is a provided data contract: `contracts/provide
 | `wd:{walletId}` | string (JSON) | 6 h | api (cache-aside) | `{"displayName","displayNameMasked","walletType","status","msisdn"}`; `DEL` on every wallet change |
 | `wlk:{walletTypeCode}:{msisdnHashHex16}` | string | 6 h | api | walletId for lookup; key uses the first 16 hex chars of `msisdn_hash` (no clear MSISDN in keys); `DEL` on create / close / contact change |
 | `wsmeta:loader` | hash | none | cache-loader (+ api for `requested`) | `state` (EMPTY / LOADING / READY), `mode`, `loadedAt`, `schema=1`, `walletCount`, `requested` |
+| `biller:{billerId}` | string (JSON) | none | api (partner write-through), cache-loader (`biller-cache-refresh`) | biller catalogue entry (data contract `biller-catalogue-cache` v1 §3), Lua CAS by partner version; never deleted |
+| `biller:mno-prefix:{prefix}` | string | none | api, cache-loader | billerId of the live MNO holding the prefix (`017` …); compare-and-delete when released |
+| `biller:meta` | hash | none | cache-loader | `state`, `loadedAt`, `schema=1`, `count` |
 
-Redis server settings (documented for the stack): `hash-max-listpack-entries 1024`, `hash-max-listpack-value 64` (80 M wallets / 131,072 buckets ≈ 610 fields per bucket). The partner module uses Caffeine only (QR account-code → partner summary TTL 30 s, refdata, config).
+Redis server settings (documented for the stack): `hash-max-listpack-entries 1024`, `hash-max-listpack-value 64` (80 M wallets / 131,072 buckets ≈ 610 fields per bucket). The partner module uses Caffeine for its own reads (QR account-code → partner summary TTL 30 s, refdata, config, biller list 30 s) and writes only the `biller:*` keys to Redis.
 
 ### 4.3 Retention and archival
 
@@ -1645,7 +1774,7 @@ Redis server settings (documented for the stack): `hash-max-listpack-entries 102
 
 Contract file: `contracts/provided/openapi.yaml` (OpenAPI 3.1; wins on conflict). Every operation takes the kernel K3.1 headers; `400 VALIDATION_FAILED` (bad header/parameter/body) and `403 ACTOR_NOT_ALLOWED` apply to every operation, `404 NOT_FOUND` to every operation with a path entity, and `409 IDEMPOTENCY_CONFLICT` to every operation that honours `Idempotency-Key`. Wallet `status` and `walletType` in every response are the single-letter codes; requests accept the code or the name. Machine sub-reasons are in `reason`; extra data in named extension members (codes.yaml `problemExtensions`).
 
-Summary (102 operations):
+Summary (104 operations; 103–104 added by CR-WALLET-1, MVP):
 
 | # | Operation | Module | Audience | Actors | Idempotency | Purpose |
 |---|---|---|---|---|---|---|
@@ -1685,7 +1814,7 @@ Summary (102 operations):
 | 34 | `GET /v1/kyc-submissions/{submissionId}` | wallet | customer | CUSTOMER (own); AGENT (assisting); STAFF (any role) | — | Submission detail (state, screening, risk breakdown, document list). |
 | 35 | `POST /v1/kyc-submissions/{submissionId}:cancel` | wallet | customer | CUSTOMER (own); AGENT (assisting); STAFF (`OPS_MAKER`) | — | Cancel (DRAFT, SUBMITTED, ON_HOLD, EXCEPTION → CANCELLED). |
 | 36 | `GET /v1/kyc/review-queue` | wallet | staff | STAFF (`OPS_MAKER`, `OPS_CHECKER`, `COMPLIANCE_OFFICER`) | — | Review queue, oldest first. |
-| 37 | `POST /v1/kyc-submissions/{submissionId}:decide` | wallet | staff | STAFF (`OPS_MAKER`) | — | Maker proposal APPROVE / REJECT → PENDING_APPROVAL + approval request (BR-W-25). |
+| 37 | `POST /v1/kyc-submissions/{submissionId}:decide` | wallet | staff | STAFF (`OPS_MAKER`) | — | Decide APPROVE / REJECT — single step in the MVP, maker-checker in R1 (BR-W-25). |
 | 38 | `GET /v1/kyc/exceptions` | wallet | staff | STAFF (`OPS_MAKER`, `OPS_CHECKER`, `COMPLIANCE_OFFICER`) | — | Exception queue. |
 | 39 | `POST /v1/kyc/exceptions/{itemId}:resolve` | wallet | staff | STAFF (`OPS_MAKER`) | — | Resolve an exception (OVERRIDE needs approval; REJECT applies immediately). |
 | 40 | `GET /v1/wallets/{walletId}/status-history` | wallet | staff | STAFF (any role); SERVICE (`support-service`, `compliance-service`) | — | Status history (ACL-010), newest first. |
@@ -1751,6 +1880,8 @@ Summary (102 operations):
 | 100 | `POST /v1/internal/perf/wallets:seed` | internal | internal | STAFF (`ADMIN`); SYSTEM | — | Create customers + ACTIVE CUSTOMER wallets with ledger accounts (perf profile only). |
 | 101 | `POST /v1/internal/jobs/dormancy:run` | internal | internal | STAFF (`ADMIN`); SYSTEM | — | Run the dormancy job as if now = asOf (local and shared dev profiles only). |
 | 102 | `POST /v1/internal/partners:republish` | internal | internal | STAFF (`ADMIN`); SYSTEM | — | Re-emit PARTNER_UPSERTED without a version bump (empty list = all). |
+| 103 | `GET /v1/billers` | partner | service | CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION (ACTIVE billers only); STAFF (any role); SERVICE (any service); SYSTEM | — | Biller catalogue (filters category, subType, status, msisdnPrefix, q) (BR-PAR-89). |
+| 104 | `GET /v1/billers/{billerId}` | partner | service | CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION (ACTIVE billers only); STAFF (any role); SERVICE (any service); SYSTEM | — | One biller (cache-miss fallback of `biller-catalogue-cache`) (BR-PAR-89). |
 
 #### 5.1.0 Shared schemas
 
@@ -1762,7 +1893,7 @@ Summary (102 operations):
 | `version` | int64 | Y | N | 1..9007199254740991; ≥ 1, < 2^53 |  |
 | `status` | enum{P,A,D,X,C,F,Q,Z} | Y | N |  | effective status code (codes.yaml walletStatus) |
 | `kycTier` | int32 | Y | N | 0..2 |  |
-| `walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `categoryCode` | int32 | Y | N | 0..99999; codes.yaml categoryCode |  |
 | `flags` | int32 | Y | N | 0..31; bitmask (codes.yaml walletFlag) |  |
 
@@ -1771,7 +1902,7 @@ Summary (102 operations):
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | `walletId` | uuid | Y | N |  |  |
-| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
+| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
 | `ownerId` | uuid | Y | N |  | customerId or partnerId |
 | `msisdn` | string | Y | N | clear `8801711000000` or masked `8801711****00` | masking §7.7 BR-W-68 |
 | `displayName` | string | Y | N | 1..100 chars |  |
@@ -1780,8 +1911,8 @@ Summary (102 operations):
 | `statusName` | enum{PENDING_KYC,ACTIVE,DORMANT,DEBIT_BLOCKED,CREDIT_BLOCKED,BLOCKED,PENDING_CLOSURE,CLOSED} | Y | N |  |  |
 | `statusReasonCode` | string | Y | N | codes.yaml reasonCodes 'Wallet status' | holder actors get `RESTRICTED` instead of AML_FREEZE / REGULATORY_INSTRUCTION / COURT_ORDER |
 | `kycTier` | int32 | Y | N | 0..2 |  |
-| `walletType` | enum{C,A,D,M,I} | Y | N |  |  |
-| `walletTypeName` | enum{CUSTOMER,AGENT,DISTRIBUTOR,MERCHANT,INSTITUTION} | Y | N |  |  |
+| `walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
+| `walletTypeName` | enum{CUSTOMER,AGENT,DISTRIBUTOR,MERCHANT,INSTITUTION,BILLER} | Y | N |  |  |
 | `categoryCode` | int32 | Y | N | 0..99999 |  |
 | `flags` | int32 | Y | N | 0..31 |  |
 | `version` | int64 | Y | N | 1.. | = wallet.events version |
@@ -1828,7 +1959,7 @@ Summary (102 operations):
 | `screeningStatus` | enum{NOT_SCREENED,PENDING,CLEAR,POTENTIAL_MATCH,CONFIRMED_MATCH,REJECTED} | Y | Y |  | null for CUSTOMER (own) callers |
 | `wallets` | array<object> | Y | N |  |  |
 | `wallets[].walletId` | uuid | Y | N |  |  |
-| `wallets[].walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `wallets[].walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `wallets[].status` | enum{P,A,D,X,C,F,Q,Z} | Y | N |  |  |
 | `nominees` | array<object> | Y | N |  |  |
 | `nominees[].name` | string | Y | N |  |  |
@@ -2091,9 +2222,9 @@ Summary (102 operations):
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | `partnerId` | uuid | Y | N |  |  |
-| `partnerCode` | string | Y | N | `^[AMDI][0-9]{9}$` | 8-digit sequence + Luhn digit |
-| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
-| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | Y | N | AGENT: RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT: MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR: MASTER\|DISTRIBUTOR\|SUB; INSTITUTION: EMPLOYER\|GOVERNMENT\|NGO\|OTHER |  |
+| `partnerCode` | string | Y | N | `^[AMDIB][0-9]{9}$` | 8-digit sequence + Luhn digit |
+| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
+| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N | AGENT: RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT: MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR: MASTER\|DISTRIBUTOR\|SUB; INSTITUTION: EMPLOYER\|GOVERNMENT\|NGO\|OTHER; BILLER: UTILITY\|EDUCATION\|GOVT_FEE\|INTERNET_TV\|MNO |  |
 | `mcc` | string | Y | Y | `^[0-9]{4}$` | merchants only |
 | `categoryCode` | int32 | Y | N | 0..99999; codes.yaml categoryCode |  |
 | `legalName` | string | Y | N |  |  |
@@ -2114,6 +2245,57 @@ Summary (102 operations):
 | `suspendedUntil` | timestamp | Y | Y |  |  |
 | `activatedAt` | timestamp | Y | Y |  |  |
 | `version` | int64 | Y | N | 1.. | = PARTNER_UPSERTED.version |
+| `biller` | object (`BillerProfileInput`) | N | Y |  | additive (CR-WALLET-1); BILLER partners only |
+
+**`BillerProfileInput`** — Biller profile (CR-WALLET-1, BIL-008); part of the BILLER partner model (PartnerForm.biller, PartnerDetail.biller, profile-changes `changes.biller`, `PARTNER_UPSERTED.biller`).
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| `billerCode` | string | Y | N | `^[A-Z0-9-]{2,16}$` | unique among live billers; immutable after activation |
+| `nameEn` | string | Y | N | 1..100 chars |  |
+| `nameBn` | string | Y | N | 1..100 chars |  |
+| `category` | enum{UTILITY_ELECTRICITY,UTILITY_GAS,UTILITY_WATER,INTERNET,TV,EDUCATION,GOVT_FEE,MOBILE_PREPAID,MOBILE_POSTPAID} | Y | N | allowed per subType (codes.yaml `billerCategory`) |  |
+| `logoKey` | string | Y | Y | ≤ 200 chars | object-store key |
+| `referenceLabelEn` | string | Y | N | 1..60 chars |  |
+| `referenceLabelBn` | string | Y | N | 1..60 chars |  |
+| `referencePattern` | string | Y | N | 1..200 chars; compiles as a Java regex | whole-reference match; MNO `^01[3-9][0-9]{8}$` |
+| `amountMode` | enum{ENQUIRY,FIXED,OPEN} | Y | N |  |  |
+| `fixedAmountPoisha` | int64 (poisha) | Y | Y | ≥ 1; set iff FIXED; within min..max |  |
+| `minAmountPoisha` | int64 (poisha) | Y | N | ≥ 1 |  |
+| `maxAmountPoisha` | int64 (poisha) | Y | N | ≥ minAmountPoisha |  |
+| `feeBearer` | enum{PAYER,BILLER} | Y | N | codes.yaml `billerFeeBearer` |  |
+| `msisdnPrefixes` | array<string> | Y | N | `^01[3-9]$`, ≤ 10; MNO ≥ 1, else [] | unique across live MNOs |
+| `rechargeTypes` | array<enum{PREPAID,POSTPAID}> | Y | N | MNO ≥ 1, else [] |  |
+| `denominationsPoisha` | array<int64> | Y | N | ≤ 20, ascending, within min..max; MNO only | quick picks; may be [] |
+
+**`Biller`** — Catalogue view of an activated biller (`GET /v1/billers…`); same fields as data contract `biller-catalogue-cache` v1 §3 without `schema`.
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| `billerId` | uuid | Y | N |  | = partnerId |
+| `version` | int64 | Y | N | 1.. | = PARTNER_UPSERTED.version |
+| `partnerCode` | string | Y | N | `^B[0-9]{9}$` |  |
+| `subType` | enum{UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N |  |  |
+| `categoryCode` | int32 | Y | N | 501..505 |  |
+| `status` | enum{PENDING_SCREENING,PENDING_APPROVAL,ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED,REJECTED} | Y | N |  | only ACTIVE is payable |
+| `walletId` | uuid | Y | N |  | settlement wallet (type `B`, ledger 150) |
+| `billerCode` | string | Y | N | `^[A-Z0-9-]{2,16}$` | unique among live billers; immutable after activation |
+| `nameEn` | string | Y | N | 1..100 chars |  |
+| `nameBn` | string | Y | N | 1..100 chars |  |
+| `category` | enum{UTILITY_ELECTRICITY,UTILITY_GAS,UTILITY_WATER,INTERNET,TV,EDUCATION,GOVT_FEE,MOBILE_PREPAID,MOBILE_POSTPAID} | Y | N | allowed per subType (codes.yaml `billerCategory`) |  |
+| `logoKey` | string | Y | Y | ≤ 200 chars | object-store key |
+| `referenceLabelEn` | string | Y | N | 1..60 chars |  |
+| `referenceLabelBn` | string | Y | N | 1..60 chars |  |
+| `referencePattern` | string | Y | N | 1..200 chars; compiles as a Java regex | whole-reference match; MNO `^01[3-9][0-9]{8}$` |
+| `amountMode` | enum{ENQUIRY,FIXED,OPEN} | Y | N |  |  |
+| `fixedAmountPoisha` | int64 (poisha) | Y | Y | ≥ 1; set iff FIXED; within min..max |  |
+| `minAmountPoisha` | int64 (poisha) | Y | N | ≥ 1 |  |
+| `maxAmountPoisha` | int64 (poisha) | Y | N | ≥ minAmountPoisha |  |
+| `feeBearer` | enum{PAYER,BILLER} | Y | N | codes.yaml `billerFeeBearer` |  |
+| `msisdnPrefixes` | array<string> | Y | N | `^01[3-9]$`, ≤ 10; MNO ≥ 1, else [] | unique across live MNOs |
+| `rechargeTypes` | array<enum{PREPAID,POSTPAID}> | Y | N | MNO ≥ 1, else [] |  |
+| `denominationsPoisha` | array<int64> | Y | N | ≤ 20, ascending, within min..max; MNO only | quick picks; may be [] |
+| `updatedAt` | timestamp | Y | N |  |  |
 
 **`Stage`** — Approval-chain stage of an application round.
 
@@ -2145,12 +2327,13 @@ Summary (102 operations):
 | `geo` | object | N | Y |  |  |
 | `geo.lat` | number | Y | N |  |  |
 | `geo.lon` | number | Y | N |  |  |
-| `tradeLicenceNo` | string | cond | Y |  | mandatory except INSTITUTION/GOVERNMENT and MERCHANT/MICRO |
+| `tradeLicenceNo` | string | cond | Y |  | mandatory except INSTITUTION/GOVERNMENT, MERCHANT/MICRO and BILLER |
 | `tradeLicenceExpiry` | date | N | Y |  |  |
 | `tin` | string | N | Y |  |  |
 | `bin` | string | N | Y |  |  |
 | `expectedMonthlyTurnoverBand` | enum{TK_UPTO_10L,TK_10L_50L,TK_50L_1CR,TK_1CR_PLUS} | N | Y |  |  |
 | `settlementMode` | enum{WALLET,BANK} | Y | N |  | BANK → 422 SERVICE_DISABLED |
+| `biller` | object (`BillerProfileInput`) | N | Y |  | additive (CR-WALLET-1); required when partnerType = BILLER, absent / null otherwise (BR-PAR-80) |
 
 **`PartnerApplication`** — Partner onboarding application.
 
@@ -2158,9 +2341,9 @@ Summary (102 operations):
 |---|---|---|---|---|---|
 | `applicationId` | uuid | Y | N |  |  |
 | `partnerId` | uuid | Y | Y |  | set at first submit |
-| `partnerCode` | string | Y | Y | `^[AMDI][0-9]{9}$` |  |
-| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
-| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | Y | N |  |  |
+| `partnerCode` | string | Y | Y | `^[AMDIB][0-9]{9}$` |  |
+| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
+| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N |  |  |
 | `status` | enum{DRAFT,SUBMITTED,IN_REVIEW,RETURNED,APPROVED,ACTIVATING,ACTIVATED,REJECTED,WITHDRAWN,EXPIRED} | Y | N |  |  |
 | `channelKind` | enum{SELF,ASSISTED} | Y | N |  |  |
 | `chainCode` | string | Y | Y |  |  |
@@ -2307,7 +2490,7 @@ Summary (102 operations):
 | `qrPayloadId` | uuid | Y | Y |  | passed by channels to POST /v1/payments/merchant |
 | `partnerType` | enum{MERCHANT,AGENT} | Y | Y |  |  |
 | `partnerId` | uuid | Y | Y |  |  |
-| `partnerCode` | string | Y | Y | `^[AMDI][0-9]{9}$` |  |
+| `partnerCode` | string | Y | Y | `^[AMDIB][0-9]{9}$` |  |
 | `merchantWalletId` | uuid | Y | Y |  |  |
 | `agentWalletId` | uuid | Y | Y |  |  |
 | `displayName` | string | Y | N |  |  |
@@ -2462,15 +2645,15 @@ Find the READY, non-CLOSED wallet of an MSISDN (confirmation screen). Cache-asid
 | Param | In | Type | Req | Constraints / notes |
 |---|---|---|---|---|
 | `msisdn` | query | string | Y | accepts `01…`, `880…`, `+880…`; normalised |
-| `walletType` | query | string | N | code `C\|A\|D\|M\|I` or name; default `C` |
+| `walletType` | query | string | N | code `C\|A\|D\|M\|I\|B` or name; default `C` |
 
 Response `200`:
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | `walletId` | uuid | Y | N |  |  |
-| `displayNameMasked` | string | Y | N | C: first name + initial + `***`; A/M/D/I: full display name |  |
-| `walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `displayNameMasked` | string | Y | N | C: first name + initial + `***`; A/M/D/I/B: full display name |  |
+| `walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `status` | enum{P,A,D,X,C,F,Q} | Y | N |  | never Z |
 
 ```json
@@ -2497,7 +2680,7 @@ Request (`application/json`):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| `walletType` | string | Y | N | code `C\|A\|D\|M\|I` or name |  |
+| `walletType` | string | Y | N | code `C\|A\|D\|M\|I\|B` or name |  |
 | `msisdns` | array<string> | Y | N | 1..1000 items | each accepts `01…`, `880…`, `+880…` |
 
 ```json
@@ -2511,7 +2694,7 @@ Response `200`:
 | `items` | array<object> | Y | N |  |  |
 | `items[].msisdn` | string | Y | N |  | echoed exactly as sent |
 | `items[].walletId` | uuid | Y | Y |  | null = not found or malformed entry |
-| `items[].walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `items[].walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `items[].status` | enum{P,A,D,X,C,F,Q} | Y | Y | null iff walletId null |  |
 | `items[].displayNameMasked` | string | Y | Y | null iff walletId null |  |
 
@@ -3034,8 +3217,8 @@ Response `200`:
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | `partnerId` | uuid | Y | N |  |  |
-| `partnerCode` | string | Y | N | `^[AMDI][0-9]{9}$` |  |
-| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
+| `partnerCode` | string | Y | N | `^[AMDIB][0-9]{9}$` |  |
+| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
 | `displayName` | string | Y | N |  |  |
 | `status` | enum{PENDING_SCREENING,PENDING_APPROVAL,ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED,REJECTED} | Y | N |  |  |
 | `walletId` | uuid | Y | Y |  |  |
@@ -3275,9 +3458,9 @@ Request (`application/json`):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N | must match walletType | `CUSTOMER` from outside → 403 |
+| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N | must match walletType | `CUSTOMER` from outside → 403 |
 | `ownerId` | uuid | Y | N |  | customerId / partnerId |
-| `walletType` | string | Y | N | code `C\|A\|D\|M\|I` or name | CUSTOMER↔C AGENT↔A MERCHANT↔M DISTRIBUTOR↔D INSTITUTION↔I |
+| `walletType` | string | Y | N | code `C\|A\|D\|M\|I\|B` or name | CUSTOMER↔C AGENT↔A MERCHANT↔M DISTRIBUTOR↔D INSTITUTION↔I BILLER↔B |
 | `msisdn` | string | Y | N | accepts `01…`, `880…`, `+880…`; normalised | unique among non-CLOSED wallets |
 | `categoryCode` | int32 | N | Y | 0..99999; codes.yaml categoryCode; 0/absent for C |  |
 | `displayName` | string | Y | N | 1..100 chars |  |
@@ -4194,9 +4377,9 @@ Errors:
 
 ##### 5.1.3.19 `POST /v1/kyc-submissions/{submissionId}:decide`
 
-Maker proposal APPROVE / REJECT → PENDING_APPROVAL + approval request (BR-W-25). HIGH grade or PEP → 2 levels (level 2 COMPLIANCE_OFFICER / CAMLCO) and EDD fields mandatory; NID correction on upgrade → 2 levels.
+Decide APPROVE / REJECT (BR-W-25, CR-WALLET-2). `bitspay.wallet.kyc.decision-mode = SINGLE_STEP` (MVP): the OPS_MAKER decision is applied at once (tier, risk grade, wallet `P → A`, `KYC_APPROVED` / `KYC_REJECTED`) and answered `200`; HIGH grade or PEP still needs the EDD fields. `MAKER_CHECKER` (R1): maker proposal → PENDING_APPROVAL + approval request, answered `202`; HIGH grade or PEP → 2 levels (level 2 COMPLIANCE_OFFICER / CAMLCO); NID correction on upgrade → 2 levels.
 
-- Module `wallet` · audience `staff` · release R1 · operationId `decideKyc`
+- Module `wallet` · audience `staff` · release MVP · operationId `decideKyc`
 - Actors: STAFF (`OPS_MAKER`)
 - Idempotency: read-only / no key
 
@@ -4224,7 +4407,25 @@ Request (`application/json`):
 }
 ```
 
-Response `202`:
+Response `200` (SINGLE_STEP, MVP):
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| `submissionId` | uuid | Y | N |  |  |
+| `state` | enum{APPROVED,REJECTED} | Y | N |  |  |
+| `approvalId` | null | N | Y |  | always null |
+| `requiredLevels` | int32 | N | N | 0 |  |
+
+```json
+{
+  "submissionId": "0192f2c0-7a00-7000-8000-0000000000b1",
+  "state": "APPROVED",
+  "approvalId": null,
+  "requiredLevels": 0
+}
+```
+
+Response `202` (MAKER_CHECKER, R1):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
@@ -4638,7 +4839,7 @@ Response `200`:
 | `items` | array<object> | Y | N |  |  |
 | `items[].walletId` | uuid | Y | N |  |  |
 | `items[].msisdnMasked` | string | Y | N |  |  |
-| `items[].walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `items[].walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `items[].dormantSince` | timestamp | Y | N |  |  |
 | `items[].ledgerBalancePoisha` | int64 (poisha) | Y | N |  |  |
 | `nextCursor` | string | Y | Y |  |  |
@@ -4846,8 +5047,8 @@ Request (`application/json`):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
-| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | Y | N | AGENT: RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT: MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR: MASTER\|DISTRIBUTOR\|SUB; INSTITUTION: EMPLOYER\|GOVERNMENT\|NGO\|OTHER |  |
+| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
+| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N | AGENT: RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT: MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR: MASTER\|DISTRIBUTOR\|SUB; INSTITUTION: EMPLOYER\|GOVERNMENT\|NGO\|OTHER; BILLER: UTILITY\|EDUCATION\|GOVT_FEE\|INTERNET_TV\|MNO |  |
 | `proposedParentPartnerId` | uuid | N | Y |  |  |
 | `formData` | object (`PartnerForm`) | Y | N |  |  |
 
@@ -5032,7 +5233,7 @@ Application work queue.
 | Param | In | Type | Req | Constraints / notes |
 |---|---|---|---|---|
 | `status` | query | string | N | application status |
-| `partnerType` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | N |  |
+| `partnerType` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | N |  |
 | `stageCode` | query | enum{SALES,COMPLIANCE,EDD,FINANCE,OPERATIONS} | N |  |
 | `slaBreached` | query | bool | N |  |
 | `initiatedById` | query | string | N |  |
@@ -5513,7 +5714,7 @@ Errors:
 | 400 | `VALIDATION_FAILED` | — | `missingItems` | missing mandatory documents / key persons / bank account / site visit; `errors[]` lists them |
 | 403 | `ACTOR_NOT_ALLOWED` | — | — | actor type, role or caller not permitted |
 | 404 | `NOT_FOUND` | — | — | path entity missing (or not visible to the actor) |
-| 409 | `STATE_CONFLICT` | `INVALID_TRANSITION`, `DUPLICATE_PARTNER`, `NO_APPROVAL_CHAIN`, `MAX_RESUBMISSIONS` | — |  |
+| 409 | `STATE_CONFLICT` | `INVALID_TRANSITION`, `DUPLICATE_PARTNER`, `NO_APPROVAL_CHAIN`, `MAX_RESUBMISSIONS`, `DUPLICATE_BILLER_CODE`, `MSISDN_PREFIX_TAKEN` | — | the last two: BILLER only (BR-PAR-81, BR-PAR-83) |
 | 409 | `IDEMPOTENCY_CONFLICT` | — | — | same `Idempotency-Key`, different body |
 | 422 | `RISK_BLOCKED` | `BLACKLISTED` | — | an identifier is blacklisted |
 | 503 | `DEPENDENCY_UNAVAILABLE` | — | — | limits-risk unreachable; nothing changed |
@@ -5746,7 +5947,7 @@ Search partners.
 
 | Param | In | Type | Req | Constraints / notes |
 |---|---|---|---|---|
-| `type` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | N |  |
+| `type` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | N |  |
 | `subType` | query | string | N |  |
 | `status` | query | enum{PENDING_SCREENING,PENDING_APPROVAL,ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED,REJECTED} | N |  |
 | `parentPartnerId` | query | uuid | N |  |
@@ -5796,8 +5997,8 @@ Response `200`:
 | `ancestors` | array<object> | Y | N |  |  |
 | `ancestors[].partnerId` | uuid | Y | N |  |  |
 | `ancestors[].walletId` | uuid | Y | Y |  |  |
-| `ancestors[].partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
-| `ancestors[].subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | Y | N |  |  |
+| `ancestors[].partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
+| `ancestors[].subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N |  |  |
 | `ancestors[].effectiveFrom` | timestamp | Y | N |  |  |
 
 ```json
@@ -5830,7 +6031,7 @@ Downstream partners (DST-005).
 | `partnerId` | path | uuid | Y |  |
 | `maxDepth` | query | int32 | N | 1..4 |
 | `status` | query | enum{PENDING_SCREENING,PENDING_APPROVAL,ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED,REJECTED} | N |  |
-| `type` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | N |  |
+| `type` | query | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | N |  |
 
 Response `200`:
 
@@ -5838,8 +6039,8 @@ Response `200`:
 |---|---|---|---|---|---|
 | `items` | array<object> | Y | N |  |  |
 | `items[].partnerId` | uuid | Y | N |  |  |
-| `items[].partnerCode` | string | Y | N | `^[AMDI][0-9]{9}$` |  |
-| `items[].partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
+| `items[].partnerCode` | string | Y | N | `^[AMDIB][0-9]{9}$` |  |
+| `items[].partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
 | `items[].displayName` | string | Y | N |  |  |
 | `items[].status` | enum{PENDING_SCREENING,PENDING_APPROVAL,ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED,REJECTED} | Y | N |  |  |
 | `items[].walletId` | uuid | Y | Y |  |  |
@@ -6056,7 +6257,7 @@ Request (`application/json`):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | N | N |  |  |
+| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | N | N |  |  |
 | `mcc` | string | N | Y | `^[0-9]{4}$` |  |
 | `reasonCode` | string | Y | N | `^[A-Z_]{3,40}$` |  |
 | `comment` | string | Y | N | 1..500 chars |  |
@@ -6155,7 +6356,7 @@ Request (`application/json`):
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
-| `changes` | object | Y | N |  | subset of email, displayNameBn (DIRECT); addressLine, geo, displayName, msisdn, legalName, tradeLicenceNo, tradeLicenceExpiry, tin, bin (APPROVAL) |
+| `changes` | object | Y | N |  | subset of email, displayNameBn (DIRECT); addressLine, geo, displayName, msisdn, legalName, tradeLicenceNo, tradeLicenceExpiry, tin, bin, biller (APPROVAL; `biller` = a full `BillerProfileInput`, BILLER partners only, `billerCode` immutable — CR-WALLET-1) |
 | `comment` | string | N | Y | 0..500 chars |  |
 
 ```json
@@ -6183,7 +6384,7 @@ Errors:
 | 400 | `VALIDATION_FAILED` | — | — | malformed header, parameter or body |
 | 403 | `ACTOR_NOT_ALLOWED` | — | — | actor type, role or caller not permitted |
 | 404 | `NOT_FOUND` | — | — | path entity missing (or not visible to the actor) |
-| 409 | `STATE_CONFLICT` | `DUPLICATE_MSISDN`, `MSISDN_COOLING`, `ALREADY_PENDING` | — |  |
+| 409 | `STATE_CONFLICT` | `DUPLICATE_MSISDN`, `MSISDN_COOLING`, `ALREADY_PENDING`, `DUPLICATE_BILLER_CODE`, `MSISDN_PREFIX_TAKEN` | — | the last two: `changes.biller` (BR-PAR-84) |
 | 409 | `IDEMPOTENCY_CONFLICT` | — | — | same `Idempotency-Key`, different body |
 | 422 | `RISK_BLOCKED` | `BLACKLISTED` | — | new MSISDN blacklisted |
 | 503 | `DEPENDENCY_UNAVAILABLE` | — | — | blacklist unreachable |
@@ -7028,6 +7229,70 @@ Errors:
 | 404 | `NOT_FOUND` | — | — | path entity missing (or not visible to the actor) |
 | 409 | `STATE_CONFLICT` | `ALREADY_PENDING` | — |  |
 
+##### 5.1.4.48 `GET /v1/billers`
+
+Biller catalogue (CR-WALLET-1; BIL-008, BIL-011, BIL-012). Activated BILLER partners with their profile, ordered by `billerCode` (BR-PAR-89). Holder actors see only ACTIVE billers; STAFF / SERVICE may filter by status. Same data as the Redis data contract `biller-catalogue-cache` v1 (the payment service's hot-path source); this operation is its cache-miss fallback and the channel catalogue read.
+
+- Module `partner` · audience `service` · release MVP · operationId `listBillers`
+- Actors: CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION (ACTIVE billers only); STAFF (any role); SERVICE (any service); SYSTEM
+- Idempotency: read-only / no key
+- Pagination: kernel K3.4 (`limit` 1..200, default 50; `cursor`) → `{items, nextCursor}`
+
+| Param | In | Type | Req | Constraints / notes |
+|---|---|---|---|---|
+| `category` | query | enum{UTILITY_ELECTRICITY,UTILITY_GAS,UTILITY_WATER,INTERNET,TV,EDUCATION,GOVT_FEE,MOBILE_PREPAID,MOBILE_POSTPAID} | N |  |
+| `subType` | query | enum{UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | N |  |
+| `status` | query | enum{ACTIVE,SUSPENDED,PENDING_TERMINATION,TERMINATED} | N | default ACTIVE; other values STAFF / SERVICE only (holder actors → 403) |
+| `msisdnPrefix` | query | string | N | `^01[3-9]$`; the MNO holding the prefix (recharge operator resolution) |
+| `q` | query | string | N | ≤ 50 chars; billerCode or nameEn prefix (case-insensitive) |
+
+Response `200`:
+
+| Field | Type | Req | Null | Constraints / enum | Notes |
+|---|---|---|---|---|---|
+| `items` | array<`Biller`> | Y | N |  |  |
+| `nextCursor` | string | Y | Y |  |  |
+
+```json
+{
+  "items": [{"billerId": "0192f4a0-0b01-7c00-8a00-00000000b001", "version": 3, "partnerCode": "B000000018", "subType": "UTILITY", "categoryCode": 501, "status": "ACTIVE", "walletId": "0192f4a1-0b01-7c00-8a00-00000000b001", "billerCode": "DESCO", "nameEn": "Dhaka Electric Supply Company (DESCO)", "nameBn": "ঢাকা ইলেকট্রিক সাপ্লাই কোম্পানি (ডেসকো)", "category": "UTILITY_ELECTRICITY", "logoKey": "billers/desco.png", "referenceLabelEn": "Account number", "referenceLabelBn": "হিসাব নম্বর", "referencePattern": "^[0-9]{8,12}$", "amountMode": "ENQUIRY", "fixedAmountPoisha": null, "minAmountPoisha": 1000, "maxAmountPoisha": 5000000, "feeBearer": "PAYER", "msisdnPrefixes": [], "rechargeTypes": [], "denominationsPoisha": [], "updatedAt": "2026-10-14T06:00:00.000Z"}],
+  "nextCursor": null
+}
+```
+
+Errors:
+
+| HTTP | code | reason | extensions | when |
+|---|---|---|---|---|
+| 400 | `VALIDATION_FAILED` | `INVALID_CURSOR` | — | malformed header, parameter or body |
+| 403 | `ACTOR_NOT_ALLOWED` | — | — | actor type, role or caller not permitted (incl. a holder actor asking for a non-ACTIVE status) |
+
+##### 5.1.4.49 `GET /v1/billers/{billerId}`
+
+One biller of the catalogue (CR-WALLET-1). 404 when the id is not an activated BILLER partner, or (holder actors) the biller is not ACTIVE.
+
+- Module `partner` · audience `service` · release MVP · operationId `getBiller`
+- Actors: CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION (ACTIVE billers only); STAFF (any role); SERVICE (any service); SYSTEM
+- Idempotency: read-only / no key
+
+| Param | In | Type | Req | Constraints / notes |
+|---|---|---|---|---|
+| `billerId` | path | uuid | Y |  |
+
+Response `200`: `Biller` (§5.1.0).
+
+```json
+{"billerId": "0192f4a0-0b01-7c00-8a00-00000000b001", "version": 3, "partnerCode": "B000000018", "subType": "UTILITY", "categoryCode": 501, "status": "ACTIVE", "walletId": "0192f4a1-0b01-7c00-8a00-00000000b001", "billerCode": "DESCO", "nameEn": "Dhaka Electric Supply Company (DESCO)", "nameBn": "ঢাকা ইলেকট্রিক সাপ্লাই কোম্পানি (ডেসকো)", "category": "UTILITY_ELECTRICITY", "logoKey": "billers/desco.png", "referenceLabelEn": "Account number", "referenceLabelBn": "হিসাব নম্বর", "referencePattern": "^[0-9]{8,12}$", "amountMode": "ENQUIRY", "fixedAmountPoisha": null, "minAmountPoisha": 1000, "maxAmountPoisha": 5000000, "feeBearer": "PAYER", "msisdnPrefixes": [], "rechargeTypes": [], "denominationsPoisha": [], "updatedAt": "2026-10-14T06:00:00.000Z"}
+```
+
+Errors:
+
+| HTTP | code | reason | extensions | when |
+|---|---|---|---|---|
+| 400 | `VALIDATION_FAILED` | — | — | malformed header, parameter or body |
+| 403 | `ACTOR_NOT_ALLOWED` | — | — | actor type, role or caller not permitted |
+| 404 | `NOT_FOUND` | — | — | not an activated biller (or not visible to the actor) |
+
 #### 5.1.5 Internal and test-support operations (`x-audience: internal`)
 
 ##### 5.1.5.1 `POST /v1/internal/cache:rebuild`
@@ -7278,9 +7543,9 @@ aggregateType `Wallet`, key = walletId, compacted (latest state per wallet, no t
 |---|---|---|---|---|---|
 | `walletId` | uuid | Y | N |  | = key |
 | `version` | int64 | Y | N | 1..9007199254740991; strictly +1 per emitted change | = status-cache version |
-| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
+| `ownerType` | enum{CUSTOMER,AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
 | `ownerId` | uuid | Y | N |  | customerId or partnerId |
-| `walletType` | enum{C,A,D,M,I} | Y | N |  |  |
+| `walletType` | enum{C,A,D,M,I,B} | Y | N |  |  |
 | `msisdn` | string | Y | N | `^8801[3-9][0-9]{8}$` | canonical; contact source of truth for wallets |
 | `status` | enum{P,A,D,X,C,F,Q,Z} | Y | N |  | effective status |
 | `kycTier` | int32 | Y | N | 0..2 | partner wallets 2 |
@@ -7394,14 +7659,14 @@ Examples (full envelopes in `contracts/provided/events/customer.events/`):
 
 #### 5.2.3 `partner.events` · `PARTNER_UPSERTED` (only type)
 
-aggregateType `Partner`, key = partnerId, compacted (no tombstones). Trigger: any change of any field below — submit (`PENDING_SCREENING`), screening CLEAR (`PENDING_APPROVAL`), activation, reject, suspend / reactivate / terminate, category, territory, profile (displayName, msisdn, legalName), **any key-person change**, risk grade, hierarchy change (the partner and every descendant), rescreen (`version + 1`). `:republish` re-emits without a version bump. Consumers apply only if `version` > stored (or = stored for an initial load). All 20 fields are mandatory in every emission (contract-tested); `tinPresent` is additive.
+aggregateType `Partner`, key = partnerId, compacted (no tombstones). Trigger: any change of any field below — submit (`PENDING_SCREENING`), screening CLEAR (`PENDING_APPROVAL`), activation, reject, suspend / reactivate / terminate, category, territory, profile (displayName, msisdn, legalName), **any key-person change**, risk grade, hierarchy change (the partner and every descendant), rescreen (`version + 1`). `:republish` re-emits without a version bump. Consumers apply only if `version` > stored (or = stored for an initial load). All 20 fields are mandatory in every emission (contract-tested); `tinPresent` and `biller` (CR-WALLET-1, BILLER partners only) are additive.
 
 | Field | Type | Req | Null | Constraints / enum | Notes |
 |---|---|---|---|---|---|
 | `partnerId` | uuid | Y | N |  | = key |
-| `partnerCode` | string | Y | N | `^[AMDI][0-9]{9}$` | type prefix + 8-digit sequence + Luhn digit |
-| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION} | Y | N |  |  |
-| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER} | Y | N | AGENT RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR MASTER\|DISTRIBUTOR\|SUB; INSTITUTION EMPLOYER\|GOVERNMENT\|NGO\|OTHER |  |
+| `partnerCode` | string | Y | N | `^[AMDIB][0-9]{9}$` | type prefix + 8-digit sequence + Luhn digit |
+| `partnerType` | enum{AGENT,MERCHANT,DISTRIBUTOR,INSTITUTION,BILLER} | Y | N |  |  |
+| `subType` | enum{RETAIL,SUPER_AGENT,MERCHANT_AGENT,BANK_AGENT,MICRO,SMALL,ENTERPRISE,ONLINE,MASTER,DISTRIBUTOR,SUB,EMPLOYER,GOVERNMENT,NGO,OTHER,UTILITY,EDUCATION,GOVT_FEE,INTERNET_TV,MNO} | Y | N | AGENT RETAIL\|SUPER_AGENT\|MERCHANT_AGENT\|BANK_AGENT; MERCHANT MICRO\|SMALL\|ENTERPRISE\|ONLINE; DISTRIBUTOR MASTER\|DISTRIBUTOR\|SUB; INSTITUTION EMPLOYER\|GOVERNMENT\|NGO\|OTHER; BILLER UTILITY\|EDUCATION\|GOVT_FEE\|INTERNET_TV\|MNO |  |
 | `categoryCode` | int32 | Y | N | 0..99999; codes.yaml categoryCode | same as the partner wallet's |
 | `mcc` | string | Y | Y | `^[0-9]{4}$` | null for non-merchants |
 | `walletId` | uuid | Y | Y |  | null until ACTIVE |
@@ -7421,7 +7686,7 @@ aggregateType `Partner`, key = partnerId, compacted (no tombstones). Trigger: an
 | `effectiveFrom` | timestamp | Y | N | max(effective_from of own ACTIVE assignment and each ancestor's) | unchanged by non-hierarchy changes |
 | `legalName` | string | Y | N |  |  |
 | `riskGrade` | enum{LOW,MEDIUM,HIGH} | Y | N |  | set at submission |
-| `keyPersons` | array<object> | Y | N |  | may be [] (e.g. INSTITUTION/GOVERNMENT) |
+| `keyPersons` | array<object> | Y | N |  | may be [] (e.g. INSTITUTION/GOVERNMENT, BILLER) |
 | `keyPersons[].personId` | uuid | Y | N |  | screening subject id of the person |
 | `keyPersons[].role` | enum{PROPRIETOR,DIRECTOR,PARTNER,AUTHORISED_SIGNATORY,BENEFICIAL_OWNER} | Y | N |  |  |
 | `keyPersons[].nameEn` | string | Y | N |  |  |
@@ -7429,6 +7694,20 @@ aggregateType `Partner`, key = partnerId, compacted (no tombstones). Trigger: an
 | `keyPersons[].nidHash` | string | Y | Y | 64 lower-case hex (kernel K2) |  |
 | `keyPersons[].dob` | date | Y | Y |  |  |
 | `tinPresent` | bool | N | N |  | additive; partner has a TIN on file |
+| `biller` | object | N | Y |  | additive (CR-WALLET-1); present only when `partnerType = BILLER`; the `BillerProfileInput` fields (§5.1.0) |
+| `biller.billerCode` | string | Y | N | `^[A-Z0-9-]{2,16}$` |  |
+| `biller.nameEn` / `biller.nameBn` | string | Y | N | 1..100 chars |  |
+| `biller.category` | enum{UTILITY_ELECTRICITY,UTILITY_GAS,UTILITY_WATER,INTERNET,TV,EDUCATION,GOVT_FEE,MOBILE_PREPAID,MOBILE_POSTPAID} | Y | N |  |  |
+| `biller.logoKey` | string | Y | Y |  |  |
+| `biller.referenceLabelEn` / `biller.referenceLabelBn` | string | Y | N | 1..60 chars |  |
+| `biller.referencePattern` | string | Y | N | 1..200 chars |  |
+| `biller.amountMode` | enum{ENQUIRY,FIXED,OPEN} | Y | N |  |  |
+| `biller.fixedAmountPoisha` | int64 | Y | Y | set iff FIXED |  |
+| `biller.minAmountPoisha` / `biller.maxAmountPoisha` | int64 | Y | N | ≥ 1; max ≥ min |  |
+| `biller.feeBearer` | enum{PAYER,BILLER} | Y | N |  |  |
+| `biller.msisdnPrefixes` | array<string> | Y | N | `^01[3-9]$`; MNO only, else [] |  |
+| `biller.rechargeTypes` | array<enum{PREPAID,POSTPAID}> | Y | N | MNO only, else [] |  |
+| `biller.denominationsPoisha` | array<int64> | Y | N | MNO only, may be [] |  |
 
 Semantics:
 - Compliance screens every new version with `status = PENDING_SCREENING` whose `version` > the last version it screened; key persons and both `legalName` and `displayName` are screened inside the partner-level result.
@@ -7439,6 +7718,7 @@ Semantics:
 - `territory.*` are GEO codes; `mcc` null for non-merchants; `settlementMode` always `WALLET` in R1.
 - `keyPersons[]` = the key persons of the latest application round; `personId` = `partner_key_person.id`.
 - `msisdn` / `displayName` describe the partner; the partner wallet's contact is published on `wallet.events`.
+- `biller` (CR-WALLET-1) is the biller profile of a BILLER partner from its first submission on (also while PENDING_SCREENING, so screening sees it); billerId = `partnerId`, and `status`, `walletId`, `subType`, `categoryCode` stay top-level. A profile change bumps `version` like any partner change. Consumers that only need the payable catalogue should read the data contract `biller-catalogue-cache` instead.
 
 ```json
 {
@@ -7460,6 +7740,14 @@ Pending-screening example (`data` only, Nirob Store at submission):
 {"partnerId": "0192f4a0-0e01-7c00-8a00-00000000e001", "partnerCode": "M000123455", "partnerType": "MERCHANT", "subType": "MICRO", "categoryCode": 3101, "mcc": "5411", "walletId": null, "parentPartnerId": "0192f4a0-0d03-7c00-8a00-00000000d003", "ancestorPartnerIds": ["0192f4a0-0d03-7c00-8a00-00000000d003", "0192f4a0-0d02-7c00-8a00-00000000d002", "0192f4a0-0d01-7c00-8a00-00000000d001"], "ancestorWalletIds": ["0192f4a1-0d03-7c00-8a00-00000000d003", "0192f4a1-0d02-7c00-8a00-00000000d002", "0192f4a1-0d01-7c00-8a00-00000000d001"], "territory": {"division": "30", "district": "3026", "upazila": "302648", "union": null}, "status": "PENDING_SCREENING", "displayName": "NIROB STORE", "msisdn": "8801812000111", "settlementMode": "WALLET", "version": 1, "effectiveFrom": "2026-10-09T09:30:00.000Z", "legalName": "Nirob Store", "riskGrade": "LOW", "keyPersons": [{"personId": "0192f4b2-0002-7c00-8a00-0000000000c2", "role": "PROPRIETOR", "nameEn": "Nirob Hossain", "nameBn": null, "nidHash": "4be1a0c3d5e7f9012b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70819a", "dob": "1988-07-01"}], "tinPresent": false}
 ```
 
+Biller example (`data` only, Grameenphone after activation, CR-WALLET-1):
+
+```json
+{"partnerId": "0192f4a0-0b07-7c00-8a00-00000000b007", "partnerCode": "B000000075", "partnerType": "BILLER", "subType": "MNO", "categoryCode": 505, "mcc": null, "walletId": "0192f4a1-0b07-7c00-8a00-00000000b007", "parentPartnerId": null, "ancestorPartnerIds": [], "ancestorWalletIds": [], "territory": {"division": "30", "district": "3026", "upazila": null, "union": null}, "status": "ACTIVE", "displayName": "GRAMEENPHONE", "msisdn": "8801300000007", "settlementMode": "WALLET", "version": 3, "effectiveFrom": "2026-10-14T05:00:00.000Z", "legalName": "Grameenphone Ltd.", "riskGrade": "LOW", "keyPersons": [], "tinPresent": true, "biller": {"billerCode": "GP", "nameEn": "Grameenphone", "nameBn": "গ্রামীণফোন", "category": "MOBILE_PREPAID", "logoKey": "billers/gp.png", "referenceLabelEn": "Mobile number", "referenceLabelBn": "মোবাইল নম্বর", "referencePattern": "^01[3-9][0-9]{8}$", "amountMode": "OPEN", "fixedAmountPoisha": null, "minAmountPoisha": 1000, "maxAmountPoisha": 100000, "feeBearer": "PAYER", "msisdnPrefixes": ["017", "013"], "rechargeTypes": ["PREPAID", "POSTPAID"], "denominationsPoisha": [2000, 5000, 10000, 20000, 50000]}}
+```
+
+The `biller` object example is also carried in the schema (`properties.biller.examples`); the envelope example file stays the agent example above.
+
 #### 5.2.4 Inbound topics written (owned by admin-service)
 
 This service also writes `notification.requests`, `approval.events` and `audit.events`; their schemas belong to admin-service (kernel K4.4) and are pinned in §6.10. Templates sent: §5.3.5; entity types: §5.3.4.
@@ -7471,10 +7759,10 @@ This service also writes `notification.requests`, `approval.events` and `audit.e
 | Set | Values | Notes |
 |---|---|---|
 | `walletStatus` | `P` PENDING_KYC, `A` ACTIVE, `D` DORMANT, `X` DEBIT_BLOCKED, `C` CREDIT_BLOCKED, `F` BLOCKED, `Q` PENDING_CLOSURE, `Z` CLOSED | Effective wallet status. Single-letter code on the wire and in the status cache; requests accept the code or the name. Directions per code below. |
-| `walletType` | `C` CUSTOMER, `A` AGENT, `D` DISTRIBUTOR, `M` MERCHANT, `I` INSTITUTION | Wallet type code (status cache, events, responses) and the matching ledger account type. |
+| `walletType` | `C` CUSTOMER, `A` AGENT, `D` DISTRIBUTOR, `M` MERCHANT, `I` INSTITUTION, `B` BILLER | Wallet type code (status cache, events, responses) and the matching ledger account type (`B` → `BILLER_WALLET` 150, owner type `BILLER`; CR-WALLET-1). |
 | `walletStatusReason` | `KYC_APPROVED`, `KYC_EXPIRED`, `DORMANCY`, `CUSTOMER_REQUEST`, `FRAUD_FREEZE`, `AML_FREEZE`, `COURT_ORDER`, `REGULATORY_INSTRUCTION`, `CLOSURE`, `WALLET_CREATED`, `PRE_REGISTRATION`, `REACTIVATION`, `KYC_UPGRADE`, `RISK_REGRADE`, `SCREENING_REJECT`, `PARTNER_SUSPENDED`, `PARTNER_REACTIVATED`, `PARTNER_TERMINATED`, `RESTRICTED` | Wallet statusReasonCode / status-changes reasonCode values (reasonCodes group 'Wallet status'); RESTRICTED is display-only. |
-| `ownerType` | `CUSTOMER`, `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION` | Wallet owner type. |
-| `categoryCode` | 0, 101–104, 201–203, 3101–3107, 3199, 3201–3207, 3299, 3301–3307, 3399, 3401–3407, 3499, 401–404 (44 values) | Partner category (int32, 0..99999), derived only by the partner module; never an MCC. CUSTOMER = 0; AGENT 101..104; DISTRIBUTOR 201..203; INSTITUTION 401..404; MERCHANT = 3000 + d*100 + g with d = MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4 and g = refdata MCC attributes.group (01 GROCERY_RETAIL, 02 FOOD, 03 UTILITY_TELCO, 04 TRANSPORT, 05 HEALTH, 06 EDUCATION, 07 DIGITAL, 99 OTHER). Consumers may match a merchant size class by its hundred group (3100, 3200, 3300, 3400). Pending architect sign-off (OPEN D-21). |
+| `ownerType` | `CUSTOMER`, `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION`, `BILLER` | Wallet owner type. |
+| `categoryCode` | 0, 101–104, 201–203, 3101–3107, 3199, 3201–3207, 3299, 3301–3307, 3399, 3401–3407, 3499, 401–404, 501–505 (49 values) | Partner category (int32, 0..99999), derived only by the partner module; never an MCC. CUSTOMER = 0; AGENT 101..104; DISTRIBUTOR 201..203; INSTITUTION 401..404; BILLER 501 UTILITY, 502 EDUCATION, 503 GOVT_FEE, 504 INTERNET_TV, 505 MNO; MERCHANT = 3000 + d*100 + g with d = MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4 and g = refdata MCC attributes.group (01 GROCERY_RETAIL, 02 FOOD, 03 UTILITY_TELCO, 04 TRANSPORT, 05 HEALTH, 06 EDUCATION, 07 DIGITAL, 99 OTHER). Consumers may match a merchant size class by its hundred group (3100, 3200, 3300, 3400). Pending architect sign-off (OPEN D-21). |
 | `kycTier` | `0` MOBILE_VERIFIED, `1` SIMPLIFIED, `2` FULL | KYC tier (definitions configurable in KYC_TIERS). |
 | `riskGrade` | `LOW`, `MEDIUM`, `HIGH` | Customer / partner risk grade. |
 | `walletFlag` | `1` AML_WATCH, `2` PIN_RESET_COOLING, `4` PRE_REGISTERED, `8` HAS_OPEN_LIEN, `16` NEW_DEVICE_COOLING | flags bitmask. Bits 4 and 16 are not externally settable. |
@@ -7488,8 +7776,8 @@ This service also writes `notification.requests`, `approval.events` and `audit.e
 | `incomeBand` | `UP_TO_BDT_10K`, `BDT_10K_25K`, `BDT_25K_50K`, `BDT_50K_100K`, `ABOVE_BDT_100K` |  |
 | `preRegisterResult` | `CREATED`, `EXISTS`, `REJECTED` |  |
 | `preRegisterRejectReason` | `INVALID_MSISDN`, `MSISDN_COOLING`, `CLOSED_WALLET` |  |
-| `partnerType` | `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION` |  |
-| `partnerSubType` | `RETAIL`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO`, `SMALL`, `ENTERPRISE`, `ONLINE`, `MASTER`, `DISTRIBUTOR`, `SUB`, `EMPLOYER`, `GOVERNMENT`, `NGO`, `OTHER` | Partner sub-type per partner type. |
+| `partnerType` | `AGENT`, `MERCHANT`, `DISTRIBUTOR`, `INSTITUTION`, `BILLER` |  |
+| `partnerSubType` | `RETAIL`, `SUPER_AGENT`, `MERCHANT_AGENT`, `BANK_AGENT`, `MICRO`, `SMALL`, `ENTERPRISE`, `ONLINE`, `MASTER`, `DISTRIBUTOR`, `SUB`, `EMPLOYER`, `GOVERNMENT`, `NGO`, `OTHER`, `UTILITY`, `EDUCATION`, `GOVT_FEE`, `INTERNET_TV`, `MNO` | Partner sub-type per partner type (BILLER: UTILITY, EDUCATION, GOVT_FEE, INTERNET_TV, MNO). |
 | `partnerStatus` | `PENDING_SCREENING`, `PENDING_APPROVAL`, `ACTIVE`, `SUSPENDED`, `PENDING_TERMINATION`, `TERMINATED`, `REJECTED` | Compliance screens on PENDING_SCREENING; money paths treat only ACTIVE as active (float return also from PENDING_TERMINATION). |
 | `partnerStatusTarget` | `SUSPENDED`, `ACTIVE`, `PENDING_TERMINATION` |  |
 | `partnerFlag` | `PERFORMANCE_WATCH`, `COMPLAINT_WATCH`, `FRAUD_WATCH`, `AML_WATCH`, `BLACKLIST_MATCH`, `INACTIVE` |  |
@@ -7499,6 +7787,10 @@ This service also writes `notification.requests`, `approval.events` and `audit.e
 | `qrPointOfInitiation` | `STATIC`, `DYNAMIC` |  |
 | `qrNotPayableReason` | `EXPIRED`, `REVOKED`, `PARTNER_NOT_ACTIVE`, `UNKNOWN_ACCOUNT`, `TAMPERED`, `OFF_US_NOT_SUPPORTED`, `CURRENCY_NOT_SUPPORTED` |  |
 | `qrDecodeError` | `CRC_MISMATCH`, `BAD_TLV`, `MISSING_TAG`, `BAD_FORMAT` | errors[].message of 400 on POST /v1/qr/decode. |
+| `billerCategory` | `UTILITY_ELECTRICITY`, `UTILITY_GAS`, `UTILITY_WATER` (UTILITY); `INTERNET`, `TV` (INTERNET_TV); `EDUCATION`; `GOVT_FEE`; `MOBILE_PREPAID`, `MOBILE_POSTPAID` (MNO) | Biller profile category, allowed per subType (CR-WALLET-1). |
+| `billerAmountMode` | `ENQUIRY`, `FIXED`, `OPEN` | How a bill amount is determined. |
+| `billerFeeBearer` | `PAYER`, `BILLER` | Who bears the bill-payment fee of the biller (not the kernel feeBearer). |
+| `rechargeType` | `PREPAID`, `POSTPAID` | Recharge types an MNO biller accepts. |
 
 Wallet status permissions:
 
@@ -7556,6 +7848,8 @@ Wallet status permissions:
 | `STATE_CONFLICT` | `ALREADY_SCHEDULED` | `POST /v1/partners/{partnerId}/hierarchy-changes` | — |
 | `STATE_CONFLICT` | `PARTNER_NOT_ACTIVE` | `POST /v1/qr/static`; `POST /v1/qr/dynamic` | — |
 | `STATE_CONFLICT` | `OUTLET_CLOSED` | `POST /v1/qr/static`; `POST /v1/qr/dynamic` | — |
+| `STATE_CONFLICT` | `DUPLICATE_BILLER_CODE` | `POST /v1/partner-applications/{applicationId}:submit`; `POST /v1/partners/{partnerId}/profile-changes` | — |
+| `STATE_CONFLICT` | `MSISDN_PREFIX_TAKEN` | `POST /v1/partner-applications/{applicationId}:submit`; `POST /v1/partners/{partnerId}/profile-changes` | — |
 | `RISK_BLOCKED` | `BLACKLISTED` | `POST /v1/partner-applications/{applicationId}/key-persons`; `PUT /v1/partner-applications/{applicationId}/key-persons/{keyPersonId}`; `POST /v1/partner-applications/{applicationId}/bank-accounts`; `POST /v1/partner-applications/{applicationId}:submit`; `POST /v1/partners/{partnerId}/profile-changes`; `POST /v1/partners/{partnerId}/bank-accounts` | — |
 | `SERVICE_DISABLED` | `SELF_REGISTRATION_DISABLED` | `POST /v1/partner-applications` | — |
 | `SERVICE_DISABLED` | `BANK_SETTLEMENT_DISABLED` | `POST /v1/partner-applications` | — |
@@ -7650,19 +7944,21 @@ Variables exactly as declared (types: TEXT, DATE, DATETIME, INT, MONEY, MSISDN);
 | `M` | business | partnerCode of a MERCHANT (not a txnRef) | `M{8-digit sequence}{Luhn digit}` | 10 |
 | `D` | business | partnerCode of a DISTRIBUTOR (not a txnRef) | `D{8-digit sequence}{Luhn digit}` | 10 |
 | `I` | business | partnerCode of an INSTITUTION (not a txnRef) | `I{8-digit sequence}{Luhn digit}` | 10 |
+| `B` | business | partnerCode of a BILLER (not a txnRef; the short `billerCode`, e.g. `DESCO`, is separate) | `B{8-digit sequence}{Luhn digit}` | 10 |
 | `Q` | business | dynamic Bangla QR reference (tag 62.05; not a txnRef) | `Q{9 Crockford base32}` | 10 |
 
 `WC` is the only ledger `txnRef` prefix; partner codes and QR references are business references, never sent to the ledger. Consumers treat every reference as opaque (kernel K1).
 
 #### 5.3.8 Product codes and metrics
 
-Product codes: none (this service owns no product switch). Service metrics: §9 (codes.yaml `metrics`).
+Product codes: none (this service owns no product switch; `BILL_PAY` / `RECHARGE` belong to transaction-service). Service metrics: §9 (codes.yaml `metrics`, incl. `bitspay_partner_biller_cache_writes_total{source,result}`).
 
 ### 5.4 Data contracts
 
 | id | Version | File | Kind | Summary |
 |---|---|---|---|---|
-| `wallet-status-cache` | 1 | `contracts/provided/data/wallet-status-cache.v1.md` | redis-format | Key / field / value format of `ws:{bucket}`, the Lua CAS, the negative-cache key `wsn:{walletId}`, readiness rules and test vectors. Readers depend on it; any change is versioned. |
+| `wallet-status-cache` | 1 | `contracts/provided/data/wallet-status-cache.v1.md` | redis-format | Key / field / value format of `ws:{bucket}`, the Lua CAS, the negative-cache key `wsn:{walletId}`, readiness rules and test vectors. Readers depend on it; any change is versioned. `walletTypeCode` `B` added additively (contract 1.1.0). |
+| `biller-catalogue-cache` | 1 | `contracts/provided/data/biller-catalogue-cache.v1.md` | redis-format | MVP, CR-WALLET-1. Keys `biller:{billerId}` (JSON, Lua CAS by partner version) and `biller:mno-prefix:{prefix}` → billerId, plus `biller:meta`; write rules, reader rules (fallback `GET /v1/billers…`), test vectors. |
 
 Summary (the file is authoritative):
 
@@ -7677,30 +7973,44 @@ value   = "{version}:{statusCode}:{kycTier}:{walletTypeCode}:{categoryCode}:{fla
 - Readers fetch sender and receiver in one round trip (pipelined `HGET`); on a miss they call `GET /v1/wallets/{walletId}/status` (single-flight + circuit breaker), on a 404 they may write `wsn:{walletId}` = `1` with TTL 60 s; this service `DEL`s that key when the wallet becomes READY. Both unavailable → the reader refuses with 503.
 - Test vectors §7.6.
 
+`biller-catalogue-cache` summary (the file is authoritative):
+
+```
+key    = "biller:" + billerId                    JSON {schema:1, billerId, version, billerCode, partnerCode, subType, category, categoryCode,
+                                                       nameEn, nameBn, logoKey, status, walletId, referenceLabelEn, referenceLabelBn,
+                                                       referencePattern, amountMode, fixedAmountPoisha, minAmountPoisha, maxAmountPoisha,
+                                                       feeBearer, msisdnPrefixes, rechargeTypes, denominationsPoisha, updatedAt}
+key    = "biller:mno-prefix:" + prefix          value = billerId   (prefix = "01X", e.g. 017)
+key    = "biller:meta"                          hash state / loadedAt / schema / count
+```
+
+- Written only for activated billers (with a `walletId`); never deleted; the CAS applies only a newer partner `version`; prefix keys are set after an applied CAS and released by compare-and-delete.
+- Readers: payable only when `status = ACTIVE`; verify `prefix ∈ msisdnPrefixes` after a prefix lookup; on a miss call `GET /v1/billers/{billerId}` (or `?msisdnPrefix=`); both unavailable → 503, never guess.
+
 ## 6. Consumed contracts
 
 Mirror of `contracts/contract.yaml → consumes`. All pins: `pinnedContractVersion 1.0.0`, major 1. Outbound headers (kernel K3.2): `X-Actor-Type: SERVICE` (ledger commands always SERVICE; job-driven reads SYSTEM), `X-Actor-Id: wallet-service` (both modules), `X-Channel` = the inbound request's channel or `SYSTEM` (jobs, consumers), `X-Correlation-Id` propagated (or the envelope `correlationId`). Clients live in `common` and are shared by both modules; one Resilience4j circuit breaker per dependency (50 % failures over 20 calls → open 10 s). Base URLs `bitspay.clients.<svc>.base-url`; profile `local` → WireMock on 8099 using `stubs/<producer>/`; tests use the same WireMock stubs (no in-memory fake clients).
 
 | Producer | Artefact | Pinned | Fields used (summary) | Why |
 |---|---|---|---|---|
-| ledger-service | `POST /v1/ledger/accounts` | v1 / 1.0.0 | req accountId, accountType, ownerType; res accountId, result | create the wallet's ledger account (ADR-05) |
-| ledger-service | `POST /v1/ledger/accounts/{id}:close` | v1 / 1.0.0 | path id; res result, closedAt; problem reason | final closure step |
-| ledger-service | `GET /v1/ledger/accounts/{id}/balance` | v1 / 1.0.0 | ledger/available/held balance, closed | closure pre-check, partner termination |
-| ledger-service | `GET /v1/ledger/holds` | v1 / 1.0.0 | items[].holdCommandId, amountPoisha, reasonCode, totalHeldPoisha | closure pre-check |
-| ledger-service | `POST /v1/ledger/accounts/balances:batchGet` | v1 / 1.0.0 | items balances, notFound | unclaimed report (R2) |
-| ledger-service | `POST /v1/ledger/commands/post-closure-payout` | v1 / 1.0.0 | command 17 body, response result / rejectionCode | closure payout |
-| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.0.0 | found, result, rejectionCode | resolve an unknown payout outcome |
-| limits-risk-service | `GET /v1/blacklist/check` | v1 / 1.0.0 | query type, valueHash; res listed, entries | onboarding blacklist checks |
-| limits-risk-service | `GET /v1/limits/wallets/{walletId}/usage` | v1 / 1.0.0 | res maxBalancePoisha | payout destination max balance |
-| admin-service | `GET /v1/retention/legal-holds` (R2) | v1 / 1.0.0 | query subjectType, subjectId, category; res items | skip anonymisation under hold |
-| admin-service | `GET /v1/refdata/{type}` | v1 / 1.0.0 | items type, code, parentCode, names, attributes, version, active | bootstrap projections |
+| ledger-service | `POST /v1/ledger/accounts` | v1 / 1.1.0 | req accountId, accountType, ownerType; res accountId, result | create the wallet's ledger account (ADR-05); `BILLER_WALLET` / `BILLER` needs ledger contract ≥ 1.1.0 (CR-WALLET-1; pin raised by the orchestrator) |
+| ledger-service | `POST /v1/ledger/accounts/{id}:close` | v1 / 1.1.0 | path id; res result, closedAt; problem reason | final closure step |
+| ledger-service | `GET /v1/ledger/accounts/{id}/balance` | v1 / 1.1.0 | ledger/available/held balance, closed | closure pre-check, partner termination |
+| ledger-service | `GET /v1/ledger/holds` | v1 / 1.1.0 | items[].holdCommandId, amountPoisha, reasonCode, totalHeldPoisha | closure pre-check |
+| ledger-service | `POST /v1/ledger/accounts/balances:batchGet` | v1 / 1.1.0 | items balances, notFound | unclaimed report (R2) |
+| ledger-service | `POST /v1/ledger/commands/post-closure-payout` | v1 / 1.1.0 | command 17 body, response result / rejectionCode | closure payout |
+| ledger-service | `GET /v1/ledger/commands/{commandId}` | v1 / 1.1.0 | found, result, rejectionCode | resolve an unknown payout outcome |
+| limits-risk-service | `GET /v1/blacklist/check` | v1 / 1.1.0 | query type, valueHash; res listed, entries | onboarding blacklist checks |
+| limits-risk-service | `GET /v1/limits/wallets/{walletId}/usage` | v1 / 1.1.0 | res maxBalancePoisha | payout destination max balance |
+| admin-service | `GET /v1/retention/legal-holds` (R2) | v1 / 1.1.0 | query subjectType, subjectId, category; res items | skip anonymisation under hold |
+| admin-service | `GET /v1/refdata/{type}` | v1 / 1.1.0 | items type, code, parentCode, names, attributes, version, active | bootstrap projections |
 | compliance-service | `case.events` SCREENING_COMPLETED / SCREENING_DECIDED (both modules), RISK_REGRADE_RECOMMENDED | v1 / 1.0.0 | §6.4 | KYC / partner screening, regrade |
 | support-service | `support.events` DISPUTE_OPENED, DISPUTE_RESOLVED, REVERSAL_REQUESTED, REVERSAL_COMPLETED | v1 / 1.0.0 | ids, walletIds | closure pre-check projection |
-| limits-risk-service | `blacklist.events` BLACKLIST_ENTRY_UPSERTED (both modules) | v1 / 1.0.0 | entryId, type, valueHash, active, expiresAt, reasonCode | re-check on list changes |
-| transaction-service | `txn.events` TRANSACTION_COMPLETED | v1 / 1.0.0 | txnRef, txnType, from/to wallet, completedAt | dormancy activity |
-| admin-service | `refdata.events` REFDATA_UPSERTED (both modules) | v1 / 1.0.0 | all item fields | validation, QR city, category formula, retention |
-| wallet-service (self) | `wallet.events` WALLET_UPSERTED | v1 / 1.0.0 | walletId, version, status, kycTier, walletType, categoryCode, flags | cache loader |
-| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` | v1 / 1.0.0 | whole schema (writer) | §6.10 |
+| limits-risk-service | `blacklist.events` BLACKLIST_ENTRY_UPSERTED (both modules) | v1 / 1.1.0 | entryId, type, valueHash, active, expiresAt, reasonCode | re-check on list changes |
+| transaction-service | `txn.events` TRANSACTION_COMPLETED | v1 / 1.1.0 | txnRef, txnType, from/to wallet, completedAt | dormancy activity |
+| admin-service | `refdata.events` REFDATA_UPSERTED (both modules) | v1 / 1.1.0 | all item fields | validation, QR city, category formula, retention |
+| wallet-service (self) | `wallet.events` WALLET_UPSERTED | v1 / 1.1.0 | walletId, version, status, kycTier, walletType, categoryCode, flags | cache loader |
+| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` | v1 / 1.1.0 | whole schema (writer) | §6.10 |
 
 ### 6.1 ledger-service — account and balance operations
 
@@ -7709,8 +8019,8 @@ Mirror of `contracts/contract.yaml → consumes`. All pins: `pinnedContractVersi
 | Field used | Type | Notes |
 |---|---|---|
 | `req.accountId` | uuid | = walletId (UUIDv7) |
-| `req.accountType` | enum{CUSTOMER_WALLET, AGENT_WALLET, DISTRIBUTOR_WALLET, MERCHANT_WALLET, INSTITUTION_WALLET} | from codes.yaml `walletType.ledgerAccountType` (C→CUSTOMER_WALLET, A→AGENT_WALLET, D→DISTRIBUTOR_WALLET, M→MERCHANT_WALLET, I→INSTITUTION_WALLET) |
-| `req.ownerType` | enum{CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION} | the wallet's owner type |
+| `req.accountType` | enum{CUSTOMER_WALLET, AGENT_WALLET, DISTRIBUTOR_WALLET, MERCHANT_WALLET, INSTITUTION_WALLET, BILLER_WALLET} | from codes.yaml `walletType.ledgerAccountType` (C→CUSTOMER_WALLET, A→AGENT_WALLET, D→DISTRIBUTOR_WALLET, M→MERCHANT_WALLET, I→INSTITUTION_WALLET, B→BILLER_WALLET (account type 150, owner type 6; ledger contract ≥ 1.1.0, CR-WALLET-1)) |
+| `req.ownerType` | enum{CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION, BILLER} | the wallet's owner type |
 | `res.accountId` | uuid | echo |
 | `res.result` | enum{OK, EXISTS} | both = success (200; 201 not used) |
 
@@ -8018,7 +8328,7 @@ Rule ids: `BR-W-nn` wallet module, `BR-PAR-nn` partner module, `BR-MC-nn` shared
 - **BR-W-22** Tier requirements (`KYC_TIERS`, §8.2): submit validates required fields / documents / consents for `targetTier`; missing → 400 `VALIDATION_FAILED` with one `errors[]` entry per item.
 - **BR-W-23** Review gate (ONB-008): a submission enters `PENDING_REVIEW` only when the correlated screening is CLEAR without EDD (or decided CLEAR), the blacklist check is done and not listed (or overridden) and no OPEN exception exists. The checker's approval re-evaluates the gate; if it no longer holds → `409 GATE_NOT_SATISFIED` and the submission returns to the matching state.
 - **BR-W-24** Screening (consumer rules §6.4): only correlated results (`sourceEventId` = stored `kyc_submitted_event_id`) change state; CLEAR ∧ ¬eddRequired ⇒ gate pass; POTENTIAL / CONFIRMED match or `eddRequired` ⇒ `ON_HOLD`; `SCREENING_DECIDED` CLEAR ⇒ gate pass; REJECT (ONBOARDING) ⇒ `REJECTED` (`SCREENING_REJECT`). No correlated result after `screeningOverdueHours` (24) ⇒ exception `SCREENING_OVERDUE` (never auto-approve). A resubmission emits a new `KYC_SUBMITTED` and stores its new eventId, so a late result for an older attempt is recorded only.
-- **BR-W-25** Decision maker-checker (ONB-018): `:decide` by `OPS_MAKER` creates `KycSubmission / APPROVE_KYC` or `REJECT_KYC`; level 1 checker `OPS_CHECKER`; computed risk grade HIGH or `pep_flag` → `required_levels = 2`, level 2 checker `COMPLIANCE_OFFICER` / `CAMLCO`, EDD fields `sourceOfWealth` and `eddNote` mandatory (ONB-011). Owner of customer EDD (compliance case vs this level-2 approval) is OPEN D-19; the level-2 approval stays until decided.
+- **BR-W-25** Decision (ONB-018), mode `bitspay.wallet.kyc.decision-mode` (CR-WALLET-2). **`SINGLE_STEP` (MVP default):** `:decide` by `OPS_MAKER` re-checks the gate (BR-W-23: correlated CLEAR screening, blacklist done, no open exception) and the EDD fields for HIGH / PEP, then applies the decision in one transaction exactly as an approved `APPROVE_KYC` / `REJECT_KYC` would (tier, risk grade, wallet `P → A`, `customer.events`, `wallet.events`, `audit.events` `KYC_DECIDED` with the deciding user and `decisionMode`); no approval request; answer `200`. **`MAKER_CHECKER` (R1):** `:decide` by `OPS_MAKER` creates `KycSubmission / APPROVE_KYC` or `REJECT_KYC`; level 1 checker `OPS_CHECKER`; computed risk grade HIGH or `pep_flag` → `required_levels = 2`, level 2 checker `COMPLIANCE_OFFICER` / `CAMLCO`, EDD fields `sourceOfWealth` and `eddNote` mandatory (ONB-011). Owner of customer EDD (compliance case vs this level-2 approval) is OPEN D-19; the level-2 approval stays until decided.
 - **BR-W-26** Approval effects (one transaction): copy submission fields to the customer (NID enc / hash / last 4, names, DOB, addresses + denormalised GEO codes, profile); `kyc_tier` = approved tier; risk grade / score; `kyc_approved_at = now`; `kyc_review_due_at` per BR-W-35; customer `ACTIVE`; wallet base `PENDING_KYC | DORMANT → ACTIVE` when tier ≥ `minTierForActive` (1); clear the flag-4 holder; lift `KYC_EXPIRED` restrictions; events `KYC_APPROVED`, `KYC_TIER_CHANGED` (if changed), `RISK_GRADE_CHANGED` (if changed; reason `KYC_APPROVED` on the first grade), `WALLET_UPSERTED`.
 - **BR-W-27** Rejection codes: `NID_MISMATCH`, `IMAGE_UNCLEAR`, `SELFIE_MISMATCH`, `INCOMPLETE`, `DUPLICATE`, `SCREENING_REJECT`, `BLACKLISTED`, `FRAUD_SUSPECTED`, `UNDERAGE`, `OTHER`. `attempt_no` increments per new submission; after `maxKycAttempts` (3) rejected attempts new submissions need a STAFF actor (customer → `409 MAX_ATTEMPTS`).
 - **BR-W-28** A checker rejecting the maker's proposal → submission back to `PENDING_REVIEW` with the checker comment (not a KYC rejection).
@@ -8045,7 +8355,7 @@ Rule ids: `BR-W-nn` wallet module, `BR-PAR-nn` partner module, `BR-MC-nn` shared
 
 ### 7.5 Wallet status cache — writer side
 
-- **BR-W-50** Codec exactly as `contracts/provided/data/wallet-status-cache.v1.md` §2 (uuid bytes big-endian; `MurmurHash3.hash32x86(bytes, 0, 16, 0)`; `bucket = Integer.toUnsignedLong(h) % 131072`; base64url without padding; value `version:status:tier:type:category:flags`). Assert `version < 2^53`.
+- **BR-W-50** Codec exactly as `contracts/provided/data/wallet-status-cache.v1.md` §2 (walletTypeCode `C A D M I B`; uuid bytes big-endian; `MurmurHash3.hash32x86(bytes, 0, 16, 0)`; `bucket = Integer.toUnsignedLong(h) % 131072`; base64url without padding; value `version:status:tier:type:category:flags`). Assert `version < 2^53`.
 - **BR-W-51** Every write is the Lua CAS of the data contract (`EVALSHA`, fallback `EVAL` on `NOSCRIPT`); never plain `HSET`, never `HDEL`.
 - **BR-W-52** Write-through (ADR-04): after the commit of BR-W-04 run the CAS with the committed tuple; 3 attempts (0 / 20 / 50 ms); then `bitspay_wallet_cache_writethrough_failures_total` + WARN log (walletId only). For `AML_FREEZE` / `FRAUD_FREEZE` (and partner suspensions) the API response is sent after the write-through attempt.
 - **BR-W-53** Read-repair: `GET …/status` and `status:batchGet` enqueue CAS writes of the values read from the primary (async, bounded queue 10,000, drop on overflow + `bitspay_wallet_readrepair_dropped_total`).
@@ -8056,7 +8366,7 @@ Rule ids: `BR-W-nn` wallet module, `BR-PAR-nn` partner module, `BR-MC-nn` shared
 
 ### 7.6 Cache codec test vectors
 
-The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PPJt6AQ`; Karim `ws:106094` / `AZLyu01ffGKbPm8aTayLEg` — negative signed hash; `01929a3c-…0001` → `ws:50999`; `…0200` → `ws:53902`) go into `BucketCodecTest`. Example values: Rahim after approval `8813:A:2:C:0:0`; Karim frozen `8813:F:1:C:0:0`; Nirob Store `9002:A:2:M:3101:0`.
+The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PPJt6AQ`; Karim `ws:106094` / `AZLyu01ffGKbPm8aTayLEg` — negative signed hash; `01929a3c-…0001` → `ws:50999`; `…0200` → `ws:53902`) go into `BucketCodecTest`. Example values: Rahim after approval `8813:A:2:C:0:0`; Karim frozen `8813:F:1:C:0:0`; Nirob Store `9002:A:2:M:3101:0`; DESCO biller wallet `3:A:2:B:501:0` (CR-WALLET-1).
 
 ### 7.7 Validation (DAT-002) and masking
 
@@ -8065,7 +8375,7 @@ The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PP
 - **BR-W-62** `nameEn` `^[A-Za-z][A-Za-z .'-]{1,99}$`; `nameBn` only U+0980–U+09FF, space, `.`, `-`; both required from tier 1.
 - **BR-W-63** DOB: age 18..120 at submission (`UNDERAGE` → 400).
 - **BR-W-64** Geography (`division / district / upazila / union`) are GEO codes validated as a parent chain against the `refdata_item` projection; occupation, income band, source of funds, purpose from `WALLET_PARAMS` lists. Empty projection (local) → validation skipped with WARN.
-- **BR-W-65** `displayNameMasked`: customer wallets → first token in full + each further token's first letter + `***` (`Karim Ahmed` → `Karim A***`; single token `Karim` → `Ka***`); partner wallets (A/M/D/I) → full display name.
+- **BR-W-65** `displayNameMasked`: customer wallets → first token in full + each further token's first letter + `***` (`Karim Ahmed` → `Karim A***`; single token `Karim` → `Ka***`); partner wallets (A/M/D/I/B) → full display name.
 - **BR-W-66** Hashes per kernel K2 (`BITSPAY_PLATFORM_HMAC_KEY`): `nid_hash` over the digits-only NID, `msisdn_hash` over the canonical MSISDN; emitted as 64 lower-case hex.
 - **BR-W-67** Documents: magic bytes must match `content_type`; ≤ 5 MB; ≤ 12 per submission; SHA-256 recorded; envelope encryption (random 256-bit DEK, AES-GCM 96-bit IV, DEK wrapped with `BITSPAY_DOC_MASTER_KEY` via AES-KW); object key `kyc/{customerId}/{documentId}`; plaintext never written to disk; every view audited (`KYC_DOCUMENT_VIEWED`).
 - **BR-W-68** `MASKING_POLICY` (caller → visible fields), for `GET /v1/wallets/{walletId}` and `GET /v1/customers/{customerId}`:
@@ -8083,12 +8393,12 @@ The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PP
 
 ### 7.8 Partner onboarding (BR-PAR-01 … 19)
 
-- **BR-PAR-01** Draft creation: STAFF `PARTNER_OPS_MAKER` (any type); DISTRIBUTOR actor for AGENT / MERCHANT only, with `proposedParentPartnerId` = itself or a descendant; CUSTOMER actor only for MERCHANT / MICRO when `onboarding.selfRegistration.microMerchant = true` (`channel_kind = SELF`, parent null unless sales sets one later); `settlementMode = BANK` → `422 SERVICE_DISABLED BANK_SETTLEMENT_DISABLED`. Form validation: `displayName` 1–25 `[A-Z0-9 .&'-]` (upper-cased); MSISDN canonical; `mcc` required for MERCHANT and must exist in refdata MCC; territory codes exist in GEO with the correct parent chain, district mandatory; `tradeLicenceNo` mandatory except INSTITUTION/GOVERNMENT and MERCHANT/MICRO.
+- **BR-PAR-01** Draft creation: STAFF `PARTNER_OPS_MAKER` (any type); DISTRIBUTOR actor for AGENT / MERCHANT only, with `proposedParentPartnerId` = itself or a descendant; CUSTOMER actor only for MERCHANT / MICRO when `onboarding.selfRegistration.microMerchant = true` (`channel_kind = SELF`, parent null unless sales sets one later); `settlementMode = BANK` → `422 SERVICE_DISABLED BANK_SETTLEMENT_DISABLED`. Form validation: `displayName` 1–25 `[A-Z0-9 .&'-]` (upper-cased); MSISDN canonical; `mcc` required for MERCHANT and must exist in refdata MCC; territory codes exist in GEO with the correct parent chain, district mandatory; `tradeLicenceNo` mandatory except INSTITUTION/GOVERNMENT, MERCHANT/MICRO and BILLER. BILLER drafts: STAFF only (DISTRIBUTOR / CUSTOMER actors → 403), `proposedParentPartnerId` must be null, `formData.biller` per BR-PAR-80.
 - **BR-PAR-02** A draft expires after `application.draftExpiryDays` (30) without submit → `EXPIRED`.
-- **BR-PAR-03** Submission requires: all mandatory documents of the checklist for (type, subType) present and not REJECTED; ≥ 1 key person (except INSTITUTION/GOVERNMENT); for MERCHANT ENTERPRISE / ONLINE and all DISTRIBUTOR: ≥ 1 bank account; Σ `ownershipBps` of PROPRIETOR / PARTNER / BENEFICIAL_OWNER ≤ 10000; for DISTRIBUTOR and SUPER_AGENT a SATISFACTORY site visit. Missing → 400 with `errors[]` and `missingItems`.
+- **BR-PAR-03** Submission requires: all mandatory documents of the checklist for (type, subType) present and not REJECTED; ≥ 1 key person (except INSTITUTION/GOVERNMENT and BILLER); for MERCHANT ENTERPRISE / ONLINE and all DISTRIBUTOR: ≥ 1 bank account (BILLER: none required in the MVP); Σ `ownershipBps` of PROPRIETOR / PARTNER / BENEFICIAL_OWNER ≤ 10000; for DISTRIBUTOR and SUPER_AGENT a SATISFACTORY site visit. Missing → 400 with `errors[]` and `missingItems`.
 - **BR-PAR-04** Duplicate rule: no other partner with the same `msisdn_hash` and `partner_type` in a non-terminal state (`409 DUPLICATE_PARTNER`); the same key-person NID across several partners is allowed but flagged in the COMPLIANCE stage view.
 - **BR-PAR-05** Blacklist: partner MSISDN, every key-person NID and MSISDN, every bank account → `GET /v1/blacklist/check` with `valueHash`; any `listed` → `422 RISK_BLOCKED BLACKLISTED`, application stays DRAFT / RETURNED, audit `BLACKLIST_MATCH_DETECTED`. Any check failing → 503, nothing changed.
-- **BR-PAR-06** First successful submit: allocate `partnerCode` (prefix `A`/`M`/`D`/`I` + 8-digit `partner_code_seq` + Luhn digit over the 8 digits); create the `partner` row (`PENDING_SCREENING`, `category_code` from the map, hierarchy assignment ACTIVE with `effective_from = now`, `version = 1`); emit `PARTNER_UPSERTED` and store its eventId / version as the screening correlation; `PARTNER_APPLICATION_RECEIVED` to the applicant MSISDN.
+- **BR-PAR-06** First successful submit: allocate `partnerCode` (prefix `A`/`M`/`D`/`I`/`B` + 8-digit `partner_code_seq` + Luhn digit over the 8 digits); create the `partner` row (`PENDING_SCREENING`, `category_code` from the map, hierarchy assignment ACTIVE with `effective_from = now`, `version = 1`); emit `PARTNER_UPSERTED` and store its eventId / version as the screening correlation; `PARTNER_APPLICATION_RECEIVED` to the applicant MSISDN.
 - **BR-PAR-07** Risk score = Σ points of matching active `partner_risk_score_rule` rows; grade LOW < `riskGrade.mediumFrom` (30) ≤ MEDIUM < `riskGrade.highFrom` (60) ≤ HIGH. HIGH → `edd_required` → stages with `condition = HIGH_RISK_ONLY` (EDD, CAMLCO) included, else SKIPPED. Salma: RETAIL 10 → LOW.
 - **BR-PAR-08** Chain selection: the active chain matching (partnerType, subType, channelKind) with the most specific match (exact `subType` beats `*`, exact `channel_kind` beats `*`); none → `409 NO_APPROVAL_CHAIN`.
 - **BR-PAR-09** Stages are sequential: stage n becomes PENDING (approval created, `APPROVAL_REQUESTED`, `sla_due_at = now + sla_hours`) only when stage n−1 is APPROVED / AUTO_APPROVED / SKIPPED.
@@ -8105,9 +8415,9 @@ The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PP
 
 ### 7.9 Activation (BR-PAR-20 … 25)
 
-- **BR-PAR-20** CREATE_WALLET: `WalletFacade.createWallet(ownerType = partnerType, ownerId = partnerId, walletType A/M/D/I, msisdn, categoryCode, displayName)`; success → store `walletId`. Provisioning pending (ledger down) → step stays, retried.
+- **BR-PAR-20** CREATE_WALLET: `WalletFacade.createWallet(ownerType = partnerType, ownerId = partnerId, walletType A/M/D/I/B, msisdn, categoryCode, displayName)`; success → store `walletId`. Provisioning pending (ledger down) → step stays, retried.
 - **BR-PAR-21** `DUPLICATE_MSISDN` / `OWNER_HAS_DIFFERENT_MSISDN` → lookup by MSISDN + type → accept only if `ownerId = partnerId`; otherwise `BLOCKED (WALLET_MSISDN_TAKEN)`, Ops notified (role inbox `PARTNER_OPS_MAKER`), application stays ACTIVATING (Ops may reject).
-- **BR-PAR-22** GENERATE_QR: MERCHANT and AGENT get one static QR (no outlet); DISTRIBUTOR / INSTITUTION skip.
+- **BR-PAR-22** GENERATE_QR: MERCHANT and AGENT get one static QR (no outlet); DISTRIBUTOR / INSTITUTION / BILLER skip.
 - **BR-PAR-23** FINALISE (one transaction): `partner.wallet_id`, `status = ACTIVE`, `activated_at`, reason `ONBOARDING_APPROVED`, `version + 1`, `PARTNER_UPSERTED`, `PARTNER_ACTIVATED`, audit, application ACTIVATED.
 - **BR-PAR-24** Retries: `ActivationRetryJob` backoff 30 s × 2^attempts capped at 15 min; after `activation.maxAttempts` (20) still failing → alert `PartnerActivationStuck` (keeps retrying hourly).
 - **BR-PAR-25** The parent must not be TERMINATED at FINALISE (`BLOCKED PARENT_TERMINATED`); a suspended parent does not block (suspension does not cascade).
@@ -8115,7 +8425,7 @@ The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PP
 ### 7.10 Hierarchy (BR-PAR-30 … 37)
 
 - **BR-PAR-30** Levels: 0 OPERATOR (implicit, never a partner), 1 MASTER_DISTRIBUTOR, 2 DISTRIBUTOR, 3 SUB_DISTRIBUTOR, 4 OUTLET (agents, merchants). `hierarchy.maxDepth` = 5 incl. the Operator ⇒ partner `depth` ≤ 4 (depth = 1 + number of ancestors).
-- **BR-PAR-31** Allowed (child → parent) pairs only from `partner_hierarchy_rule` (seed §8.3). INSTITUTION always under the Operator.
+- **BR-PAR-31** Allowed (child → parent) pairs only from `partner_hierarchy_rule` (seed §8.3). INSTITUTION and BILLER always under the Operator (a BILLER has no hierarchy changes).
 - **BR-PAR-32** The new parent must be ACTIVE (`PARENT_NOT_ACTIVE`), must not be the partner itself or a descendant (`CYCLE`, checked on `ancestor_ids`), and `newDepth + subtreeHeight ≤ maxDepth − 1` (`DEPTH_EXCEEDED`); pair allowed (`RULE_NOT_ALLOWED`).
 - **BR-PAR-33** `effectiveFrom` ≥ now − 60 s (no backdating, `BACKDATED`) and ≤ now + 180 days; at most one SCHEDULED change per partner (`ALREADY_SCHEDULED`).
 - **BR-PAR-34** On approval: future-dated → insert SCHEDULED and set the current ACTIVE row's `effective_to = effectiveFrom`; immediate → apply now. Cancel before due → row CANCELLED, current `effective_to = null`.
@@ -8143,7 +8453,7 @@ The four vectors of the data contract §5 (Rahim `ws:86318` / `AZLyqhw-e1GKLV4PP
 
 ### 7.12 Data scope (BR-PAR-60 … 62)
 
-- **BR-PAR-60** Partner actors (AGENT / MERCHANT / DISTRIBUTOR / INSTITUTION) read only `partnerId = X-Actor-Id` or partners where `X-Actor-Id = ANY(ancestor_ids)`; they write only self-service endpoints for themselves (and DST-008 suspension of descendants).
+- **BR-PAR-60** Partner actors (AGENT / MERCHANT / DISTRIBUTOR / INSTITUTION) read only `partnerId = X-Actor-Id` or partners where `X-Actor-Id = ANY(ancestor_ids)`; they write only self-service endpoints for themselves (and DST-008 suspension of descendants). BILLER is a partner type, not an actor type: billers have no login in the MVP and are maintained by STAFF only.
 - **BR-PAR-61** CUSTOMER actors: only `POST /v1/qr/decode`, partner summary by code / wallet, and their own self-registration application.
 - **BR-PAR-62** Partner document download: STAFF `COMPLIANCE_OFFICER`, `CAMLCO`, `PARTNER_OPS_MAKER`, `PARTNER_OPS_CHECKER`, `AUDITOR`; every download audited.
 
@@ -8219,6 +8529,19 @@ Breakdown of the dynamic example: `00 02 01` · `01 02 12` · `26 37 [00 14 BD.C
 - **BR-EV-02** Retryable failures: 5 attempts with exponential backoff, then `<topic>.dlq`; non-retryable (deserialisation, malformed JSON, envelope violation) → DLQ immediately with the kernel K4.3 headers.
 - **BR-EV-03** Unknown or filtered eventTypes and null values → ignore + `bitspay_consumer_events_ignored_total{topic,group,event_type,reason}`; unknown enum values handled safely (record, no state change).
 
+### 7.16 Biller catalogue (BR-PAR-80 … 89, CR-WALLET-1, MVP)
+
+- **BR-PAR-80** Biller profile validation. `formData.biller` is required for `partnerType = BILLER` and must be absent / null for every other type (400). Shape at save, full rules at submit, at a profile-change request and again at its approval: `billerCode` `^[A-Z0-9-]{2,16}$`; `category` allowed for the subType (UTILITY → UTILITY_ELECTRICITY / UTILITY_GAS / UTILITY_WATER; INTERNET_TV → INTERNET / TV; EDUCATION → EDUCATION; GOVT_FEE → GOVT_FEE; MNO → MOBILE_PREPAID / MOBILE_POSTPAID); `referencePattern` ≤ 200 chars and compiles with `java.util.regex.Pattern` (matched against the whole reference); `minAmountPoisha ≥ 1`, `maxAmountPoisha ≥ minAmountPoisha`; `fixedAmountPoisha` present iff `amountMode = FIXED` and within min..max. MNO: `referencePattern = ^01[3-9][0-9]{8}$`, ≥ 1 `msisdnPrefixes` (`^01[3-9]$`, no duplicates), ≥ 1 `rechargeTypes`, `denominationsPoisha` ascending, unique, within min..max, and `biller.mno.minAmountPoisha` (1,000) ≤ min ≤ max ≤ `biller.mno.maxAmountPoisha` (100,000). Non-MNO: `msisdnPrefixes`, `rechargeTypes`, `denominationsPoisha` = `[]`. Violations → `400 VALIDATION_FAILED`, one `errors[]` entry per field.
+- **BR-PAR-81** Submission of a BILLER (BR-PAR-03..09 otherwise unchanged): `billerCode` not used by another live biller (case-sensitive, codes are upper-case) → else `409 DUPLICATE_BILLER_CODE`; MNO prefixes per BR-PAR-83. The first successful submit inserts `partner_biller_profile` (`live = true`) in the same transaction as the `partner` row (BR-PAR-06); a resubmission overwrites it from the form. Checklist `BILLER/*` (§8.3: AGREEMENT mandatory); key persons optional; no bank account and no site visit required; chain `BILLER_STD`; risk score from the existing rules (no BILLER-specific rule; normally LOW).
+- **BR-PAR-82** Screening and approval exactly as for every partner: `PARTNER_UPSERTED PENDING_SCREENING` (with `biller`) → compliance screens the partner-level names and any key persons → correlated CLEAR → stages of `BILLER_STD` (maker-checker per stage, BR-PAR-09..17). Billers do **not** need KYC tiers: there is no KYC submission, tier assignment, upgrade or re-KYC for a biller; its wallet carries the technical tier of every partner wallet (`partnerWalletKycTier`, 2).
+- **BR-PAR-83** MNO prefixes: `partner_biller_msisdn_prefix` (PK = prefix) holds each prefix of a live MNO biller once; a prefix held by another live biller → `409 MSISDN_PREFIX_TAKEN`. Rows are inserted with the profile, replaced in the approval transaction of a profile change, and deleted when the partner becomes REJECTED or TERMINATED (which also sets `live = false`, releasing the `billerCode`).
+- **BR-PAR-84** Profile changes after submission: `POST /v1/partners/{partnerId}/profile-changes` with `changes.biller` (a full `BillerProfileInput`) is an APPROVAL field (`Partner / UPDATE_PROFILE`, maker `PARTNER_OPS_MAKER`, checker `PARTNER_OPS_CHECKER`, checker ≠ maker). `billerCode` is immutable once the biller is ACTIVE (400). On approval: profile and prefix rows updated, partner `version + 1`, `PARTNER_UPSERTED` (new `biller` object) and audit in the same transaction, cache write-through after commit (BR-PAR-87). Biller names are not screened fields (no rescreen).
+- **BR-PAR-85** Activation of a BILLER (BR-PAR-20..25): CREATE_WALLET with `ownerType BILLER`, `walletType B`, `categoryCode` 501..505 → the wallet module creates the ledger account `BILLER_WALLET` (150) with owner type `BILLER` (6) first, the same way a merchant's `MERCHANT_WALLET` (130) is created (ADR-05, provisioning retry); GENERATE_QR skipped; FINALISE unchanged (partner ACTIVE, `PARTNER_UPSERTED`, `PARTNER_ACTIVATED`); the biller cache write is an after-commit hook of FINALISE.
+- **BR-PAR-86** `B` wallets (wallet module): created only in-process by the partner module (`POST /v1/wallets` with `ownerType BILLER` from outside → 403); `msisdn_scope = 'B'` always, so a biller's contact number never blocks a customer, agent or merchant wallet with the same MSISDN; base ACTIVE at creation; excluded from dormancy (partner wallets); restrictions, freezes, `WALLET_UPSERTED` and the status cache (`walletTypeCode B`) as for every wallet; partner suspension / reactivation / termination synchronise the wallet per BR-PAR-47. A `B` wallet is closed only after partner termination with a zero balance (no closure payout: ledger command 17 does not accept 150 in the MVP; biller settlement is R1+).
+- **BR-PAR-87** Biller cache writer: after the commit of every change of an activated biller (activation, approved profile change, status change, category change, termination) the partner module runs the Lua CAS of data contract `biller-catalogue-cache` §4 with the committed value (`version` = partner version), then maintains the prefix keys (SET for current prefixes; compare-and-delete for released ones; none when TERMINATED). 3 attempts (0 / 20 / 50 ms), then `bitspay_partner_biller_cache_writes_total{source=writethrough,result=error}` + WARN (billerId only); the refresh job converges. Billers without a wallet are never written.
+- **BR-PAR-88** `biller-cache-refresh` (ShedLock, cache-loader role, at start-up and every `bitspay.billers.cache.refresh-interval` (60 s)): reads every BILLER partner with a `walletId` (+ profile, prefixes) from the database, applies the CAS for each (newer wins), re-sets prefix keys, compare-and-deletes prefix keys that point to a biller which no longer holds them, then `HSET biller:meta state READY, loadedAt, schema 1, count`. The cache is fully rebuildable from the database.
+- **BR-PAR-89** Read APIs `GET /v1/billers` and `GET /v1/billers/{billerId}`: only activated BILLER partners; holder actors (CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION) see only ACTIVE billers (other status filter → 403, other biller → 404); STAFF / SERVICE / SYSTEM see every status; ordered by `billerCode`, keyset cursor; `msisdnPrefix` resolves through `partner_biller_msisdn_prefix`; Caffeine 30 s; the response carries the cache JSON fields (§5.1.0 `Biller`).
+
 ## 8. Configuration
 
 All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09 / B-10 pending Operator, Compliance and Operations confirmation); they are configuration, not code.
@@ -8227,6 +8550,8 @@ All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09
 
 | Property | Default | Meaning | Provisional / OPEN |
 |---|---|---|---|
+| `bitspay.wallet.kyc.decision-mode` | `SINGLE_STEP` | BR-W-25: `SINGLE_STEP` (MVP, one OPS_MAKER decides) or `MAKER_CHECKER` (R1, ONB-018 maker-checker, 2 levels for HIGH / PEP) | W-MVP-ONB |
+| `bitspay.wallet.seed.customers.enabled` | `false` | Demo / test customers seeded at start-up; allowed only in profiles `local`, `dev`, `qa`, `demo` — start-up fails if `true` under `prod` | W-MVP-ONB |
 | `bitspay.cache.buckets` | 131072 | fixed by the data contract — not changeable at runtime | contract |
 | `bitspay.cache.writethrough.attempts` | 3 | write-through attempts (0 / 20 / 50 ms) | |
 | `bitspay.cache.readrepair.queue` | 10000 | bounded read-repair queue | |
@@ -8248,6 +8573,8 @@ All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09
 | `bitspay.clients.ledger.timeouts` | connect 300 ms, read 1 s (close / payout 2 s, batch 3 s) | §6.1 | |
 | `bitspay.clients.limits-risk.timeouts` | connect 300 ms, read 500 ms (wallet) / 1 s (partner, usage) | §6.3 | |
 | `bitspay.partner.documents.max-bytes` | 10485760 | partner document size limit | |
+| `bitspay.billers.cache.refresh-interval` | 60 s | `biller-cache-refresh` period (BR-PAR-88) | CR-WALLET-1 |
+| `bitspay.billers.cache.writethrough.attempts` | 3 | biller cache write-through attempts (0 / 20 / 50 ms) | CR-WALLET-1 |
 | `bitspay.outbox.relay` | `debezium` | kernel K8.3 | |
 
 ### 8.2 Wallet configuration documents (`config_document`, V2 seed)
@@ -8323,13 +8650,14 @@ All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09
 | `qr.includeAltLanguage` | false | tag 64 |
 | `expiryAlerts.agreementDays` | [30, 7, 1] | PON-010 |
 | `expiryAlerts.tradeLicenceDays` | [30, 7] | |
-| `profileChange.fieldPolicy` | DIRECT: `email`, `displayNameBn`; APPROVAL: `addressLine`, `geo`, `displayName`, `msisdn`, `legalName`, `tradeLicenceNo`, `tradeLicenceExpiry`, `tin`, `bin` | BR-PAR-53 |
+| `profileChange.fieldPolicy` | DIRECT: `email`, `displayNameBn`; APPROVAL: `addressLine`, `geo`, `displayName`, `msisdn`, `legalName`, `tradeLicenceNo`, `tradeLicenceExpiry`, `tin`, `bin`, `biller` | BR-PAR-53, BR-PAR-84 |
+| `biller.mno.minAmountPoisha` / `biller.mno.maxAmountPoisha` | 1000 / 100000 | MNO profile amount bounds (BR-PAR-80); provisional (OPEN B-26) |
 
-`partner_category_code_map` seed = codes.yaml `categoryCode` (AGENT RETAIL 101, SUPER_AGENT 102, MERCHANT_AGENT 103, BANK_AGENT 104; DISTRIBUTOR MASTER 201, DISTRIBUTOR 202, SUB 203; INSTITUTION EMPLOYER 401, GOVERNMENT 402, NGO 403, OTHER 404; MERCHANT `3000 + d×100 + g`). Worked examples: Nirob Store MICRO grocery (MCC 5411, group `01`) = **3101**; an ENTERPRISE restaurant (MCC 5812, group `02`) = **3302**. MCC groups come from refdata MCC `attributes.group` (`01` GROCERY_RETAIL 5411/5499/5311, `02` FOOD 5812/5814, `03` UTILITY_TELCO 4814/4900, `04` TRANSPORT 4111/4121, `05` HEALTH 5912/8062, `06` EDUCATION 8211/8220, `07` DIGITAL 5815–5818, `99` OTHER).
+`partner_category_code_map` seed = codes.yaml `categoryCode` (AGENT RETAIL 101, SUPER_AGENT 102, MERCHANT_AGENT 103, BANK_AGENT 104; DISTRIBUTOR MASTER 201, DISTRIBUTOR 202, SUB 203; INSTITUTION EMPLOYER 401, GOVERNMENT 402, NGO 403, OTHER 404; BILLER UTILITY 501, EDUCATION 502, GOVT_FEE 503, INTERNET_TV 504, MNO 505 (seeded by partner V4, §4.1.3); MERCHANT `3000 + d×100 + g`). Worked examples: Nirob Store MICRO grocery (MCC 5411, group `01`) = **3101**; an ENTERPRISE restaurant (MCC 5812, group `02`) = **3302**. MCC groups come from refdata MCC `attributes.group` (`01` GROCERY_RETAIL 5411/5499/5311, `02` FOOD 5812/5814, `03` UTILITY_TELCO 4814/4900, `04` TRANSPORT 4111/4121, `05` HEALTH 5912/8062, `06` EDUCATION 8211/8220, `07` DIGITAL 5815–5818, `99` OTHER).
 
 `partner_hierarchy_level_def` seed: 0 OPERATOR "Bits Pay operator — issues e-money, owns all partners"; 1 MASTER_DISTRIBUTOR "Holds bulk float, appoints distributors"; 2 DISTRIBUTOR "Supplies float to sub-distributors / agents in a territory"; 3 SUB_DISTRIBUTOR "Supplies float to agents in an upazila"; 4 OUTLET "Agent or merchant serving customers".
 
-`partner_hierarchy_rule` seed (child → parent): DISTRIBUTOR/MASTER → OPERATOR; DISTRIBUTOR/DISTRIBUTOR → OPERATOR | DISTRIBUTOR/MASTER; DISTRIBUTOR/SUB → DISTRIBUTOR/DISTRIBUTOR; AGENT/* → OPERATOR | DISTRIBUTOR/*; AGENT/RETAIL → AGENT/SUPER_AGENT; MERCHANT/* → OPERATOR | DISTRIBUTOR/*; INSTITUTION/* → OPERATOR.
+`partner_hierarchy_rule` seed (child → parent): DISTRIBUTOR/MASTER → OPERATOR; DISTRIBUTOR/DISTRIBUTOR → OPERATOR | DISTRIBUTOR/MASTER; DISTRIBUTOR/SUB → DISTRIBUTOR/DISTRIBUTOR; AGENT/* → OPERATOR | DISTRIBUTOR/*; AGENT/RETAIL → AGENT/SUPER_AGENT; MERCHANT/* → OPERATOR | DISTRIBUTOR/*; INSTITUTION/* → OPERATOR; BILLER/* → OPERATOR (V4).
 
 `partner_approval_chain_def` seed (stage: code / roles / SLA hours):
 
@@ -8341,17 +8669,18 @@ All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09
 | `MERCHANT_STD` | MERCHANT/* | 1 SALES 24 · 2 COMPLIANCE 48 · 3 EDD 72 (HIGH only) · 4 OPERATIONS 24 |
 | `DISTRIBUTOR_STD` | DISTRIBUTOR/* | 1 SALES 48 · 2 COMPLIANCE 72 · 3 EDD 72 (HIGH only) · 4 FINANCE `FIN_CHECKER` 48 · 5 OPERATIONS 24 |
 | `INSTITUTION_STD` | INSTITUTION/* | 1 SALES 48 · 2 COMPLIANCE 72 · 3 EDD 72 (HIGH only) · 4 OPERATIONS 24 |
+| `BILLER_STD` (V4, MVP) | BILLER/*/ASSISTED | 1 SALES `PARTNER_OPS_MAKER` 24 · 2 COMPLIANCE `COMPLIANCE_OFFICER` 48 (screening) · 3 EDD `CAMLCO` 72 (HIGH only) · 4 OPERATIONS `PARTNER_OPS_CHECKER` 24 |
 
-`partner_document_checklist` seed (M mandatory, O optional): AGENT: TRADE_LICENCE M, NID_FRONT M, NID_BACK M, PHOTO M, SHOP_PHOTO M, TIN_CERT O; MERCHANT/MICRO: NID_FRONT M, NID_BACK M, SHOP_PHOTO M, TRADE_LICENCE O; MERCHANT/SMALL: + TRADE_LICENCE M; MERCHANT/ENTERPRISE and ONLINE: TRADE_LICENCE M, TIN_CERT M, BIN_CERT M, BANK_PROOF M, INCORPORATION_CERT M, BOARD_RESOLUTION M; DISTRIBUTOR: TRADE_LICENCE M, TIN_CERT M, BIN_CERT M, BANK_PROOF M, INCORPORATION_CERT M, AGREEMENT M; INSTITUTION: INCORPORATION_CERT M (GOVERNMENT O), BANK_PROOF M, BOARD_RESOLUTION M.
+`partner_document_checklist` seed (M mandatory, O optional): AGENT: TRADE_LICENCE M, NID_FRONT M, NID_BACK M, PHOTO M, SHOP_PHOTO M, TIN_CERT O; MERCHANT/MICRO: NID_FRONT M, NID_BACK M, SHOP_PHOTO M, TRADE_LICENCE O; MERCHANT/SMALL: + TRADE_LICENCE M; MERCHANT/ENTERPRISE and ONLINE: TRADE_LICENCE M, TIN_CERT M, BIN_CERT M, BANK_PROOF M, INCORPORATION_CERT M, BOARD_RESOLUTION M; DISTRIBUTOR: TRADE_LICENCE M, TIN_CERT M, BIN_CERT M, BANK_PROOF M, INCORPORATION_CERT M, AGREEMENT M; INSTITUTION: INCORPORATION_CERT M (GOVERNMENT O), BANK_PROOF M, BOARD_RESOLUTION M; BILLER (V4): AGREEMENT M, TRADE_LICENCE O, INCORPORATION_CERT O, BANK_PROOF O.
 
-`partner_risk_score_rule` seed: TYPE DISTRIBUTOR +15, INSTITUTION +10; SUB_TYPE SUPER_AGENT +20, RETAIL +10, ONLINE +20, ENTERPRISE +10, MICRO +5; MCC_RISK HIGH +30, MEDIUM +10; PEP_DECLARED true +40; SCREENING_HIT_CLEARED true +20; TERRITORY_FLAG true (GEO `riskFlag`) +10; TURNOVER_BAND TK_1CR_PLUS +15, TK_50L_1CR +10.
+`partner_risk_score_rule` seed: TYPE DISTRIBUTOR +15, INSTITUTION +10 (no BILLER rule); SUB_TYPE SUPER_AGENT +20, RETAIL +10, ONLINE +20, ENTERPRISE +10, MICRO +5; MCC_RISK HIGH +30, MEDIUM +10; PEP_DECLARED true +40; SCREENING_HIT_CLEARED true +20; TERRITORY_FLAG true (GEO `riskFlag`) +10; TURNOVER_BAND TK_1CR_PLUS +15, TK_50L_1CR +10.
 
 ## 9. Non-functional requirements
 
 | Area | Target / behaviour |
 |---|---|
 | Throughput | System design target 5,000 TPS sustained (10,000 burst for 10 min). This service is off the payment hot path except the cache-miss fallback and QR decode. Status fallback sized for the Redis-down scenario: ≈ 1,000 req/s across 3 pods (HikariCP 40 / pod, PK lookups). Registrations ≤ 50/s peak; status changes ≤ 25/s; QR decode 500 req/s per pod. Never measured on a laptop. |
-| Scale | 80 M wallets (~2 GB Redis for `ws:*`); 1 M partners and 10 M QR rows without schema change; 50,000-partner subtree republished ≤ 5 min |
+| Scale | 80 M wallets (~2 GB Redis for `ws:*`); biller catalogue ≤ 1,000 billers (`biller:*` < 2 MB); 1 M partners and 10 M QR rows without schema change; 50,000-partner subtree republished ≤ 5 min |
 | Latency | §3.7 |
 | Loader | rebuild 80 M wallets ≤ 30 min (≥ 50k CAS/s per pod); follow lag p99 ≤ 2 s |
 | Availability | stateless API ≥ 3 replicas; loader 2 replicas (one active per partition); a wallet-service outage never blocks payments while Redis is up |
@@ -8360,7 +8689,7 @@ All business values below are provisional seeds (SRS Appendix B-05 / B-06 / B-09
 | Security / PII | NID and bank account numbers AES-GCM + HMAC; documents envelope-encrypted; no PII in logs (MSISDN masked `8801711****00`, no NID, no account numbers, no dynamic QR payload at INFO — payload hash only); blacklist query strings excluded from access logs; Redis keys contain no MSISDN; log-scan test |
 | Logging | JSON logs `ts, level, service, module, correlationId, traceId, actorId, msg` (kernel K9) |
 
-Metrics: kernel K8.4 generic metrics (HTTP with tags `service`, `module`; outbox; consumers) plus the service metrics of codes.yaml `metrics`: `bitspay_wallet_registrations_total{channel}`, `bitspay_wallet_kyc_submissions_total{state}`, `bitspay_wallet_kyc_queue_size{state}`, `bitspay_wallet_kyc_queue_oldest_seconds`, `bitspay_wallet_status_changes_total{reason,outcome}`, `bitspay_wallet_cache_writethrough_total{result}`, `bitspay_wallet_cache_writethrough_failures_total`, `bitspay_wallet_cache_loader_lag_seconds`, `bitspay_wallet_cache_sample_total`, `bitspay_wallet_cache_mismatch_total{type}`, `bitspay_wallet_provisioning_pending`, `bitspay_wallet_closures_total{state}`, `bitspay_wallet_closure_payouts_total{result}`, `bitspay_wallet_dormancy_marked_total`, `bitspay_wallet_readrepair_dropped_total`, `bitspay_partner_applications_total{type,outcome}`, `bitspay_partner_application_stage_sla_breached_total{stage}`, `bitspay_partner_activation_pending`, `bitspay_partner_activation_attempts_total{result}`, `bitspay_partner_status_changes_total{to,actorType}`, `bitspay_partner_hierarchy_republished_total`, `bitspay_partner_qr_generated_total{type}`, `bitspay_partner_qr_decode_total{onUs,payable,reason}`, `bitspay_partner_qr_decode_seconds`, `bitspay_partner_blacklist_matches_total`.
+Metrics: kernel K8.4 generic metrics (HTTP with tags `service`, `module`; outbox; consumers) plus the service metrics of codes.yaml `metrics`: `bitspay_wallet_registrations_total{channel}`, `bitspay_wallet_kyc_submissions_total{state}`, `bitspay_wallet_kyc_queue_size{state}`, `bitspay_wallet_kyc_queue_oldest_seconds`, `bitspay_wallet_status_changes_total{reason,outcome}`, `bitspay_wallet_cache_writethrough_total{result}`, `bitspay_wallet_cache_writethrough_failures_total`, `bitspay_wallet_cache_loader_lag_seconds`, `bitspay_wallet_cache_sample_total`, `bitspay_wallet_cache_mismatch_total{type}`, `bitspay_wallet_provisioning_pending`, `bitspay_wallet_closures_total{state}`, `bitspay_wallet_closure_payouts_total{result}`, `bitspay_wallet_dormancy_marked_total`, `bitspay_wallet_readrepair_dropped_total`, `bitspay_partner_applications_total{type,outcome}`, `bitspay_partner_application_stage_sla_breached_total{stage}`, `bitspay_partner_activation_pending`, `bitspay_partner_activation_attempts_total{result}`, `bitspay_partner_status_changes_total{to,actorType}`, `bitspay_partner_hierarchy_republished_total`, `bitspay_partner_qr_generated_total{type}`, `bitspay_partner_qr_decode_total{onUs,payable,reason}`, `bitspay_partner_qr_decode_seconds`, `bitspay_partner_blacklist_matches_total`, `bitspay_partner_biller_cache_writes_total{source,result}` (CR-WALLET-1).
 
 Alert conditions (rules are built later; metrics exposed now): cache mismatch > 0 for 3 sampler runs; loader lag > 5 s for 2 min; write-through failures > 0 for 5 min; provisioning pending older than 10 min; KYC queue oldest > 24 h; screening overdue items > 0; activation pending > 30 min; partner screening overdue > 24 h; QR decode p99 > 30 ms for 5 min; QR TAMPERED > 10/min; outbox backlog > 1,000 for 5 min; any DLQ record.
 
@@ -8368,103 +8697,117 @@ Alert conditions (rules are built later; metrics exposed now): cache mismatch > 
 
 Every WP ends with `./gradlew check` green, the OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated (one section per module) and `make verify` green. No WP needs another service running (WireMock stubs from `stubs/`, fixtures from `fixtures/events/`). Branches `wallet-service/<module>/wp-<n>-<slug>`; owners: W-WPs Dev-3, P-WPs Dev-4, shared WPs Dev-3 with Dev-4 reviewing.
 
-### WP-1 Skeleton, shared kernel and contracts (Dev-3)
+Scope tags: `[MVP]` = needed by the MVP release (SRS v1.2); `[R1+]` = no MVP need (R1 / R2 features: R2 lifecycle jobs and pre-registration, effective-dated hierarchy changes, outlets / partner users / agreements). Inside an `[MVP]` WP, items marked R2 (e.g. W-WP-7 risk regrade) may be built later without blocking the MVP. WP-CR-1 is applied after P-WP-7 (and W-WP-3 for the cache writer pattern) and before X-WP-1.
+
+### WP-1 [MVP] Skeleton, shared kernel and contracts (Dev-3)
 - Goal: a running service with both module skeletons and every provided operation answering from its contract.
-- Scope: standalone Gradle project (kernel K9 build template), packages `wallet`, `partner`, `common`; `docs/MODULES.md`; `ArchitectureTest` module rule green. `common`: ActorContext filter, `@RequiresActor`, problem+json mapper (kernel codes + this pack's reasons / extensions), correlation id, JSON logging with PII masking, outbox writer + polling relay, inbox helper + DLQ, idempotency store, maker-checker engine skeleton, ShedLock, `FieldCipher`, `HmacHasher` (kernel K2 vectors), `DocumentStore` (S3 + filesystem). Flyway wallet V1 (§4.1.1) + V2 seed and partner V1 (§4.1.2) + V2 seed + V3 dev refdata. Controllers for all 102 operations returning the OpenAPI examples (501 for not-yet-built logic is allowed only before the owning WP). WireMock wiring for ledger, limits-risk and admin stubs; event fixtures loaded.
+- Scope: standalone Gradle project (kernel K9 build template), packages `wallet`, `partner`, `common`; `docs/MODULES.md`; `ArchitectureTest` module rule green. `common`: ActorContext filter, `@RequiresActor`, problem+json mapper (kernel codes + this pack's reasons / extensions), correlation id, JSON logging with PII masking, outbox writer + polling relay, inbox helper + DLQ, idempotency store, maker-checker engine skeleton, ShedLock, `FieldCipher`, `HmacHasher` (kernel K2 vectors), `DocumentStore` (S3 + filesystem). Flyway wallet V1 (§4.1.1) + V2 seed and partner V1 (§4.1.2) + V2 seed + V3 dev refdata. Controllers for all 104 operations returning the OpenAPI examples (501 for not-yet-built logic is allowed only before the owning WP). WireMock wiring for ledger, limits-risk and admin stubs; event fixtures loaded.
 - Acceptance: app starts on an empty `svc_wallet` in Compose (`dev,api,cache-loader`); `/actuator/health/readiness` UP; generated OpenAPI matches the contract; provider contract tests validate every example; `ArchitectureTest` (ArchUnit: layering, module facade rule, no float/double in money code) green; a test proves `svc_wallet` cannot read another schema; Flyway re-run is a no-op.
 - Depends on: —.
 
-### W-WP-2 Wallet core and ledger provisioning
+### W-WP-2 [MVP] Wallet core and ledger provisioning
 - Scope: `Wallet`, `StatusResolver` (BR-W-02), version semantics (ADR-03); `POST /v1/wallets` ledger-first + `provisioning-retry` + exception; GET detail / status / batchGet / lookup / lookup:batch; category; flags holder model; `WALLET_UPSERTED` + `audit.events` (BR-W-04); `WalletFacade.createWallet / lookup / get / setCategory / changeContact`.
 - Acceptance: `createWallet_ledgerDown_returns503_thenJobProvisions_andPublishesOnce`; `createWallet_sameOwnerTwice_returnsSameWalletId`; `flags_twoHolders_clearByOne_keepsBit`; `statusResolver_allCombinations` (25 cases); `lookupBatch_malformedMsisdn_nullItem_not400`; `getWallet_holderAmlFreeze_seesRESTRICTED`.
 - Depends on: WP-1.
 
-### W-WP-3 Status cache writer, loader, sampler
+### W-WP-3 [MVP] Status cache writer, loader, sampler
 - Scope: `BucketCodec` (§7.6 vectors), Lua CAS, write-through after commit, read-repair queue, `wd:` / `wlk:` cache-aside, `DEL wsn:`; `cache-loader` profile (DB_THEN_KAFKA / KAFKA_ONLY, `wsmeta:loader`, rebuild and check operations); sampler with metrics and repair.
 - Acceptance: `cas_olderVersion_isIgnored`; `writeThrough_freeze_visibleInRedisBeforeResponse`; `loader_rebuildFromDbThenKafka_noGap` (10k wallets, concurrent updates, final Redis == DB); `sampler_detectsStaleAndRepairs`; `ready_deletesNegativeCacheKey`.
 - Depends on: W-WP-2.
 
-### W-WP-4 Maker-checker engine and wallet status changes
+### W-WP-4 [MVP] Maker-checker engine and wallet status changes
 - Scope: full engine (levels, checker roles, expiry job, `approval.events` mapping, partner-ready handler registry); `/v1/approvals`; status changes BR-W-10..16 incl. forwarded staff context, restrictions, history, REASON_AUTHORITY; `WalletFacade.changeStatus`.
 - Acceptance: `statusChange_serviceAmlFreeze_appliedImmediately`; `statusChange_staffCustomerRequest_requiresApproval`; `liftFreeze_withoutReference_400`; `liftAmlFreeze_otherReference_untouched`; `approve_byMaker_returns422MakerChecker`; `liftAmlFreeze_leavesKycExpiredDebitBlock_statusX`; `secondFreeze_onFrozenWallet_bumpsVersion_reasonUpdated`; `approval_expires_after72h`; `approvalEvents_moduleAndCheckerRolesSet`.
 - Depends on: W-WP-2.
 
-### W-WP-5 Customers, profile, nominees, consents
+### W-WP-5 [MVP] Customers, profile, nominees, consents
 - Scope: `POST /v1/customers` (+ wallet P, referralCode), search, GET with masking (BR-W-68) and tipping-off, preferences, nominees, consents, profile update via approval (BR-W-38), validators BR-W-60..64, `refdata.events` projection (`refdata_item`) with bootstrap.
 - Acceptance: `register_duplicateMsisdn_409`; `register_preRegisteredMsisdn_links`; `getCustomer_auditorRole_masksMsisdnAndAddress`; `getCustomer_ownCustomer_nullsRiskFields`; `getCustomer_serviceWithoutRoles_clearMsisdn`; `profileUpdate_nidField_409FieldLocked`; `profileUpdate_msisdnApproved_emitsWalletUpserted`; `nominees_sharesNot100_400`; `logs_containNoFullMsisdnOrNid`.
 - Depends on: W-WP-4.
 
-### W-WP-6 KYC submissions and review
+### W-WP-6 [MVP] KYC submissions and review
 - Scope: submission state machine, documents (envelope encryption), tier validation, de-dup, blacklist client (`valueHash`) + recheck job, risk calculator, SPIs; `KYC_SUBMITTED` with stored eventId; `case.events` consumer (correlation, eddRequired, PEP rule); review queue; `:decide` → approval; approval effects (BR-W-26); exceptions + resolve; draft expiry; screening-overdue job.
 - Acceptance: `kyc_rahimTier2_happyPath_walletBecomesActive_eventsInOrder`; `kyc_potentialMatch_onHold_thenDecidedClear_toReview`; `kyc_clearWithEdd_onHold`; `kyc_lateResultForOldAttempt_recordedOnly`; `kyc_pepOnlyOnDecidedClearWithEdd`; `kyc_duplicateNid_routedToException`; `kyc_highRisk_requiresTwoLevels`; `kyc_checkerApprovesWhileScreeningNotClear_409`; `document_storedEncrypted_plaintextNeverOnDisk`; `blacklistCall_usesValueHashOnly`.
 - Depends on: W-WP-5.
 
-### W-WP-7 Risk regrade, blacklist events, config documents
+### W-WP-7 [MVP] Risk regrade, blacklist events, config documents
 - Scope: `RISK_REGRADE_RECOMMENDED` → `CHANGE_GRADE` approval (BR-W-32); `blacklist.events` consumer (NID, MSISDN, WALLET hash); config documents CRUD + activation approval + hot reload.
 - Acceptance: `riskRegrade_toHigh_afterApproval_setsEddAndShortensReview`; `riskRegrade_deliveredTwice_oneApproval`; `blacklistEvent_openSubmission_movesToException`; `blacklistEvent_walletHashMatch`; `configActivation_tierChange_takesEffectWithoutRestart`.
 - Depends on: W-WP-6.
 
-### W-WP-8 Closure, payout and MSISDN cooling
+### W-WP-8 [MVP] Closure, payout and MSISDN cooling
 - Scope: `support.events` projection; closure API + pre-checks (ledger balance / holds), same-person target check (via `PartnerFacade` when needed), approval, settle job (payout via command 17 with attempt-derived commandId, usage max balance, unknown-outcome lookup), ledger close, revert path, notifications, `msisdn_release`.
 - Acceptance: `closure_openDispute_precheckFailed`; `closure_balanceNonZero_awaitingZeroBalance`; `closure_ownWalletTarget_balanceNotBlocking`; `closure_payoutOk_thenClose_walletZ_msisdnCooling180d`; `closure_payoutRejected_reverts_nextAttemptUsesPayout2`; `closure_payoutTimeout_resolvedByLookup_sameCommandId`; `closure_finalCheckFindsHold_reverts`; `closure_ledgerUnknown_neverCloses`.
 - Depends on: W-WP-4, W-WP-5.
 
-### W-WP-9 R2 lifecycle jobs and pre-registration
+### W-WP-9 [R1+] R2 lifecycle jobs and pre-registration
 - Scope: `txn.events` activity consumer (ADR-10), dormancy job + warning + `dormancy:run`, KYC review job + `KYC_EXPIRED`, reactivation (BR-W-33), unclaimed report, `POST /v1/customers:preRegister`, perf seed operation, anonymisation job (off) with legal-hold check.
 - Acceptance: `dormancy_365daysInactive_marksD_creditStillAllowed`; `dormancyRun_asOf_countsMatch`; `kycReview_graceElapsed_addsDebitBlock_statusX`; `reactivate_overdueKyc_409RekycRequired`; `preRegister_1000rows_idempotentReplay`; `activityConsumer_reversalIgnored`; `activityConsumer_burst_atMostOneWritePerWalletPerDay`; `anonymisation_legalHold_skips`.
 - Depends on: W-WP-8.
 
-### P-WP-2 Partner config, reference data, approval handlers
+### P-WP-2 [MVP] Partner config, reference data, approval handlers
 - Scope: handlers registered in the shared engine (stage, partner, hierarchy, config, bank account); `refdata.events` partner consumer (GEO, MCC, REASON_CODE, BANK) + GEO chain validator; config endpoints with maker-checker; category resolver; hierarchy rule evaluator; chain selector.
 - Acceptance: `refdata_olderVersion_ignored`; `categoryCode_microGrocery_is3101`; `categoryCode_enterpriseRestaurant_is3302`; chain selection specificity tests; `partnerConfig_requiresChecker`.
 - Depends on: WP-1, W-WP-4 (engine).
 
-### P-WP-3 Applications: drafts, key persons, documents, bank accounts, site visits
+### P-WP-3 [MVP] Applications: drafts, key persons, documents, bank accounts, site visits
 - Scope: applications create / read / update / list, key persons, documents (encrypted), bank accounts, site visits; blacklist client (`valueHash`); draft expiry; actor rules BR-PAR-01.
 - Acceptance: NID / account number never stored or logged in clear; `selfRegistration_nonMicro_returns403`; `distributorDraft_parentOutsideSubtree_returns403`; `document_download_isAudited`; `keyPerson_blacklisted_returns422RiskBlocked`.
 - Depends on: P-WP-2.
 
-### P-WP-4 Submission, risk grading, screening
+### P-WP-4 [MVP] Submission, risk grading, screening
 - Scope: submit (BR-PAR-03..09), partner code + row, risk score, stages, `PARTNER_UPSERTED` builder (20 fields + tinPresent, ancestor arrays, key persons), `case.events` partner consumer with `sourceVersion` correlation, screening timeout, `:rescreen`.
 - Acceptance: `partnerUpserted_dataKeysExactlyContract`; `submit_limitsRiskDown_returns503_noPartnerCreated`; `screeningClear_movesPartnerToPendingApproval`; `screeningRejected_rejectsApplication`; `staleScreeningVersion_recordedOnly`; `keyPersonChange_bumpsVersion`; `caseEvent_deliveredTwice_appliedOnce`; Luhn partner code tests.
 - Depends on: P-WP-3.
 
-### P-WP-5 Approval chain workflow
+### P-WP-5 [MVP] Approval chain workflow
 - Scope: stage progression BR-PAR-09..17 (auto stage, EDD skip / include, return / resubmit rounds, reject with reasonCode, distinct deciders, SLA monitor + notifications), return / withdraw / rescreen operations, application queue.
 - Acceptance: `chain_agentStd_stagesApproveInOrder`; `complianceStage_screeningPending_returns409`; `microSelf_lowRiskClear_autoApproved`; `highRisk_includesEddStage`; `sameStaffTwoStages_returns422`; `return_thenResubmit_newRoundFromStage1`; `returned_publishedAsRejected_waitingNotPublished`; `slaBreach_notifiesStageRoleOnce`.
 - Depends on: P-WP-4.
 
-### P-WP-6 Bangla QR engine
+### P-WP-6 [MVP] Bangla QR engine
 - Scope: `Tlv`, `EmvQrEncoder`, `EmvQrDecoder`, `Crc16Ccitt` (`partner.service`), golden vectors, amount conversion; QR operations, PNG / SVG rendering (ZXing, EC level M, quiet zone 4), dynamic reference generator, expiry job, Caffeine cache for decode.
 - Acceptance: `crc_checkValue_123456789_is29B1`; three golden payloads byte-exact; `decode_tamperedAmountWithValidCrc_payableFalseTampered`; `decode_expiredDynamic_payableFalse`; `decode_offUsGuid_onUsFalse`; `decode_badCrc_returns400`; jqwik `encodeThenDecode_roundTrips`.
 - Depends on: P-WP-2.
 
-### P-WP-7 Activation saga
+### P-WP-7 [MVP] Activation saga
 - Scope: activation steps BR-PAR-20..25 through `WalletFacade` (in-process), static QR, FINALISE transaction, retry job, BLOCKED handling, notifications.
 - Acceptance: `activation_walletCreated_partnerActive_eventPublishedOnce`; `activation_ledgerDown_retriesUntilWalletReady`; `activation_msisdnTakenByOtherOwner_blocked`; `activation_crashBetweenSteps_resumes`; `activation_parentTerminated_blocked`.
 - Depends on: P-WP-5, P-WP-6, W-WP-2 (until merged: `WalletFacade` mocked with Mockito, tests only).
 
-### P-WP-8 Hierarchy (effective-dated, R2)
+### P-WP-8 [R1+] Hierarchy (effective-dated, R2)
 - Scope: hierarchy changes + approval handler, validations BR-PAR-30..36, scheduling, cancel, apply job, subtree recompute + chunked republish, ancestors / descendants / history queries, data scope BR-PAR-60.
 - Acceptance: `hierarchy_cycle_rejected`; `hierarchy_depthExceeded_rejected`; `hierarchy_backdated_rejected`; `hierarchy_futureChange_appliedByJobAtEffectiveFrom`; `hierarchy_moveSubDistributor_republishesAllDescendants`; `ancestorsAt_returnsHistoricalChain`; exclusion-constraint overlap test; 100-thread concurrent change → exactly one SCHEDULED; `partnerActor_readsNonDescendant_403`.
 - Depends on: P-WP-7.
 
-### P-WP-9 Partner lifecycle and controls
+### P-WP-9 [MVP] Partner lifecycle and controls
 - Scope: partner status changes (staff maker-checker, SERVICE immediate, DST-008 + expiry job), complete termination with ledger balance, category / territory / profile changes, bank accounts, risk flags, `blacklist.events` partner consumer (BR-PAR-52a), QR side effects; atomic wallet sync via `WalletFacade.changeStatus / setCategory / changeContact`.
 - Acceptance: `suspend_byStaff_requiresChecker`; `suspend_bySERVICE_amlFreeze_immediate`; `suspend_partnerAndWalletRestrictionCommitTogether`; `suspend_walletModuleRejects_rollsBackPartnerChange`; `suspend_redisWriteThroughOnlyAfterOuterCommit`; `distributorSuspendsDescendant_untilExpiry_autoReactivates`; `terminate_withActiveDescendants_409WithCount`; `completeTermination_nonZeroBalance_409BalanceNotZero`; `completeTermination_ledgerDown_503`; `categoryChange_walletCategoryCommittedAtomically`; `msisdnChange_walletContactCommittedAtomically`; `blacklistEvent_partnerHash_flagsPartner`.
 - Depends on: P-WP-7, W-WP-4.
 
-### P-WP-10 Outlets, partner users, agreements, expiry alerts (R2)
+### P-WP-10 [R1+] Outlets, partner users, agreements, expiry alerts (R2)
 - Scope: outlets (QR tag 62.07), partner users, agreements, expiry alert job with dedupe log, bank accounts with FIN_CHECKER.
 - Acceptance: `outletQr_containsTerminalLabel`; `partnerUser_duplicateMsisdn_409`; `agreementExpiry_D30_alertSentOnceToWalletAndRole`; `tradeLicenceExpiry_D7_alert`.
 - Depends on: P-WP-9.
 
-### X-WP-1 Integration on the Compose stack (both owners)
-- Scope: switch to real ledger, limits-risk, admin and Kafka topics; walk by hand: Salma / Nirob Store onboarding (wallets + QR + screening round trip), Rahim tier 2 / Karim tier 1, a blocked wallet refused by the payment service via the cache, a compliance freeze and lift, closure with payout + dormancy (`dormancy:run asOf`), partner suspension with wallet restriction.
+### WP-CR-1 [MVP] Billers: partner type, `B` wallet and biller catalogue (CR-WALLET-1, Dev-4 with Dev-3 for the wallet module)
+- Goal: billers onboarded through the normal partner path with a `B` settlement wallet, and a payable catalogue published for transaction-service (BILL_PAY / RECHARGE).
+- Scope: `BILLER` partner type and sub-types, category codes 501..505, partner code prefix `B`; `partner_biller_profile` + `partner_biller_msisdn_prefix` and seeds (partner V4, §4.1.3); `PartnerForm.biller` validation (BR-PAR-80), submit rules (BR-PAR-81, BR-PAR-83), `BILLER_STD` chain, screening with the `biller` object on `PARTNER_UPSERTED` (BR-PAR-82); profile changes with `changes.biller` (BR-PAR-84); activation with `walletType B` / ledger `BILLER_WALLET` 150 owner `BILLER`, no QR (BR-PAR-85); wallet module support for `B` (CHECKs, `msisdn_scope 'B'`, status cache type `B`, BR-PAR-86); `BillerCacheWriter` (Lua CAS, prefix keys) + `biller-cache-refresh` job (BR-PAR-87, BR-PAR-88); `GET /v1/billers`, `GET /v1/billers/{billerId}` (BR-PAR-89); metric `bitspay_partner_biller_cache_writes_total`; WireMock ledger stub for `BILLER_WALLET`.
+- Acceptance: `billerProfile_mnoWithoutPrefixes_400`; `billerProfile_categoryNotAllowedForSubType_400`; `billerProfile_fixedModeWithoutAmount_400`; `billerSubmit_duplicateBillerCode_409`; `billerSubmit_prefixHeldByOtherMno_409MsisdnPrefixTaken`; `billerSubmit_noKeyPersons_ok`; `billerUpserted_pendingScreening_carriesBillerObject`; `billerActivation_createsBWalletWithLedger150Owner6_noQr`; `billerWallet_msisdnScopeB_doesNotBlockCustomerRegistration`; `billerActivation_writesBillerCacheAfterCommit_andPrefixKeys`; `billerCache_olderVersion_ignored`; `billerProfileChange_requiresChecker_bumpsVersion_rewritesCache`; `billerProfileChange_prefixMoved_oldPrefixKeyDeleted`; `billerTerminated_prefixReleased_codeReusable`; `billerCacheRefresh_flushAll_rebuildsCatalogue`; `listBillers_customer_onlyActive`; `listBillers_msisdnPrefix017_returnsGp`; `getBiller_notActivated_404`; `statusCache_billerWallet_typeB_vector` (`3:A:2:B:501:0`); `seedCatalogue_11Drafts_present_submitAndApprove_activates`.
+- Depends on: P-WP-7, P-WP-9 (profile changes), W-WP-3.
+
+### WP-CR-2 [MVP] Single-step KYC decision and non-prod customer seeds (CR-WALLET-2, Dev-3)
+- Goal: MVP customers are onboarded by one back-office staff member, with no maker-checker on the KYC decision; seeded customers never reach production.
+- Scope: `bitspay.wallet.kyc.decision-mode` (`SINGLE_STEP` default, `MAKER_CHECKER` keeps W-WP-6 behaviour) in `KycDecisionService`; `200` response of `decideKyc`; `KYC_DECIDED` audit with `decisionMode`; `bitspay.wallet.seed.customers.enabled` with a `prod` start-up guard.
+- Acceptance: `kyc_decide_singleStep_approvesAndActivates`; `kyc_decide_singleStep_reject_emitsKycRejected`; `kyc_decide_singleStep_highRisk_requiresEddFields`; `kyc_decide_singleStep_screeningNotClear_409GateNotSatisfied`; `kyc_decide_singleStep_noApprovalRequestCreated`; `kyc_decide_makerChecker_unchanged_202`; `seed_customers_prodProfile_startupFails`.
+- Depends on: W-WP-6.
+
+### X-WP-1 [MVP] Integration on the Compose stack (both owners)
+- Scope: switch to real ledger, limits-risk, admin and Kafka topics; walk by hand: Salma / Nirob Store onboarding (wallets + QR + screening round trip), Rahim tier 2 / Karim tier 1, a blocked wallet refused by the payment service via the cache, a compliance freeze and lift, closure with payout + dormancy (`dormancy:run asOf`), partner suspension with wallet restriction; a seeded biller (DESCO) and an MNO (GP) activated and visible in `biller:*` (CR-WALLET-1).
 - Acceptance: scenarios pass on the stack; cache mismatch metric = 0 during the walk; no DLQ records produced by this service's consumers; OpenAPI drift clean.
 - Depends on: all W-WPs and P-WPs.
 
-### X-WP-2 Hardening
+### X-WP-2 [MVP] Hardening
 - Scope: Redis flush drill (rebuild while serving), kill-pod drill during a subtree republish, concurrency suites, PII log scan, `docs/TRACEABILITY.md`, `docs/MODULES.md` final.
 - Acceptance: after `FLUSHALL` the cache is READY again and mismatches return to 0 with no payment allowed on a blocked wallet during the rebuild; republish resumes with correct ancestors and monotonic versions; traceability covers every SRS id of §2.
 - Depends on: X-WP-1.
@@ -8473,13 +8816,15 @@ Every WP ends with `./gradlew check` green, the OpenAPI drift check green agains
 
 | Layer | Must-have tests |
 |---|---|
-| Provider contract | every operation of `contracts/provided/openapi.yaml` (request / response examples and schemas, problem reasons); every event example validates against its schema; `partnerUpserted_dataKeysExactlyContract`; `customerEvents_dataFieldsExactlyContract`; `walletUpserted_envelopeAndKey`; data contract vectors (§7.6) |
+| Provider contract | every operation of `contracts/provided/openapi.yaml` (request / response examples and schemas, problem reasons); every event example validates against its schema; `partnerUpserted_dataKeysExactlyContract`; `customerEvents_dataFieldsExactlyContract`; `walletUpserted_envelopeAndKey`; data contract vectors (§7.6); `partnerUpserted_billerObject_matchesSchema`; `billerCatalogueCache_vectors` (prefix derivation, CAS cases of data contract §6); `listBillers_examplesValidate` |
 | Consumer contract | stubs and snapshots of ledger (accounts, close, balance, holds, batch, command 17, command lookup), limits-risk (blacklist check with `valueHash`, usage), admin (legal holds, refdata), fixtures of case / support / blacklist / txn / refdata events |
 | Service unit (rules) | `statusResolver_allCombinations`, `bucketCodec_vectorsMatchSpec`, `bucketCodec_negativeHash_usesUnsignedMod`, `cacheValue_format`, `riskGrade_rahim_isLow`, `riskGrade_pepOverride_isHigh`, `riskGrade_highRiskDistrict_atLeastMedium`, `msisdn_normalisation_variants`, `nid17_yearMismatch_rejected`, `nameBn_latinChars_rejected`, `displayNameMasked_rules`, `kycStateMachine_illegalTransitions_throw`, `closureStateMachine_illegalTransitions_throw`, `payoutCommandId_isUuidV5OfClosureAndAttempt`, `crc_checkValue_123456789_is29B1`, `tlv_parse_rejectsLengthBeyondInput`, `tlv_parse_rejectsDuplicateTopLevelTag`, `amount_encode_35000_is350_00`, `amount_decode_threeDecimals_invalid`, `partnerCode_luhnValid`, `riskScore_salmaRetail_isLow`, `riskScore_pepDeclared_isHigh`, `partnerStateMachine_terminatedToActive_rejected`, `hierarchy_depthRule`, `effectiveFrom_isMaxOfChain` |
 | Property (jqwik) | `bucket_inRange_forAnyUuid`, `cas_isMonotonic_forAnyEventOrder`, `statusResolver_debitCreditSemantics_matchCodes`, `encodeThenDecode_roundTrips`, `crc_detectsSingleCharMutation`, `subtreeRecompute_ancestorsConsistentWithParents` |
 | Service unit (Mockito / WireMock) | `decideKyc_makerCannotApproveOwn`, `approvalEffects_tierAndStatusAndEvents_atomic`, `statusChange_liftOnlyMatchingReasonAndReference`, `flagsHolder_setClearSemantics`, `preRegister_rowResults`, `submit_missingMandatoryDoc_returns400WithList`, `submit_duplicateMsisdnSameType_409`, `resubmit_screenedFieldsUnchanged_noRescreen`, `approvalStageExpired_reissued` |
 | Integration (Testcontainers Postgres / Redis / Kafka + WireMock) | `createWallet_ledgerDown_returns503_thenJobProvisions_andPublishesOnce`, `writeThrough_freeze_visibleInRedisBeforeResponse`, `loader_rebuildFromDbThenKafka_noGap`, `sampler_detectsStaleAndRepairs`, `document_storedEncrypted_plaintextNeverOnDisk`, `closure_payoutOk_thenClose_walletZ_msisdnCooling180d`, `closure_ledgerUnknown_neverCloses`, `blacklistDown_submissionProceeds_gateBlocksReview`, `endToEnd_salmaOnboarding_activeWithWalletAndQr`, `endToEnd_nirobMicroSelf_autoComplianceStage`, `outboxRow_and_stateChange_sameTransaction` |
 | Event (consume twice) | `screeningCompleted_deliveredTwice_appliedOnce`, `riskRegrade_deliveredTwice_oneApproval`, `supportDisputeOpened_deliveredTwice_oneRowPerWallet`, `blacklistEntry_deliveredTwice_oneException`, `refdata_deliveredTwice_noop`, `partnerCaseEvent_deliveredTwice_appliedOnce`, `unknownEventType_ignoredWithMetric`, `poisonEvent_goesToDlqAfter5Retries`, `malformedJson_toDlqImmediately` |
+| KYC decision mode (CR-WALLET-2, MVP) | the WP-CR-2 acceptance tests; `decideKyc_makerCannotApproveOwn` applies to `MAKER_CHECKER` only |
+| Biller catalogue (CR-WALLET-1, MVP) | the WP-CR-1 acceptance tests; `billerCache_writeThroughVsRefresh_race_finalValueIsNewest`; `billerSubmit_twoMnosSamePrefix_concurrent_oneWins`; `redisKeys_billerKeysContainNoMsisdn` |
 | Concurrency (≥ 100 threads) | `concurrentStatusChanges_versionsMonotonic_noLostRestriction`, `concurrentRegistrations_sameMsisdn_oneWins`, `writeThroughVsLoader_race_finalValueIsNewest`, `parallelStageApprovals_onlyOneSucceeds`, `parallelHierarchyChanges_oneScheduled`, `parallelStaticQrRegenerate_oneActive`, `activationJob_twoInstances_singleWalletCreate`, `closureSettle_twoInstances_singlePayout` |
 | Security / PII | `logs_containNoNidOrFullMsisdn`, `documentDownload_unauthorisedRole_403`, `schemaTest_noClearNidOrAccountColumns`, `redisKeys_containNoMsisdn` |
 | Manual Compose scenarios | X-WP-1 list |
@@ -8495,12 +8840,15 @@ Every WP ends with `./gradlew check` green, the OpenAPI drift check green agains
 - [ ] Hierarchy subtree republish proven idempotent and crash-safe.
 - [ ] No clear NID / account number outside `*_enc` columns (schema test); log-scan test green.
 - [ ] Closure payout never posts twice for one attempt and never closes on an unknown balance (tests).
+- [ ] Biller catalogue (CR-WALLET-1): every activated biller has a `B` wallet (ledger 150 / owner 6) and a `biller:{billerId}` entry equal to the database after a refresh; no live prefix is held by two MNOs.
 
 ## 13. Open decisions, deferred items, assumptions
 
 | Tag | Topic | Provisional value used | Where used |
 |---|---|---|---|
 | OPEN D-06 | Customer notification of freezes (tipping-off) | No customer message for AML_FREEZE / REGULATORY_INSTRUCTION / COURT_ORDER and their lifts; FRAUD_FREEZE notifiable; holders see `RESTRICTED` | §5.2.1, §7.7 BR-W-68, codes.yaml reasonCodes |
+| W-MVP-ONB (decided, MVP decisions 2026-10-14) | Customer onboarding in the MVP (no self-onboarding: OTP, PIN, e-KYC provider are R1) | Assisted onboarding by one back-office staff member (ONB-002 `assistedBy`), basic KYC decided in a single step with no maker-checker (CR-WALLET-2, applied: BR-W-25 `SINGLE_STEP`). Seeded customers only in `local` / `dev` / `qa` / `demo` profiles, never `prod` | §2 ONB-002, ONB-018; BR-W-25 |
+| W-MVP-PAYOUT (decided, MVP decisions 2026-10-14) | Biller payouts in the MVP | None: biller `B` wallets accumulate (billers are simulated; nothing is owed outside the system). Biller bank settlement / payout R1+ | §1.3 |
 | OPEN D-11 | Owner of re-KYC reminders | This service is the single sender (`KYC_REVIEW_DUE` / `_OVERDUE`) | BR-W-35, codes.yaml templates |
 | OPEN D-16 | Ledger REJECTED-is-final, 400 vs REJECTED, lookup interpretation | Applied as consumer rules for command 17 | §6.2, BR-W-44 |
 | OPEN D-19 | Owner of customer EDD (compliance case vs wallet level-2) | Wallet level-2 approval kept; `eddRequired` holds the submission | BR-W-25 |
@@ -8512,8 +8860,10 @@ Every WP ends with `./gradlew check` green, the OpenAPI drift check green agains
 | OPEN D-35 | Unclaimed-balance account | none; unclaimed report is a dataset only; no payout to such an account | BR-W-44, unclaimed report |
 | OPEN D-42 | Merchant bank settlement | `settlementMode` WALLET only; BANK → 422 | §1.3, partner form |
 | OPEN D-51 | Event carrying the `WC` closure-payout reference | none; `payout_txn_ref` kept on the closure (visible in the closure API) | BR-W-44, codes.yaml txnRefPrefixes |
+| OPEN B-25 | MVP seed biller and MNO catalogue sign-off (SRS v1.2) | 11 seed DRAFT applications (§4.1.3): codes, names, reference patterns, amount bounds, prefixes, placeholder contact MSISDNs `88013000000NN`, logo keys | §4.1.3, BR-PAR-80 |
+| OPEN B-26 | MVP fee and limit values (SRS v1.2) | biller min / max as in §4.1.3; MNO bounds 1,000..100,000 poisha (`biller.mno.*`); fees live in pricing-service | §8.3, BR-PAR-80 |
 
-**Deferred items (interim behaviour):** OTP / PIN / device binding (edge layer later; headers trusted); e-KYC, OCR, liveness (manual review SPIs); minors (rejected); multiple customer wallets (one); bank / MFS closure payout (same-person wallet or cash-out drain); off-us QR (decoded, not payable); merchant bank settlement (WALLET only); geo-fencing (data only); partner portal credentials (`credentialsIssued=false`); KYC anonymisation job (built, off until R2); single-use dynamic QR (reusable until expiry).
+**Deferred items (interim behaviour):** OTP / PIN / device binding (edge layer later; headers trusted); e-KYC, OCR, liveness (manual review SPIs); minors (rejected); multiple customer wallets (one); bank / MFS closure payout (same-person wallet or cash-out drain); off-us QR (decoded, not payable); merchant bank settlement (WALLET only); MVP biller deferrals (CR-WALLET-1) — biller bank settlement / payout of `B` wallet balances (R1+; balances accumulate in the `B` wallet), biller logins and biller-side APIs (R1+), ekPay / aggregator and biller adapters (BIL-001 / BIL-002, R1+), agent-assisted bill pay and recharge (R1+), logo upload (staff sets `logoKey`), holds and closure payout on `B` wallets (not in the ledger MVP guards); geo-fencing (data only); partner portal credentials (`credentialsIssued=false`); KYC anonymisation job (built, off until R2); single-use dynamic QR (reusable until expiry).
 
 **Assumptions:**
 1. All seeds of §8 (tiers, risk matrix, dormancy 365 d, cooling 180 d, review periods 60 / 36 / 12 months, grace 30 d, settle 15 min, chains, SLAs, risk points, checklists, expiry days) are provisional configuration.
@@ -8526,6 +8876,8 @@ Every WP ends with `./gradlew check` green, the OpenAPI drift check green agains
 8. A partner's key persons published on `partner.events` are those of the latest application round.
 9. Staff and channel operations not used by other services (KYC, closures, partner applications, config, internal) were renamed only where their old paths would collide with other services' paths: wallet configuration moved from `/v1/config/{key}` to `/v1/wallet-config/{key}`, partner documents from `/v1/documents/{documentId}…` to `/v1/partner-documents/{documentId}…`, generic job runs from `/v1/internal/jobs/{jobName}:run` to `/v1/internal/wallet-jobs/{jobName}:run`.
 10. Jobs run in the `api` role by default (Compose profiles `dev,api,cache-loader`); a separate jobs deployment is a production option.
+11. A-41 (SRS v1.2): no external biller or telco call in the MVP; bill enquiry, payment confirmation and recharge fulfilment are simulated by transaction-service from the catalogue this service publishes.
+12. A-43 (SRS v1.2): no OTP / step-up in the MVP; `X-Actor-*` headers are trusted.
 
 **Provenance (consolidated sources, one line each):**
 - Old spec: `Dev Plan v5.0/services/SVC-03-wallet-service.md` v1.2 consolidated (Part 0 merged-service chapter, Part A wallet module, Part B partner module), with its v5.0 overlay rules applied (Gradle, schema `svc_wallet`, 5k TPS, Compose only, no Spring Modulith).
@@ -8540,3 +8892,6 @@ Every WP ends with `./gradlew check` green, the OpenAPI drift check green agains
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-03 v1.2 (wallet + partner) + v5.0 overlay + catalogue v1.4 + contract audit §4.3 + D-08 |
+| 1.1.0 | 2026-10-14 | CR-WALLET-1 | MVP (SRS v1.2) biller catalogue, kind B: wallet type `B` BILLER (ledger 150 / owner 6), partner type `BILLER` (UTILITY, EDUCATION, GOVT_FEE, INTERNET_TV, MNO), category codes 501..505, partner code prefix `B`, `partner_biller_profile` + MNO prefix index + V4 seeds (11 billers as DRAFT applications), `GET /v1/billers`, `GET /v1/billers/{billerId}`, optional `PARTNER_UPSERTED.biller`, `PartnerForm.biller` / `PartnerDetail.biller`, reasons `DUPLICATE_BILLER_CODE` / `MSISDN_PREFIX_TAKEN`, data contract `biller-catalogue-cache` v1, `wallet-status-cache` type `B`; BR-PAR-80..89, WP-CR-1; §2 baseline SRS v1.2 with MVP markers; §10 scope tags |
+| 1.1.0 | 2026-10-14 | — | Kind A (documentation only, MVP decisions 2026-10-14): W-MVP-ONB and W-MVP-PAYOUT recorded; CR-WALLET-2 (single-step KYC decision, kind C) proposed |
+| 1.2.0 | 2026-10-14 | [CR-WALLET-2](changes/CR-WALLET-2.md) | Kind B (reclassified from C: zero impacted consumers; `202` kept, `200` added): `decideKyc` single step in the MVP (`bitspay.wallet.kyc.decision-mode = SINGLE_STEP`, response `200` APPROVED / REJECTED), maker-checker kept for R1 (`MAKER_CHECKER`, `202`); `x-release MVP`; BR-W-25, ONB-011, ONB-018; config incl. non-prod customer seeds; WP-CR-2; §11 tests |

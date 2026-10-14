@@ -1,12 +1,12 @@
 <!-- Generated from docs/CLAUDE.md of the v6 pack; paths adjusted to the bitspay-core layout. -->
 # general-ledger-service — agent instructions
 
-You are implementing **general-ledger-service** (SVC-16) of Bits Pay: the Operator's official books. It ingests `ledger.changes` exactly once, maps every TigerBeetle leg to the chart of accounts with versioned posting rules, closes business days (trial balance, control checks GL-1…GL-7), keeps manual/accrual journals, closes months and fiscal years, produces trial balance / balance sheet / P&L and a daily ERP journal file. Back-office only (Swagger, no UI). This folder is the whole world for this service.
+You are implementing **general-ledger-service** (SVC-16) of Bits Pay: the Operator's official books. It ingests `ledger.changes` exactly once, maps every TigerBeetle leg to the chart of accounts with versioned posting rules, closes business days (trial balance, control checks GL-1…GL-7), keeps manual/accrual journals, closes months and fiscal years, produces trial balance / balance sheet / P&L. MVP = slice GL-R1a (books for the seven MVP products incl. bill payment, ledger cmd 18, and mobile recharge, cmd 19; biller e-money liability 2106, fee income 4108/4109); R1+ = slice GL-R1b (journals, periods, hardening). There is no journal file export (withdrawn by CR-GENERALLEDGER-2). Back-office only (Swagger, no UI). This folder is the whole world for this service.
 
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages, §7 the business rules BR-GL-xx).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins, group ids, fieldsUsed).
-3. `docs/contracts/provided/*` — binding API (`openapi.yaml`), `gl.events` schemas/examples, `codes.yaml`, data contracts (`gl-export-generic-csv.v1.md`, golden vectors).
+3. `docs/contracts/provided/*` — binding API (`openapi.yaml`), `gl.events` schemas/examples, `codes.yaml`, data contract (golden vectors `gl-posting-golden-vectors.v1.json`).
 4. `docs/contracts/consumed/*` — snapshots of everything this service uses from others (read-only).
 5. `../../docs/global/GLOBAL-CONVENTIONS.md` — kernel rules (headers, errors, envelope, outbox, money, testing).
 6. `reference/` — Flyway V1–V4, CoA v0 CSV, rule set v1 YAML, posting universe, golden-day input streams and ledger stubs (implementation material owned by this pack).
@@ -42,7 +42,7 @@ You are implementing **general-ledger-service** (SVC-16) of Bits Pay: the Operat
 - If a WP seems to need a contract change: stop, write `docs/changes/CR-GL-<n>.md` (template in `../../docs/global/templates/`), and tell the developer.
 
 ## Code map
-Traditional layered (kernel K9 "Layout"): `com.bracits.bitspay.generalledger` — `controller` / `dto` / `service` (business logic, jobs, `ingest`, `close`, `rules`: CoA rules, `RuleEngine`, journal arithmetic, calendar, checks) / `repository` (Spring Data JPA; native `@Query` for batch upserts) / `entity` / `mapper` / `exception` / `client` (`HttpLedgerClient`, Kafka AdminClient, `GenericCsvV1` export format) / `messaging` (outbox, Kafka listeners, inbox) / `config` (incl. ShedLock).
+Traditional layered (kernel K9 "Layout"): `com.bracits.bitspay.generalledger` — `controller` / `dto` / `service` (business logic, jobs, `ingest`, `close`, `rules`: CoA rules, `RuleEngine`, journal arithmetic, calendar, checks) / `repository` (Spring Data JPA; native `@Query` for batch upserts) / `entity` / `mapper` / `exception` / `client` (`HttpLedgerClient`, Kafka AdminClient) / `messaging` (outbox, Kafka listeners, inbox) / `config` (incl. ShedLock).
 
 ## Testing expectations
 Provider contract tests against `docs/contracts/provided/*`; consumer tests from `docs/contracts/consumed/*`; events consumed twice and `ledger.changes` batches replayed (no double count); ≥ 100-thread concurrency tests on ingest vs close; `rules_goldenVectors_all` and both golden days byte-exact against `docs/contracts/provided/data/gl-posting-golden-vectors.v1.json`; jqwik properties (bucket totals = TB counters, journals balance, restatement idempotent); kill-between-commits and rebalance ITs.

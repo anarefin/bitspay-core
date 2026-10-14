@@ -1,6 +1,6 @@
 # GENERATED from the SVC-05 v6 pack builder; edit via change request only (CHANGE-PROCESS).
 openapi: 3.1.0
-info: {title: limits-risk-service, version: 1.0.0, description: 'Bits Pay SVC-05 limits & risk. contractVersion 1.0.0, kernel 1.0. Headers, problem body, pagination and idempotency per
+info: {title: limits-risk-service, version: 1.1.0, description: 'Bits Pay SVC-05 limits & risk. contractVersion 1.1.0, kernel 1.0. Headers, problem body, pagination and idempotency per
     kernel K3. No operation moves money; Idempotency-Key is never required (optional where stated). x-actors lists allowed actor types; for SERVICE the allowed X-Actor-Id values; for
     STAFF the roles (''*'' = any staff role).'}
 servers:
@@ -373,13 +373,13 @@ paths:
         required: false
         schema:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT]
       - name: walletType
         in: query
         required: false
         schema:
           type: string
-          enum: [C, A, D, M, I]
+          enum: [C, A, D, M, I, B]
         description: used only when no profile is held for the wallet
       - name: kycTier
         in: query
@@ -769,7 +769,7 @@ paths:
         schema:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
       - name: kycTier
         in: query
         required: false
@@ -977,7 +977,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [C, A, D, M, I]
+          enum: [C, A, D, M, I, B]
       - name: kycTier
         in: query
         required: false
@@ -997,7 +997,7 @@ paths:
         required: true
         schema:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
       - name: channel
         in: query
         required: false
@@ -3274,8 +3274,8 @@ components:
         walletId: {type: string, format: uuid, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'}
         walletType:
           type: string
-          enum: [C, A, D, M, I, CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION, S]
-          description: C|A|D|M|I (names accepted). S only for the from party of an evaluate:batch CAMPAIGN_REWARD item; anywhere else 400 reason SYSTEM_PARTY_NOT_ALLOWED
+          enum: [C, A, D, M, I, B, CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION, BILLER, S]
+          description: C|A|D|M|I|B (names accepted; B = BILLER, the to party of BILL_PAY / RECHARGE since 1.1.0). S only for the from party of an evaluate:batch CAMPAIGN_REWARD item; anywhere else 400 reason SYSTEM_PARTY_NOT_ALLOWED
         kycTier: {type: integer, format: int32, minimum: 0, maximum: 2, description: from the wallet status cache}
         categoryCode: {type: integer, format: int32, minimum: 0, maximum: 99999, description: 'wallet category code (0 for customers; 101..104 agents, 201..203 distributors, 3000+d*100+g
             merchants, 401..404 institutions)'}
@@ -3321,7 +3321,7 @@ components:
             re-used}
         txnType:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL]
           description: REVERSAL is a no-counter type, reserved and never sent in R1
         channel:
           type: string
@@ -3429,7 +3429,7 @@ components:
             across re-runs); unique within the batch}
         txnType:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
           description: evaluate txnTypes + DISBURSEMENT, CAMPAIGN_REWARD
         channel:
           type: string
@@ -3554,7 +3554,7 @@ components:
       properties:
         txnType:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT]
         direction:
           type: string
           enum: [SEND, RECEIVE]
@@ -3584,7 +3584,7 @@ components:
         userCategory:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
           description: derived from walletType + categoryCode
         kycTier: {type: integer, format: int32, minimum: 0, maximum: 2}
         riskGrade:
@@ -3599,7 +3599,7 @@ components:
           type: array
           items: {$ref: '#/components/schemas/UsageItem'}
           description: 'without txnType: one item per (txnType, direction) with >= 1 effective limit, txnTypes in P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER,
-            REVERSAL, DISBURSEMENT order, SEND before RECEIVE; with txnType: its SEND and RECEIVE items even when unlimited'
+            BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT order, SEND before RECEIVE; with txnType: its SEND and RECEIVE items even when unlimited'
       required: [walletId, asOf, userCategory, kycTier, riskGrade, maxBalancePoisha, items]
     BlacklistCheckEntry:
       type: object
@@ -3787,12 +3787,12 @@ components:
       properties:
         walletType:
           type: string
-          enum: [C, A, D, M, I]
+          enum: [C, A, D, M, I, B]
         categoryCode: {type: integer, format: int32, minimum: -1, maximum: 99999, description: -1 = any category of this wallet type; merchant hundred groups 3100..3400}
         userCategory:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
         updatedAt: {type: string, format: date-time, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$'}
       required: [walletType, categoryCode, userCategory, updatedAt]
     UserCategoryList:
@@ -3812,7 +3812,7 @@ components:
         userCategory:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
         kycTier:
           type: [integer, 'null']
           format: int32
@@ -3850,7 +3850,7 @@ components:
         userCategory:
           type: [string, 'null']
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION, null]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER, null]
           description: null only for OVERRIDE / SELF
         kycTier:
           type: [integer, 'null']
@@ -3919,7 +3919,7 @@ components:
         userCategory:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
         kycTier:
           type: [integer, 'null']
           format: int32
@@ -3964,7 +3964,7 @@ components:
             userCategory:
               type: string
               enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-                SUB_DISTRIBUTOR, INSTITUTION]
+                SUB_DISTRIBUTOR, INSTITUTION, BILLER]
             kycTier:
               type: [integer, 'null']
               format: int32
@@ -3988,7 +3988,7 @@ components:
               type: array
               items:
                 type: string
-                enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+                enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
               minItems: 1
           required: [code, txnTypes]
         categoryMap:
@@ -3997,12 +3997,12 @@ components:
           properties:
             walletType:
               type: string
-              enum: [C, A, D, M, I]
+              enum: [C, A, D, M, I, B]
             categoryCode: {type: integer, format: int32, minimum: -1, maximum: 99999}
             userCategory:
               type: string
               enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-                SUB_DISTRIBUTOR, INSTITUTION]
+                SUB_DISTRIBUTOR, INSTITUTION, BILLER]
           required: [walletType, categoryCode]
       required: [op]
       description: 'Exactly the member matching `op` is set: UPSERT_RULE rule; DEACTIVATE_RULE ruleId; UPSERT_TIER tier; UPSERT_SCOPE_GROUP scopeGroup; *_CATEGORY_MAP categoryMap'
@@ -4103,14 +4103,14 @@ components:
         userCategory:
           type: string
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER]
         kycTier: {type: integer, format: int32, minimum: 0, maximum: 2}
         riskGrade:
           type: string
           enum: [LOW, MEDIUM, HIGH]
         txnType:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
         channel:
           type: [string, 'null']
           enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM, null]
@@ -4148,7 +4148,7 @@ components:
           enum: [FREEZE, REDUCE]
         txnType:
           type: [string, 'null']
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD, null]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD, null]
           description: null = any
         channel:
           type: [string, 'null']
@@ -4156,12 +4156,12 @@ components:
           description: null = any
         walletType:
           type: [string, 'null']
-          enum: [C, A, D, M, I, null]
+          enum: [C, A, D, M, I, B, null]
           description: null = any
         userCategory:
           type: [string, 'null']
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION, null]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER, null]
           description: null = any
         kycTier:
           type: [integer, 'null']
@@ -4200,17 +4200,17 @@ components:
           enum: [FREEZE, REDUCE]
         txnType:
           type: [string, 'null']
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD, null]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD, null]
         channel:
           type: [string, 'null']
           enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM, null]
         walletType:
           type: [string, 'null']
-          enum: [C, A, D, M, I, null]
+          enum: [C, A, D, M, I, B, null]
         userCategory:
           type: [string, 'null']
           enum: [CUSTOMER, RETAIL_AGENT, SUPER_AGENT, MERCHANT_AGENT, BANK_AGENT, MICRO_MERCHANT, SMALL_MERCHANT, ENTERPRISE_MERCHANT, ONLINE_MERCHANT, DISTRIBUTOR, MASTER_DISTRIBUTOR,
-            SUB_DISTRIBUTOR, INSTITUTION, null]
+            SUB_DISTRIBUTOR, INSTITUTION, BILLER, null]
         kycTier:
           type: [integer, 'null']
           format: int32
@@ -4324,7 +4324,7 @@ components:
               type: array
               items:
                 type: string
-                enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+                enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
             channels:
               type: array
               items:
@@ -4334,12 +4334,12 @@ components:
               type: array
               items:
                 type: string
-                enum: [C, A, D, M, I]
+                enum: [C, A, D, M, I, B]
             toWalletTypes:
               type: array
               items:
                 type: string
-                enum: [C, A, D, M, I]
+                enum: [C, A, D, M, I, B]
           description: null / absent member = any
         condition: {type: object, description: 'Cond := {all:[Cond]} | {any:[Cond]} | {not:Cond} | Pred (SPEC fraud rule DSL); depth <= 6, <= 50 nodes'}
         weight: {type: integer, format: int32, minimum: 0, maximum: 1000}
@@ -4502,7 +4502,7 @@ components:
           type: array
           items:
             type: string
-            enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+            enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
         alertOnLimitExceeded: {type: boolean}
       required: [thresholds, maxScore, stepUpUnsupportedChannels, stepUpFallback, bypassTxnTypes, alertOnLimitExceeded]
     RiskSettings:
@@ -4595,7 +4595,7 @@ components:
         decidedAt: {type: string, format: date-time, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$'}
         txnType:
           type: string
-          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
+          enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, BILL_PAY, RECHARGE, REVERSAL, DISBURSEMENT, CAMPAIGN_REWARD]
         channel:
           type: string
           enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM]

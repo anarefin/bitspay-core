@@ -39,7 +39,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/create-hold"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "LIEN freezes (AML_LIEN hold, ledger command type 14); attempt-derived commandId"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.accountId", "req.amountPoisha", "req.reasonCode",
                    "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
@@ -50,7 +50,7 @@ consumes:
     - producer: ledger-service
       operation: "POST /v1/ledger/commands/release-hold"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "lift of a LIEN freeze (ledger command type 15)"
       fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.holdCommandId", "res.commandId", "res.result", "res.rejectionCode", "res.postedAt"]
       codesUsed:
@@ -60,7 +60,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/commands/{commandId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "resolve an unknown create-hold / release-hold outcome before retrying a step whose first try is older than 24 h (kernel K3.3 rule 4)"
       fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode"]
       codesUsed:
@@ -69,7 +69,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/accounts/{id}/balance"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "lien sizing: held = min(requested, available)"
       fieldsUsed: ["path.id", "res.availableBalancePoisha", "res.closed"]
       codesUsed: []
@@ -77,7 +77,7 @@ consumes:
     - producer: ledger-service
       operation: "GET /v1/ledger/holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "case view of open holds on the subject wallet"
       fieldsUsed: ["query.accountId", "res.items[].holdCommandId", "res.items[].amountPoisha", "res.items[].reasonCode",
                    "res.items[].createdBy", "res.items[].createdAt", "res.totalHeldPoisha"]
@@ -87,7 +87,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/wallets/{walletId}/status-changes"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "apply (BLOCKED / DEBIT_BLOCKED) and lift (ACTIVE, same reasonCode + reference) compliance freezes; HTTP 200 APPLIED|NOOP is the confirmation"
       fieldsUsed: ["path.walletId", "header.Idempotency-Key", "req.targetStatus", "req.reasonCode", "req.reference", "req.comment",
                    "res.changeRequestId", "res.walletId", "res.outcome", "res.approvalId", "res.walletStatus", "res.walletVersion"]
@@ -98,7 +98,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/wallets/{walletId}/flags"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "AML_WATCH (bit 1) and HAS_OPEN_LIEN (bit 8) held by compliance-service"
       fieldsUsed: ["path.walletId", "req.set", "req.clear", "req.reasonCode", "res.flags"]
       codesUsed: []
@@ -106,7 +106,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/wallets/{walletId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "case / STR enrichment and projection miss"
       fieldsUsed: ["path.walletId", "res.walletId", "res.ownerType", "res.ownerId", "res.walletType", "res.status", "res.statusReasonCode",
                    "res.msisdn", "res.displayName", "res.kycTier", "res.flags", "res.version", "res.createdAt"]
@@ -116,7 +116,7 @@ consumes:
     - producer: wallet-service
       operation: "GET /v1/customers/{customerId}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "STR party details and EDD; forwards the acting officer's X-Actor-Roles and X-Actor-User-Id (masking per those roles, OPEN D-20)"
       fieldsUsed: ["path.customerId", "header.X-Actor-Roles", "header.X-Actor-User-Id",
                    "res.customerId", "res.status", "res.msisdn", "res.email", "res.nameEn", "res.nameBn", "res.nidMasked", "res.dob", "res.gender",
@@ -129,7 +129,7 @@ consumes:
     - producer: wallet-service
       operation: "POST /v1/partners/{partnerId}/status-changes"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "SUSPEND_PARTNER action and sanctions auto-freeze of a PARTNER subject (targetStatus SUSPENDED only)"
       fieldsUsed: ["path.partnerId", "header.Idempotency-Key", "req.targetStatus", "req.reasonCode", "req.comment", "res.partnerId", "res.status", "res.version"]
       codesUsed:
@@ -139,7 +139,7 @@ consumes:
     - producer: limits-risk-service
       operation: "POST /v1/blacklist/entries"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "PROPOSE_BLACKLIST case action (source COMPLIANCE_CASE, hash only); maker-checked in limits-risk"
       fieldsUsed: ["header.Idempotency-Key", "req.type", "req.valueHash", "req.valueMasked", "req.reasonCode", "req.expiresAt", "req.comment",
                    "req.source", "req.reference", "res.entryId", "res.status", "res.approvalId", "res.valueMasked", "problem.entryId"]
@@ -151,7 +151,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/refdata/{type}"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "bootstrap GEO and SYSTEM_PARAM items before refdata.events has been read"
       fieldsUsed: ["path.type", "query.cursor", "query.limit", "res.items[].type", "res.items[].code", "res.items[].parentCode",
                    "res.items[].nameEn", "res.items[].nameBn", "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
@@ -161,7 +161,7 @@ consumes:
     - producer: admin-service
       operation: "GET /v1/retention/legal-holds"
       major: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       purpose: "(R2) checked before any purge of an AML case or its documents; skip while an ACTIVE hold exists"
       fieldsUsed: ["query.subjectType", "query.subjectId", "query.category", "res.items[].holdId", "res.items[].category", "res.items[].subjectType",
                    "res.items[].subjectId", "res.items[].status", "res.items[].placedAt"]
@@ -175,7 +175,7 @@ consumes:
       topic: customer.events
       eventType: KYC_SUBMITTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "upsert CUSTOMER subject from the submitted values; onboarding screening; answer with SCREENING_COMPLETED (sourceEventId = envelope eventId)"
       fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
@@ -186,7 +186,7 @@ consumes:
       topic: customer.events
       eventType: CUSTOMER_REGISTERED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "upsert CUSTOMER subject"
       fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
@@ -196,7 +196,7 @@ consumes:
       topic: customer.events
       eventType: CUSTOMER_PROFILE_UPDATED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "upsert subject; name/DOB change of an active customer -> PROFILE_CHANGE screening"
       fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
@@ -206,7 +206,7 @@ consumes:
       topic: customer.events
       eventType: KYC_APPROVED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "subject KYC status, tier and review baseline (R2 review schedule)"
       fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
@@ -215,7 +215,7 @@ consumes:
       topic: customer.events
       eventType: KYC_REJECTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "subject KYC status"
       fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
@@ -224,7 +224,7 @@ consumes:
       topic: customer.events
       eventType: KYC_TIER_CHANGED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "subject tier"
       fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
@@ -233,7 +233,7 @@ consumes:
       topic: customer.events
       eventType: RISK_GRADE_CHANGED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "subject grade; HIGH -> EDD case if none open; review schedule (R2)"
       fieldsUsed: ["customerId", "riskGrade", "reasonCode"]
@@ -244,7 +244,7 @@ consumes:
       topic: partner.events
       eventType: PARTNER_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "PARTNER + key-person subjects; screen every new version in PENDING_SCREENING (legalName, displayName, key persons) -> partner-level SCREENING_COMPLETED"
       fieldsUsed: ["partnerId", "partnerType", "status", "displayName", "legalName", "msisdn", "walletId", "territory.district", "riskGrade",
@@ -257,7 +257,7 @@ consumes:
       topic: wallet.events
       eventType: WALLET_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "wallet_projection (subject resolution, status_before, reactivation date for AML-SC-07); never a freeze confirmation"
       fieldsUsed: ["walletId", "version", "ownerType", "ownerId", "walletType", "msisdn", "status", "previousStatus", "statusReasonCode",
@@ -269,7 +269,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_COMPLETED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service.txn-ingest
       purpose: "monitoring detail (aml_txn) + daily rollups; batched, idempotent by ON CONFLICT DO NOTHING (no inbox)"
       fieldsUsed: ["txnId", "txnRef", "txnType", "channel", "completedAt", "fromWalletId", "fromWalletType", "toWalletId", "toWalletType",
@@ -280,7 +280,7 @@ consumes:
       topic: txn.events
       eventType: TRANSACTION_REVERSED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service.txn-ingest
       purpose: "mark the original aml_txn row reversed (correlate by txnId/txnRef, never originalTxnRef)"
       fieldsUsed: ["txnId", "txnRef", "completedAt", "reversalTxnRef", "reversedAmountPoisha"]
@@ -290,7 +290,7 @@ consumes:
       topic: risk.alerts
       eventType: RISK_ALERT_RAISED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "FRAUD alert (dedupe RISK:<alertId>) -> case grouping"
       fieldsUsed: ["alertId", "txnId", "walletId", "decision", "ruleIds", "riskScore", "details.txnType", "details.channel", "details.amountPoisha",
@@ -303,7 +303,7 @@ consumes:
       topic: blacklist.events
       eventType: BLACKLIST_ENTRY_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "internal_blacklist (NID, MSISDN only); newly active entry -> RESCREEN of matching subjects"
       fieldsUsed: ["entryId", "type", "valueHash", "active", "expiresAt", "reasonCode"]
@@ -314,7 +314,7 @@ consumes:
       topic: refdata.events
       eventType: REFDATA_UPSERTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       groupId: compliance-service
       purpose: "GEO names (MIS), CUTOFF.EOD (business date), RETENTION.AML_CASE (R2 purge); other types/codes ignored"
       fieldsUsed: ["type", "code", "parentCode", "nameEn", "nameBn", "attributes", "version", "active"]
@@ -326,32 +326,32 @@ consumes:
       topic: notification.requests
       eventType: NOTIFICATION_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
       templates: [CASE_ASSIGNED, CASE_SLA_WARNING, CASE_SLA_BREACHED, CASE_UNASSIGNED, SANCTIONS_AUTO_FREEZE, FREEZE_FAILED, WALLET_RESTRICTED_NOTICE]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_REQUESTED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_DECIDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: approval.events
       eventType: APPROVAL_EXPIRED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
     - owner: admin-service
       topic: audit.events
       eventType: AUDIT_RECORDED
       version: 1
-      pinnedContractVersion: 1.0.0
+      pinnedContractVersion: 1.1.0
       fieldsUsed: ["*"]
 
   data: []

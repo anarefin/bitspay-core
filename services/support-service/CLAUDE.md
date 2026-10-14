@@ -3,6 +3,8 @@
 
 You are implementing **support-service** (SVC-09) of Bits Pay: tickets, SLA / escalation, disputes, wrong-transfer holds, reversal requests with maker-checker, service actions, customer 360, transaction enquiry, dashboards and the BB complaint dataset. This folder is the whole world for this service.
 
+**Release scope (SRS v1.2, CR-SUPPORT-1):** MVP = tickets core, wrong transfer (SUP-005) and back-office reversal (SUP-006) — WPs tagged `[MVP]` in SPEC §10, incl. WP-CR-1 (`BILL_PAY` / `RECHARGE` reversible, BR-S-38). SLA / escalation / dashboards / BB dataset, service actions, customer 360 / enquiry and CRM are `[R1+]`.
+
 ## Read first (every session)
 1. `docs/SPEC.md` — the specification (one clean text; §10 lists work packages).
 2. `docs/contracts/contract.yaml` — what this service provides and consumes (pins).

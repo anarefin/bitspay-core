@@ -4,7 +4,7 @@
 |---|---|
 | Service | `support-service` (`spring.application.name`) |
 | Number / owner | SVC-09 · Dev-3 (Track B) · single module (no `data.module`) |
-| Layer / release | Back office · R1 (SUP-010 CRM integration and SUP-011 BB dataset format: R2) |
+| Layer / release | Back office · **MVP**: tickets core, wrong-transfer (SUP-005) and back-office reversal (SUP-006, incl. BILL_PAY / RECHARGE) · R1: other dispute types, SLA / escalation, dashboards, customer 360 / enquiry, service actions (SUP-010 CRM integration and SUP-011 BB dataset format: R2) |
 | contractVersion | 1.0.0 (see `contracts/contract.yaml`) |
 | Kernel | 1.0 (`../../../docs/global/GLOBAL-CONVENTIONS.md`) |
 | Ports | HTTP 8109 · management 9109 |
@@ -39,10 +39,13 @@ The same service handles Salma's complaint that agent cash-out money was not rec
 - **Customer 360** (SUP-001) and **transaction enquiry** (SUP-007): aggregation with per-call timeouts, partial results and role-based masking; history older than 30 days from finance-ops-service.
 - **Dashboards** (SUP-009) and the **Bangladesh Bank complaint dataset** (SUP-011, RR-05 system of record).
 
+**MVP vs R1+ (SRS v1.2, CR-SUPPORT-1).** The MVP release delivers: the ticket core needed to anchor a case (WP-2), wrong-transfer handling (SUP-005: `WRONG_TRANSFER` dispute, hold, consent; WP-4) and back-office reversal requests with maker-checker and execution (SUP-006; WP-5), now also for `BILL_PAY` and `RECHARGE` (ledger commands 18 / 19 are reversible, BR-S-38). Everything else is **R1+**: dispute types other than `WRONG_TRANSFER` and `OTHER` as product features, SLA / escalation / auto-close, dashboards and the BB dataset (WP-3), service actions, customer 360 and enquiry (WP-6), CRM integration (SUP-010). Complaint handling beyond what a wrong transfer or reversal needs is R1+.
+
 ### 1.3 Out of scope / deferred
 
 | Deferred item | Replacement now |
 |---|---|
+| R1+ features in the MVP release (CR-SUPPORT-1) | SLA / escalation / dashboards / BB dataset (WP-3) and service actions / customer 360 / enquiry (WP-6) are not delivered in the MVP; MVP staff use the ticket, dispute and reversal APIs only |
 | CRM / contact-centre integration (SUP-010, R2) | `client.ExternalTicketingProvider` interface with a `none` implementation (kept as an interface because CRM vendors are selected by config in R2); built-in ticketing is the system of record (`ticket.external_ref` reserved) |
 | PIN reset, device unbind (needs the future auth layer) | Recorded as service actions with state `RECORDED_PENDING_AUTH`; no API for the auth layer yet (OPEN D-34) |
 | Provisional **credit** for disputes (SUP-004 "hold/credit") | Holds only. No ledger command exists for a provisional credit (OPEN D-34) |
@@ -70,25 +73,29 @@ Single module. Package root `com.bracits.bitspay.support`.
 
 ## 2. SRS traceability
 
+Baseline: **SRS v1.2 (14 Oct 2026)**. "· MVP" in the last column marks rows the MVP release delivers; every other row is R1+.
+
 | SRS ID | Requirement (short) | Covered by (BR / WP / API / event) |
 |---|---|---|
 | SUP-001 | 360° customer view, masked per role | `GET /v1/support/customer-360` (BR-S-50..53); WP-6 |
-| SUP-002 | Complaint registration from all channels, ticket number communicated | `POST /v1/support/tickets` (`X-Channel` APP / USSD / PARTNER_APP / PORTAL / BACKOFFICE / API; IVR and chatbot adaptors as `SYSTEM` with `source` IVR / CHATBOT); `TICKET_CREATED`; `TICKET_UPDATE` (event CREATED) (BR-S-01..03, BR-S-08); WP-2 |
+| SUP-002 | Complaint registration from all channels, ticket number communicated | `POST /v1/support/tickets` (`X-Channel` APP / USSD / PARTNER_APP / PORTAL / BACKOFFICE / API; IVR and chatbot adaptors as `SYSTEM` with `source` IVR / CHATBOT); `TICKET_CREATED`; `TICKET_UPDATE` (event CREATED) (BR-S-01..03, BR-S-08); WP-2 · MVP |
 | SUP-003 | Category, priority, SLA, assignment, escalation, customer-visible status | CATEGORIES / SLA_POLICY / ESCALATION config; `sla-evaluator`; `GET /v1/support/my/tickets`; BR-S-04..07, BR-S-10..13; WP-2, WP-3 |
 | SUP-004 | Dispute: initiation, evidence, workflow, provisional hold (credit deferred), resolution, notification | Disputes API, ledger holds, `DISPUTE_*` events, `TICKET_UPDATE` (event DISPUTE_RESOLVED); BR-S-20..26; WP-4 (credit: OPEN D-34) |
-| SUP-005 | Wrong transfer: hold, reversal with consent / regulatory instruction, maker-checker | `WRONG_TRANSFER` dispute + consent + reversal request; BR-S-21..26, BR-S-30..35; WP-4, WP-5 |
-| SUP-006 | Reversal with maker-checker, reason code, notification, fee/commission per rule | `reversal_request` + REVERSAL_POLICY + `POST /v1/internal/reversals`; BR-S-30..36; WP-5 |
+| SUP-005 | Wrong transfer: hold, reversal with consent / regulatory instruction, maker-checker | `WRONG_TRANSFER` dispute + consent + reversal request; BR-S-21..26, BR-S-30..35; WP-4, WP-5 · MVP |
+| SUP-006 | Reversal with maker-checker, reason code, notification, fee/commission per rule | `reversal_request` + REVERSAL_POLICY + `POST /v1/internal/reversals`; BR-S-30..36, BR-S-38 (BILL_PAY / RECHARGE); WP-5, WP-CR-1 · MVP |
 | SUP-007 | Transaction enquiry by ID, mobile, date, amount, partner | `GET /v1/support/transactions/{txnRef}`, `GET /v1/support/transactions` (30-day hot window + history); BR-S-53; WP-6 |
 | SUP-008 | Block / unblock, PIN reset, unbind device, resend receipt, contact update — audited | Service actions (BR-S-40..44); PIN / device recorded only (OPEN D-34); WP-6 |
 | SUP-009 | Dashboards: open / closed, ageing, SLA breaches, categories, FCR | `GET /v1/support/dashboards/summary` (BR-S-60); WP-3 |
 | SUP-010 | CRM integration | `client.ExternalTicketingProvider` (`none`) — deferred R2 |
 | SUP-011 | BB complaint reporting data | `GET /v1/support/reports/bb-complaints` (BR-S-61, format provisional B-07); `TICKET_STATUS_CHANGED` carries the RR-05 fields; WP-3 |
 | LED-009 | "Disputed" state visible | `disputeState` beside the transaction status in 360 / enquiry; partial (OPEN D-34) |
-| LED-011 | Reversals as compensating postings | Only via transaction-service `POST /v1/internal/reversals` (ledger `post-reversal`); WP-5 |
+| LED-011 | Reversals as compensating postings | Only via transaction-service `POST /v1/internal/reversals` (ledger `post-reversal`); WP-5 · MVP |
 | PRT-008 | Partner dispute initiation / tracking | `POST /v1/support/disputes` and `GET /v1/support/disputes` for MERCHANT / AGENT actors (own); WP-4 |
-| BOM-004 / 005 | Maker-checker on reversals; checker ≠ maker; multi-level | Local `approval_request` (kernel K5); BR-S-32; WP-5 |
+| BOM-004 / 005 | Maker-checker on reversals; checker ≠ maker; multi-level | Local `approval_request` (kernel K5); BR-S-32; WP-5 · MVP |
 | BOM-008 | Data views audited | `CUSTOMER_360_VIEWED`, `ATTACHMENT_DOWNLOADED` on `audit.events` (BR-S-52); WP-6 |
-| UC-11 | Dispute and wrong-transfer resolution | Flows F2, F4 (§3.4); WP-4, WP-5 |
+| UC-11 | Dispute and wrong-transfer resolution | Flows F2, F4 (§3.4); WP-4, WP-5 · MVP (wrong transfer; other dispute types R1+) |
+| BIL-011 / BIL-012 | Bill payment and mobile recharge (MVP) | Back-office reversal of `BILL_PAY` / `RECHARGE` (ledger commands 18 / 19 reversible); BR-S-38; WP-CR-1 · MVP |
+| A-43 | No OTP / step-up in MVP; trusted headers | Staff identity from trusted `X-Actor-*` headers (§6 identity rules) · MVP |
 | PER-008 | Back-office search ≤ 3 s | Ticket search indexes; enquiry via transaction-service (30 d) and history (≤ 3 s SLA, 3.5 s client timeout); WP-3, WP-6 |
 | SRS §8.3 | Complaints retention 12 months online / 5 years after closure | `RETENTION.COMPLAINT` (§4.3); purge R2 with legal-hold check |
 
@@ -4680,7 +4687,7 @@ None. support-service owns no cache format, shared algorithm or golden-vector fi
 | transaction-service | `POST /v1/internal/reversals` | 1 / 1.0.0 | §6.1 | execute approved reversals |
 | transaction-service | `GET /v1/transactions/{txnRef}` | 1 / 1.0.0 | §6.2 | eligibility, re-check, enquiry |
 | transaction-service | `GET /v1/transactions` | 1 / 1.0.0 | §6.3 | 360 / enquiry (30 d) |
-| transaction-service | `txn.events` `TRANSACTION_REVERSED` | v1 / 1.0.0 | §6.13 | lost-response reconciliation |
+| transaction-service | `txn.events` `TRANSACTION_REVERSED` | v1 / 1.1.0 | §6.13 | lost-response reconciliation |
 | ledger-service | `POST /v1/ledger/commands/create-hold` and `POST /v1/ledger/commands/release-hold` | 1 / 1.0.0 | §6.4 | dispute holds |
 | ledger-service | `GET /v1/ledger/accounts/{id}/balance` | 1 / 1.0.0 | §6.5 | hold sizing, funds pre-check, 360 |
 | ledger-service | `GET /v1/ledger/holds` | 1 / 1.0.0 | §6.6 | 360, hold reconciliation |
@@ -4688,15 +4695,15 @@ None. support-service owns no cache format, shared algorithm or golden-vector fi
 | wallet-service | `POST /v1/wallets/{walletId}/status-changes` | 1 / 1.0.0 | §6.8 | block / unblock |
 | wallet-service | `POST /v1/wallets/{walletId}/flags` | 1 / 1.0.0 | §6.9 | flag 8 |
 | wallet-service | `PATCH /v1/customers/{customerId}` | 1 / 1.0.0 | §6.10 | contact update |
-| wallet-service | `wallet.events` `WALLET_UPSERTED` | v1 / 1.0.0 | §6.14 | wallet projection |
+| wallet-service | `wallet.events` `WALLET_UPSERTED` | v1 / 1.1.0 | §6.14 | wallet projection |
 | limits-risk-service | `GET /v1/limits/wallets/{walletId}/usage` | 1 / 1.0.0 | §6.11 | 360 limits |
 | finance-ops-service | `GET /v1/history/wallets/{walletId}`, `GET /v1/history/transactions/{txnRef}` | 1 / 1.0.0 | §6.12 | history > 30 d, non-transaction refs |
 | admin-service | `GET /v1/notifications/logs` | 1 / 1.0.0 | §6.12a | 360 notifications |
 | admin-service | `GET /v1/refdata/{type}`, `GET /v1/retention/legal-holds` | 1 / 1.0.0 | §6.12b | bootstrap, legal holds (R2) |
-| admin-service | `refdata.events` `REFDATA_UPSERTED` | v1 / 1.0.0 | §6.16 | calendar, reason codes, retention |
-| admin-service (schema owner; records by wallet-service) | `approval.events` `APPROVAL_DECIDED`, `APPROVAL_EXPIRED` | v1 / 1.0.0 | §6.17 | complete forwarded actions |
+| admin-service | `refdata.events` `REFDATA_UPSERTED` | v1 / 1.1.0 | §6.16 | calendar, reason codes, retention |
+| admin-service (schema owner; records by wallet-service) | `approval.events` `APPROVAL_DECIDED`, `APPROVAL_EXPIRED` | v1 / 1.1.0 | §6.17 | complete forwarded actions |
 | compliance-service | `case.events` `REVERSAL_RECOMMENDED` | v1 / 1.0.0 | §6.15 | internal review ticket |
-| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` (written) | v1 / 1.0.0 | `*` | §6.18 |
+| admin-service | inbound `notification.requests`, `approval.events`, `audit.events` (written) | v1 / 1.1.0 | `*` | §6.18 |
 
 ### 6.1 transaction-service — `POST /v1/internal/reversals`
 
@@ -4740,7 +4747,7 @@ None. support-service owns no cache format, shared algorithm or golden-vector fi
 |---|---|---|---|---|---|
 | txnId | uuid | Y | N | UUIDv7 | `dispute.txn_id`, `reversal_request.original_txn_id` |
 | txnRef | string | Y | N | opaque | |
-| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL` | |
+| txnType | enum | Y | N | `P2P`, `CASH_IN`, `CASH_OUT`, `MERCHANT_PAYMENT`, `MERCHANT_REFUND`, `FLOAT_TRANSFER`, `REVERSAL`, `BILL_PAY`, `RECHARGE` | `BILL_PAY` / `RECHARGE` are additive in transaction-service 1.1.0 (MVP); unknown values are handled as not reversible / not disputable (`TXN_TYPE_NOT_ALLOWED`) |
 | status | enum{INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED} | Y | N | current lifecycle state | |
 | amountPoisha | int64 (poisha) | Y | N | > 0 | principal |
 | feePoisha | int64 (poisha) | Y | N | ≥ 0 | |
@@ -5051,7 +5058,7 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
 
 ### 7.4 Reversal requests (SUP-005 / SUP-006)
 
-- **BR-S-30 Creation checks** (standalone requests and `:resolve` UPHELD). Re-read the original (§6.2): status `COMPLETED` (not REVERSED, REFUNDED, PARTIALLY_REFUNDED; else 409 `TXN_NOT_COMPLETED`); `txnType ∈ reversibleTxnTypes` (P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER; else 409 `TXN_TYPE_NOT_ALLOWED`); `completedAt ≥ now − reversalWindowDays` (180; else 409 `OUTSIDE_REVERSAL_WINDOW`); no other active request for `originalTxnRef` (409 `ACTIVE_REVERSAL_EXISTS` + `reversalRequestId`). Reason prerequisites: `WRONG_TRANSFER` → a WRONG_TRANSFER dispute on this txn with consent (409 `CONSENT_REQUIRED`); `DISPUTE_UPHELD` → a dispute being resolved UPHELD (only through `:resolve`); `FRAUD_CONFIRMED` and `SYSTEM_ERROR` → `caseReference` (409 `REVERSAL_PREREQUISITE_MISSING`). `ticketId` is mandatory for standalone requests (404 when unknown). Partial: `amountPoisha` 0 < x ≤ principal; x < principal with `reverseFee` or `reverseCommission` true → 400 `PARTIAL_WITH_FEE_FLAGS`; partial requests always send both flags false; `amountPoisha` absent = full principal. `releaseHoldCommandId` = the ACTIVE hold of the linked dispute on the original's **to** wallet (if any). Emits `REVERSAL_REQUESTED` (`walletIds = [from, to]`, `makerId` = maker `X-Actor-Id`) and `APPROVAL_REQUESTED`.
+- **BR-S-30 Creation checks** (standalone requests and `:resolve` UPHELD). Re-read the original (§6.2): status `COMPLETED` (not REVERSED, REFUNDED, PARTIALLY_REFUNDED; else 409 `TXN_NOT_COMPLETED`); `txnType ∈ reversibleTxnTypes` (P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER, BILL_PAY, RECHARGE; else 409 `TXN_TYPE_NOT_ALLOWED`); `completedAt ≥ now − reversalWindowDays` (180; else 409 `OUTSIDE_REVERSAL_WINDOW`); no other active request for `originalTxnRef` (409 `ACTIVE_REVERSAL_EXISTS` + `reversalRequestId`). Reason prerequisites: `WRONG_TRANSFER` → a WRONG_TRANSFER dispute on this txn with consent (409 `CONSENT_REQUIRED`); `DISPUTE_UPHELD` → a dispute being resolved UPHELD (only through `:resolve`); `FRAUD_CONFIRMED` and `SYSTEM_ERROR` → `caseReference` (409 `REVERSAL_PREREQUISITE_MISSING`). `ticketId` is mandatory for standalone requests (404 when unknown). Partial: `amountPoisha` 0 < x ≤ principal; x < principal with `reverseFee` or `reverseCommission` true → 400 `PARTIAL_WITH_FEE_FLAGS`; partial requests always send both flags false; `amountPoisha` absent = full principal. `releaseHoldCommandId` = the ACTIVE hold of the linked dispute on the original's **to** wallet (if any). Emits `REVERSAL_REQUESTED` (`walletIds = [from, to]`, `makerId` = maker `X-Actor-Id`) and `APPROVAL_REQUESTED`.
 - **BR-S-31 Maker roles and defaults** (`REVERSAL_POLICY`): WRONG_TRANSFER / DISPUTE_UPHELD → `SUP_MAKER`, `OPS_MAKER`; SYSTEM_ERROR → `OPS_MAKER`; FRAUD_CONFIRMED → `COMPLIANCE_OFFICER`, `RISK_ANALYST`. Wrong role → 403. Default flags (overridable by the maker, recorded): WRONG_TRANSFER `reverseFee = false, reverseCommission = false`; DISPUTE_UPHELD, SYSTEM_ERROR, FRAUD_CONFIRMED `true / true`.
 - **BR-S-32 Approval levels.** Requested principal ≤ `singleLevelMaxPoisha` (2 500 000 = 25 000 Tk) → 1 level, checkers `SUP_CHECKER`, `OPS_CHECKER` (FRAUD_CONFIRMED: `RISK_CHECKER`, `CAMLCO`); above → 2 levels, level 2 `FIN_CHECKER`. Checker ≠ maker and ≠ any earlier-level checker (also compared on `X-Actor-User-Id`) → else 422 `MAKER_CHECKER_VIOLATION`. Role not in the current level's roles → 403. Expiry `approvalExpiryHours` (72) → EXPIRED. Before the final approval the request is revalidated (original still COMPLETED, still within the window); failure → 409 `REVALIDATION_FAILED` and the request stays PENDING_APPROVAL. Example: 3 000 000 poisha (30 000 Tk) WRONG_TRANSFER → L1 `SUP_CHECKER`/`OPS_CHECKER`, then L2 `FIN_CHECKER`.
 - **BR-S-33 Execution** (`reversal-executor`, single-flight per request via `SELECT … FOR UPDATE SKIP LOCKED`). For APPROVED requests: re-read the original — already `REVERSED` → BR-S-35 path (COMPLETED with its `reversalTxnRef`); otherwise funds pre-check `available(to wallet) + activeOwnHold ≥ amountPoisha ?? principal`, else PENDING_FUNDS (no call). Then commit `EXECUTING`, `attempt_started_at` (first send of this attempt), key `rev-{id}-{attempt}`, and call §6.1 with `releaseHoldCommandId` (unless `omit_release_hold`), `approvalId` and `amountPoisha` when partial. Worked example: principal 50 000, recipient available 0, own ACTIVE hold 50 000 → 0 + 50 000 ≥ 50 000 → call.
@@ -5071,6 +5078,7 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
   `REVERSAL_COMPLETED.failureCode`: FAILED → the problem `code` or `transaction.failureCode`; REJECTED `APPROVAL_REJECTED`; EXPIRED `APPROVAL_EXPIRED`; CANCELLED `CANCELLED_BY_MAKER`; COMPLETED null. PENDING_FUNDS / FAILED_RETRYABLE are retried only by `:retry` (STAFF `SUP_MAKER`, `OPS_MAKER`; other states → 409 `NOT_RETRYABLE`) or, for PENDING_FUNDS, daily while the hold is ACTIVE when `autoRetryPendingFunds`. A retry sets APPROVED with `attempt + 1`.
 - **BR-S-35 Lost-response reconciliation.** `TRANSACTION_REVERSED` whose `data.txnRef` matches a request in APPROVED / EXECUTING / PENDING_FUNDS / FAILED_RETRYABLE → COMPLETED with `data.reversalTxnRef` (same cascade as a 200; idempotent with a later 200 replay). No match → if an active dispute exists for that txnRef, add an INTERNAL ticket comment "reversed by another path" and resolve the dispute UPHELD only if a reversal request of it exists; otherwise ignore.
 - **BR-S-36 Party notifications.** Money notifications to the parties come from the REVERSAL transaction's own events (notification rules on `txn.events`); support sends only `TICKET_UPDATE` for the ticket. support sends no reversal SMS of its own.
+- **BR-S-38 Bill payment and recharge reversals** (MVP, CR-SUPPORT-1; SRS BIL-011, BIL-012). `BILL_PAY` (ledger command 18 `post-bill-payment`) and `RECHARGE` (command 19 `post-recharge`) are reversible by ledger `post-reversal` like commands 1-6, so they are in `reversibleTxnTypes` and follow BR-S-30..37 unchanged: the original's **to** wallet is the biller's settlement wallet (type `B`, ledger account type 150 `BILLER_WALLET`), so the BR-S-33 funds pre-check reads the biller wallet's available balance; fee / commission flags follow the `REVERSAL_POLICY` defaults (feeBearer and commissionSource apply as for commands 1-6 on the ledger side). Allowed reasons: `SYSTEM_ERROR` (with `caseReference`, e.g. a simulated-provider receipt the customer never received) and `DISPUTE_UPHELD` (through an `OTHER` dispute; no hold, `HOLD_POLICY.OTHER.holdAllowed = false`). `WRONG_TRANSFER` is not offered for them (wrong biller reference or MSISDN is handled as `OTHER`). A reversal moves money back from the biller wallet only; in the MVP no biller or telco is called (SRS A-41), so there is nothing to cancel at a provider. Worked example: `BP26101400…` 120 000 poisha to `DESCO`, fee 500 + VAT 75 poisha (PAYER), `SYSTEM_ERROR` with case `CS-0041` → 1 level (`OPS_MAKER` → `OPS_CHECKER`), executor pre-check `available(DESCO wallet) ≥ 120 000`, transaction-service posts `RV…`, fee and VAT returned (`reverseFee = true`).
 - **BR-S-37 Cancel.** `:cancel` allowed in PENDING_APPROVAL (the approval becomes CANCELLED, `APPROVAL_DECIDED` status CANCELLED), PENDING_FUNDS and FAILED_RETRYABLE; never once EXECUTING or terminal (409 `NOT_CANCELLABLE`). Emits `REVERSAL_COMPLETED` outcome CANCELLED; the dispute returns to INVESTIGATING.
 
 ### 7.5 Service actions (SUP-008)
@@ -5167,13 +5175,13 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
   "MERCHANT_DISPUTE":      { "txnTypes": ["MERCHANT_PAYMENT"], "holdAllowed": true, "autoHold": false, "maxHoldDays": 15, "maxTxnAgeDaysForHold": 60, "notifyCounterparty": true },
   "DUPLICATE_TXN":         { "txnTypes": ["P2P","MERCHANT_PAYMENT","CASH_OUT"], "holdAllowed": true, "autoHold": false, "maxHoldDays": 7, "maxTxnAgeDaysForHold": 30, "notifyCounterparty": true },
   "CASH_OUT_NOT_RECEIVED": { "txnTypes": ["CASH_OUT"], "holdAllowed": true, "autoHold": false, "maxHoldDays": 7, "maxTxnAgeDaysForHold": 7, "notifyCounterparty": true },
-  "OTHER":                 { "txnTypes": ["P2P","CASH_IN","CASH_OUT","MERCHANT_PAYMENT","FLOAT_TRANSFER"], "holdAllowed": false },
+  "OTHER":                 { "txnTypes": ["P2P","CASH_IN","CASH_OUT","MERCHANT_PAYMENT","FLOAT_TRANSFER","BILL_PAY","RECHARGE"], "holdAllowed": false },
   "disputeWindowDays": 90, "maxExtensions": 1 }
 ```
 
 `REVERSAL_POLICY`:
 ```json
-{ "reversibleTxnTypes": ["P2P","CASH_IN","CASH_OUT","MERCHANT_PAYMENT","FLOAT_TRANSFER"], "reversalWindowDays": 180,
+{ "reversibleTxnTypes": ["P2P","CASH_IN","CASH_OUT","MERCHANT_PAYMENT","FLOAT_TRANSFER","BILL_PAY","RECHARGE"], "reversalWindowDays": 180,
   "singleLevelMaxPoisha": 2500000, "approvalExpiryHours": 72, "autoRetryPendingFunds": true,
   "makerRoles": { "WRONG_TRANSFER": ["SUP_MAKER","OPS_MAKER"], "DISPUTE_UPHELD": ["SUP_MAKER","OPS_MAKER"], "SYSTEM_ERROR": ["OPS_MAKER"], "FRAUD_CONFIRMED": ["COMPLIANCE_OFFICER","RISK_ANALYST"] },
   "checkerRoles": { "default": [["SUP_CHECKER","OPS_CHECKER"],["FIN_CHECKER"]], "FRAUD_CONFIRMED": [["RISK_CHECKER","CAMLCO"],["FIN_CHECKER"]] },
@@ -5211,43 +5219,50 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
 
 ## 10. Work packages (build order for Claude Code)
 
-### WP-1 Skeleton and contracts
+Scope tags (CR-SUPPORT-1): `[MVP]` work packages are delivered in the MVP release; `[R1+]` ones follow in R1. In WP-4 only the `WRONG_TRANSFER` and `OTHER` dispute types are exercised for the MVP; the other dispute types ship with the WP but are product-enabled in R1.
+
+### [MVP] WP-1 Skeleton and contracts
 - **Goal:** a green, contract-first project.
 - **Scope:** Gradle project from the build template; profiles `local` / `dev` / `hybrid`; Flyway `V1__init.sql` (§4.1, incl. outbox / inbox) and `V2__seed_config.sql` (§8.2); `ActorContext` + `@RequiresActor`; problem+json model with provider reasons and extensions (`codes.yaml`); idempotency filter (K3.3); outbox writer; inbox helper; ShedLock; ArchUnit (layering, money as `long`, only `ReversalExecutor` may call `HttpTransactionClient.reverse`); all 39 operations served as stubs returning the `openapi.yaml` examples; WireMock stubs from `contracts/consumed/` wired; event fixtures wired; WireMock-backed `Http<Svc>Client` for every dependency.
 - **Acceptance:** provider contract tests (every operation and the six event schemas) green; OpenAPI drift check green; Flyway idempotent on an empty `svc_support`; role cannot read another schema.
 - **Depends on:** nothing.
 
-### WP-2 Tickets core (SUP-002, SUP-003 status, PRT-008 tracking)
+### [MVP] WP-2 Tickets core (SUP-002, SUP-003 status, PRT-008 tracking)
 - **Scope:** numbering (ADR-06); CATEGORIES; create / search / get / by-number / my-tickets; comments; attachments (encrypted store); assign; transitions (BR-S-05); reopen; FCR flag; `TICKET_CREATED` / `TICKET_STATUS_CHANGED`; `TICKET_UPDATE` (BR-S-08); `wallet.events` projection.
 - **Acceptance:** `ticketNumbering_isSequentialPerDhakaDay_underConcurrency`; `customerView_hidesInternalComments`; `resolve_withActiveDispute_409`; `ticketCreated_eventCarriesTicketNumber`; `ticketUpdate_sentOnCreateAndVisibleStatusChange_notForInternal`; `ivrAdaptor_systemActor_sourceIvr`.
 - **Depends on:** WP-1.
 
-### WP-3 SLA, escalation, auto-close, dashboards, BB dataset (SUP-003, SUP-009, SUP-011)
+### [R1+] WP-3 SLA, escalation, auto-close, dashboards, BB dataset (SUP-003, SUP-009, SUP-011)
 - **Scope:** `BusinessCalendar` with `refdata.events` (HOLIDAY, CALENDAR.*) and bootstrap; deadlines, pause / resume, `sla-evaluator`, escalation, `SUPPORT_ESCALATION`; `ticket-auto-close`; dashboard and BB dataset queries (json / csv); config document endpoints with `ConfigDocument` approvals.
 - **Acceptance:** `businessSla_P3_createdThursday1600_dueMonday1600` (§7.2 example); `pendingCustomer_pausesResolutionClock`; `slaBreach_escalatesToLevel2_andEmitsStatusChanged`; `holidayChange_recomputesOpenDeadlines`; `bbDataset_openingPlusReceivedMinusResolved_equalsClosing`; `config_activation_requiresSecondPerson`.
 - **Depends on:** WP-2.
 
-### WP-4 Disputes, holds, consent (SUP-004, SUP-005, LED-009, PRT-008)
+### [MVP] WP-4 Disputes, holds, consent (SUP-004, SUP-005, LED-009, PRT-008)
 - **Scope:** dispute API with transaction-service validation (forwarded headers for holders); hold placement / release / extension through the ledger; wallet flag 8; consent capture; `hold-expiry` and `hold-retry` jobs; `DISPUTE_*` events; `FUNDS_HELD_NOTICE` / `FUNDS_RELEASED_NOTICE`; `HoldExtension` approvals.
 - **Acceptance:** `dispute_wrongTransfer_autoHold_minOfPrincipalAndAvailable`; `hold_retry_usesSameCommandId`; `hold_rejected_nextHoldUsesSeqPlusOne`; `holdExpiry_releasesAndClearsFlagWhenLast`; `holdExpiry_skipsHoldWithApprovedReversal`; `dispute_duplicateForTxn_409_withDisputeIdExtension`; `regulatoryInstruction_requiresAttachment`; `customerDispute_notAParty_404`.
 - **Depends on:** WP-2.
 
-### WP-5 Reversal requests and execution (SUP-005, SUP-006, LED-011, BOM-004/005)
+### [MVP] WP-5 Reversal requests and execution (SUP-005, SUP-006, LED-011, BOM-004/005)
 - **Scope:** eligibility (BR-S-30/31), partial reversals, maker-checker levels (BR-S-32), executor with key-per-attempt and mapping (BR-S-33/34), `:retry` / `:cancel`, `txn.events` reconciliation (BR-S-35), `REVERSAL_*` events, dispute / ticket cascade; `case.events REVERSAL_RECOMMENDED` consumer (BR-S-27).
 - **Acceptance:** `reversal_checkerEqualsMaker_422`; `reversal_above25kTk_requiresFinChecker`; `reversal_503_retriesWithSameIdempotencyKey`; `reversal_422InsufficientFunds_retryUsesAttempt2Key`; `reversal_holdNotFound_nextAttemptWithoutReleaseHold`; `reversal_lostResponse_completedByTransactionReversedEvent_matchedByDataTxnRef`; `reversal_partial_forcesFlagsFalse`; `reversal_concurrentExecutors_singleCall`; `reversalRecommended_createsInternalTicket_once_noCustomerNotification`.
 - **Depends on:** WP-4.
 
-### WP-6 Service actions, customer 360, enquiry (SUP-001, SUP-007, SUP-008, BOM-008)
+### [R1+] WP-6 Service actions, customer 360, enquiry (SUP-001, SUP-007, SUP-008, BOM-008)
 - **Scope:** forwarded block / unblock and contact update with completion from `approval.events` (group `support-service.approvals`); resend receipt (`TXN_RECEIPT`); recorded PIN / device actions; 360 fan-out with timeouts, masking and audit; enquiry endpoints with the history fallback; notification-log section.
 - **Acceptance:** `block_forwardsStaffHeaders_andCompletesFromApprovalEvents`; `approvalEvents_otherServiceOrEntityType_ignored`; `contactUpdate_walletApiMode_pendingApproval`; `resendReceipt_limit3PerDay`; `customer360_limitsTimeout_returnsPartialWithStatus`; `customer360_auditorRole_masksMsisdn`; `customer360_notificationLogs403_sectionForbidden`; `customer360_viewAudited`; `enquiry_olderThan30d_routedToHistory`; `enquiry_nonTransactionPrefix_usesHistoryLookup`.
 - **Depends on:** WP-2 (WP-5 for annotations).
 
-### WP-7 Integration on the Compose stack
+### [MVP] WP-CR-1 Bill payment and recharge reversals (CR-SUPPORT-1)
+- **Scope:** `REVERSAL_POLICY.reversibleTxnTypes` and `HOLD_POLICY.OTHER.txnTypes` seeds gain `BILL_PAY`, `RECHARGE` (`V3__seed_bill_recharge_reversal.sql`, config-document version + 1); BR-S-38; WireMock stubs `txn-get-billpay-completed.json`, `txn-get-recharge-completed.json` (until the re-pinned transaction-service 1.1.0 snapshot provides them).
+- **Acceptance:** `reversal_billPay_systemError_executesWithBillerWalletPreCheck`; `reversal_recharge_disputeUpheld_viaOtherDispute`; `reversal_billPay_wrongTransferReason_409ConsentRequired`; `dispute_otherOnBillPay_noHoldPlaced`.
+- **Depends on:** WP-5.
+
+### [MVP] WP-7 Integration on the Compose stack
 - **Scope:** switch stubs to the real transaction, ledger, wallet, limits-risk, finance-ops and admin services; walk by hand: wrong transfer → hold → consent → maker-checker reversal → hold voided in the reversal chain → flag 8 cleared → ticket resolved; wallet closure pre-check blocked while the dispute is open (wallet-service reads `support.events`); ticket SMS visible in notification logs.
 - **Acceptance:** scenario steps checked off in `docs/PROGRESS.md`; no DLQ records.
 - **Depends on:** WP-5, WP-6.
 
-### WP-8 Hardening
+### [MVP] WP-8 Hardening
 - **Scope:** failure drills on the Compose stack (transaction-service stopped during execution → no double reversal after recovery; ledger stopped during hold placement); log-scan for PII; `docs/TRACEABILITY.md`.
 - **Acceptance:** drills pass; traceability complete.
 - **Depends on:** WP-7.
@@ -5257,7 +5272,7 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
 | Layer | Must-have tests |
 |---|---|
 | Service unit | `businessCalendar_skipsWeekendDaysAndBankHolidays`, `slaClock_pauseResume_addsBusinessMinutes`, `ticketStateMachine_illegalTransitions_throw`, `disputeStateMachine_illegalTransitions_throw`, `reversalStateMachine_illegalTransitions_throw`, `holdAmount_isMinOfPrincipalAvailableRequested`, `holdCommandId_deterministicUuidV5`, `releaseCommandId_deterministicUuidV5`, `reversalKey_perAttempt`, `reversalLevels_byAmountAndReason`, `masking_mostRestrictiveWins`, `customerVisibleStatus_mapping`, `ticketNumber_format` |
-| Service (Mockito / WireMock) | `resolveUpheld_createsReversalWithDefaultsFromPolicy`, `reversalEligibility_partiallyRefundedMerchantPayment_rejected`, `wrongTransferReversal_withoutConsent_rejected`, `fraudConfirmed_requiresCaseReferenceAndComplianceMaker`, `partialReversal_withFeeFlags_400`, `responseMapping_table_BR_S_34` (one case per row) |
+| Service (Mockito / WireMock) | `reversal_billPay_systemError_executesWithBillerWalletPreCheck`, `reversal_recharge_disputeUpheld_viaOtherDispute`, `reversal_billPay_wrongTransferReason_409ConsentRequired`, `dispute_otherOnBillPay_noHoldPlaced`, `resolveUpheld_createsReversalWithDefaultsFromPolicy`, `reversalEligibility_partiallyRefundedMerchantPayment_rejected`, `wrongTransferReversal_withoutConsent_rejected`, `fraudConfirmed_requiresCaseReferenceAndComplianceMaker`, `partialReversal_withFeeFlags_400`, `responseMapping_table_BR_S_34` (one case per row) |
 | Provider contract | every operation in `contracts/provided/openapi.yaml` (request / response / problem shapes, reasons); every `support.events` type validates against its schema; example envelopes in `contracts/provided/events/` round-trip |
 | Consumer contract | stubs from `contracts/consumed/` snapshots: `/v1/internal/reversals`, ledger `create-hold` / `release-hold`, balance, holds, wallet lookup / get / customers / status-changes / flags / PATCH, limits usage, history (both), notification logs, refdata, legal holds; fixtures: `TRANSACTION_REVERSED`, `WALLET_UPSERTED`, `REVERSAL_RECOMMENDED`, `REFDATA_UPSERTED` (HOLIDAY, CALENDAR.*, RETENTION.COMPLAINT), `APPROVAL_DECIDED` / `APPROVAL_EXPIRED` (wallet-service) |
 | Integration (Testcontainers + WireMock) | `wrongTransfer_endToEnd_holdConsentApproveExecute_allEventsInOrder`, `reversal_503_retriesWithSameIdempotencyKey`, `hold_ledgerDown_requestedThenActiveAfterRecovery`, `attachments_encryptedAtRest`, `customer360_partialResults`, `outbox_rowsWrittenInSameTransaction` |
@@ -5291,6 +5306,8 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
 | OPEN D-34 | Provisional credit, "Disputed" state, PIN / device actions | holds only; `disputeState` shown in support APIs; PIN / device RECORDED_PENDING_AUTH | §1.3, BR-S-42, BR-S-53, codes `disputeState`, `serviceActionType` |
 | OPEN D-36 | Reversal path for disbursement rows | not supported (`TXN_TYPE_NOT_ALLOWED`) | §1.3, BR-S-30 |
 | OPEN D-51 | Reference event for `WC` closure payouts | `WC…` lookup returns 404 | §6.12 |
+| MVP deferral (CR-SUPPORT-1) | Support features not in the MVP release | SLA / escalation / auto-close, dashboards, BB dataset (WP-3), service actions, customer 360, enquiry (WP-6), dispute types other than `WRONG_TRANSFER` / `OTHER`, CRM (SUP-010) → R1+ | §1.2, §10 |
+| MVP deferral (CR-SUPPORT-1) | Wrong-transfer for `BILL_PAY` / `RECHARGE` (wrong biller reference or MSISDN) | not offered; `SYSTEM_ERROR` or `OTHER` dispute → `DISPUTE_UPHELD` reversal only (B-25 catalogue sign-off) | BR-S-38 |
 
 **Deferred items (interim behaviour):** CRM integration (SUP-010) → `ExternalTicketingProvider` `none`; provisional dispute credit → holds only; PIN / device actions → recorded; purge of complaint records → R2 job disabled, legal-hold check designed; `ticket` partitioning → R2; BB dataset format → provisional (B-07); SLA / escalation / hold / reversal seeds → provisional (B-10).
 
@@ -5315,3 +5332,4 @@ Rule ids are stable (`BR-S-nn`). Config keys in `CAPS` are the config documents 
 | contractVersion | Date | CR | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-10-13 | — | v6 baseline consolidated from SVC-09 v1.2 + v5.0 overlay + catalogue v1.4 + contract audit + GL CCRs |
+| 1.0.0 | 2026-10-14 | CR-SUPPORT-1 | MVP scope (SRS v1.2): SUP-005 wrong transfer and SUP-006 reversal are MVP; other support features R1+; §10 WPs tagged [MVP]/[R1+]; `BILL_PAY` / `RECHARGE` added to `reversibleTxnTypes` and `HOLD_POLICY.OTHER` (BR-S-38, WP-CR-1). Kind A, no provided-contract change |

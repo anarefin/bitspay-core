@@ -89,7 +89,6 @@
     <a class="sub" href="#mod-days">4.5 Days &amp; day close</a>
     <a class="sub" href="#mod-periods">4.6 Periods &amp; fiscal years</a>
     <a class="sub" href="#mod-reports">4.7 Reports</a>
-    <a class="sub" href="#mod-exports">4.8 ERP export</a>
     <a class="sub" href="#mod-exceptions">4.9 Exceptions</a>
     <a class="sub" href="#mod-approvals">4.10 Approvals</a>
     <a class="sub" href="#mod-internal">4.11 Internal test hook</a>
@@ -112,8 +111,8 @@
   <main>
     <header class="hero">
       <h1>general-ledger-service</h1>
-      <div>The Operator's official accounting books: it turns every committed ledger transfer into double-entry journals in the chart of accounts, closes days, months and fiscal years, and publishes trial balance, balance sheet, P&amp;L and a daily ERP file. It never moves money.</div>
-      <div class="meta">SVC-16 · Source: docs/SPEC.md (v6) + docs/contracts (contractVersion 1.0.0) · For new developers · Example values are illustrative · Ports 8116 / 9116 · Schema <code>svc_general_ledger</code></div>
+      <div>The Operator's official accounting books: it turns every committed ledger transfer into double-entry journals in the chart of accounts, closes days, months and fiscal years, and produces the trial balance, balance sheet and P&amp;L. It never moves money.</div>
+      <div class="meta">SVC-16 · Source: docs/SPEC.md (v6) + docs/contracts (contractVersion 2.0.0; MVP = slice GL-R1a, see SPEC §1.2) · For new developers · Example values are illustrative · Ports 8116 / 9116 · Schema <code>svc_general_ledger</code></div>
     </header>
 
     <!-- ===================================================== 1 -->
@@ -127,13 +126,13 @@
         <div class="card compact">
           <h4>What it owns</h4>
           <ul>
-            <li>The <b>chart of accounts</b> (CoA): the single platform owner, seed v0 with 56 provisional accounts.</li>
-            <li><b>Posting rules</b>: versioned, effective-dated rule sets (v1 = 51 rules) that map each ledger leg to a GL account.</li>
+            <li>The <b>chart of accounts</b> (CoA): the single platform owner, seed v0 with 59 provisional accounts (56 + the MVP biller accounts 2106, 4108, 4109).</li>
+            <li><b>Posting rules</b>: versioned, effective-dated rule sets (v1 = 54 rules incl. the MVP biller rules) that map each ledger leg to a GL account.</li>
             <li>The <b>ledger account registry</b> (ledger account id to bucket such as <code>WALLET:C</code>, <code>SYS:FEE_INCOME</code>, <code>TRUST:01</code>).</li>
             <li>The <b>sub-ledger summary</b> (stage 1) and one <b>LEDGER_DAY journal</b> per business day and revision (stage 2).</li>
             <li>Manual journals, accruals, reversals, opening balances, the trust-interest auto-journal (flag, default off).</li>
             <li>GL days, months, fiscal years and their close; daily balances; <b>control totals</b> for reconciliation.</li>
-            <li>Reports (trial balance, balance sheet, P&amp;L, account statement) and the daily ERP file <code>GENERIC_CSV_V1</code>.</li>
+            <li>Reports (trial balance, balance sheet, P&amp;L, account statement), in JSON and CSV.</li>
             <li>Exceptions, staff notifications, maker-checker approvals and audit for its own entities.</li>
           </ul>
         </div>
@@ -143,7 +142,7 @@
             <li>Moving money, ledger commands, editing TigerBeetle data: never.</li>
             <li>Bank statement reconciliation, e-money vs trust variance, ledger to transaction matching: finance-ops (reconciliation). The GL is <i>checked</i> by reconciliation; it never checks itself.</li>
             <li>Per-wallet statements and transaction history: finance-ops reporting. The GL holds bucket-level data only.</li>
-            <li>Hierarchical commission accrual (R2), real-time ERP push, multi-currency, fixed assets, payroll, AP/AR, back-office UI (Swagger only).</li>
+            <li>Hierarchical commission accrual (R2), any journal file export (withdrawn in SRS v1.2), multi-currency, fixed assets, payroll, AP/AR, back-office UI (Swagger only).</li>
           </ul>
         </div>
       </div>
@@ -170,11 +169,11 @@
         <tr><th>Question</th><th>ledger-service (operational money ledger)</th><th>general-ledger-service (accounting GL)</th></tr>
         <tr><td>Main job</td><td>Moves e-money: executes ledger commands on TigerBeetle; the only place money moves.</td><td>Keeps the Operator's official books in the chart of accounts; never moves money.</td></tr>
         <tr><td>Granularity</td><td>One account per wallet, plus system accounts (FEE_INCOME 200, VAT_PAYABLE 210, COMMISSION_PAYABLE 220, AIT_PAYABLE 230, CAMPAIGN_FUNDING 240, SUSPENSE 400, ADJUSTMENT_CLEARING 410, HOLD_CONTROL 420) and trust accounts (300).</td><td>Bucket level: all customer wallets together are one GL account <code>2101</code>, all agent wallets <code>2102</code>, and so on. No per-wallet data.</td></tr>
-        <tr><td>Vocabulary</td><td>Transfers, legs, transfer codes (1001–1016, 2001–2004), command types (1..17), account types.</td><td>Journals, journal lines, GL account codes (<code>2101</code>, <code>4101</code>…), debit / credit, periods, trial balance.</td></tr>
+        <tr><td>Vocabulary</td><td>Transfers, legs, transfer codes (1001–1018, 2001–2004), command types (1..19), account types.</td><td>Journals, journal lines, GL account codes (<code>2101</code>, <code>4101</code>…), debit / credit, periods, trial balance.</td></tr>
         <tr><td>Timing</td><td>Real time, on the payment path.</td><td>Consumer only: seconds behind (ingestion lag p99 &lt; 5 s), books close once per business day after cut-off + grace.</td></tr>
         <tr><td>Who talks to it</td><td>Payment services, through ledger commands.</td><td>Reads <code>ledger.changes</code>; Finance staff through <code>/v1/gl/*</code>; finance-ops reads control totals.</td></tr>
         <tr><td>Corrections</td><td>New ledger commands (reversals, adjustments) owned by other services.</td><td>The GL books those corrections when they arrive; its own corrections are new journals (reversal, manual), never edits.</td></tr>
-        <tr><td>Output</td><td>Balances, <code>ledger.changes</code> stream, system balance sheet.</td><td><code>gl.events</code>, reports, daily ERP file <code>GL_{yyyyMMdd}_v{n}.csv</code>.</td></tr>
+        <tr><td>Output</td><td>Balances, <code>ledger.changes</code> stream, system balance sheet.</td><td><code>gl.events</code> and reports (trial balance, balance sheet, P&amp;L).</td></tr>
         <tr><td>If it is down</td><td>Payments stop.</td><td>Payments are unaffected; the GL catches up from <code>ledger.changes</code> (14-day retention).</td></tr>
       </table></div>
     </section>
@@ -214,9 +213,6 @@
 <rect x="800" y="230" width="130" height="50" rx="8" fill="#ffffff" stroke="#98a2b3" stroke-width="1.5"/>
 <text x="865" y="252" text-anchor="middle" font-size="13" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">gl.events</text>
 <text x="865" y="268" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">readers</text>
-<rect x="680" y="400" width="220" height="50" rx="8" fill="#ffffff" stroke="#98a2b3" stroke-width="1.5"/>
-<text x="790" y="422" text-anchor="middle" font-size="13" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">Operator ERP</text>
-<text x="790" y="438" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">(file import)</text>
 <line x1="480" y1="320" x2="480" y2="350" stroke="#98a2b3" stroke-width="1.4"/>
 <line x1="220" y1="48" x2="360" y2="205" stroke="#5b6475" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr-context)"/>
 <line x1="360" y1="222" x2="220" y2="68" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-context)"/>
@@ -229,7 +225,6 @@
 <line x1="680" y1="55" x2="560" y2="190" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-context)"/>
 <line x1="580" y1="255" x2="640" y2="255" stroke="#5b6475" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr-context)"/>
 <line x1="770" y1="255" x2="800" y2="255" stroke="#5b6475" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arr-context)"/>
-<line x1="560" y1="320" x2="680" y2="425" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-context)"/>
 <circle cx="262" cy="95" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="262" y="99" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">1</text>
 <circle cx="318" cy="174" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="318" y="178" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">2</text>
 <circle cx="290" cy="194" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="290" y="198" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">3</text>
@@ -240,7 +235,6 @@
 <circle cx="360" cy="358" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="360" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">8</text>
 <circle cx="620" cy="122" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="620" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">9</text>
 <circle cx="610" cy="240" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="610" y="244" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">10</text>
-<circle cx="620" cy="372" r="10" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/><text x="620" y="376" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">11</text>
 </svg>
         <figcaption>Context diagram. Numbers match the list below. Arrow direction = direction of the call or the event.</figcaption>
       </figure>
@@ -255,7 +249,6 @@
         <li><b>GL → admin-service</b>: <code>notification.requests</code>, <code>approval.events</code>, <code>audit.events</code> (admin-owned inbound topics).</li>
         <li><b>Finance staff → GL</b>: <code>/v1/gl/*</code> staff APIs and <code>/v1/approvals</code> (roles FIN_MAKER, FIN_CHECKER, AUDITOR).</li>
         <li><b>GL → readers</b>: <code>gl.events</code> (day closed, day certified, period status, journal posted, account upserted, exception raised).</li>
-        <li><b>GL → Operator ERP</b>: daily journal file <code>GENERIC_CSV_V1</code> (downloaded, not pushed).</li>
       </ol>
     </section>
 
@@ -1233,7 +1226,7 @@ Idempotency-Key: fc-20261009
           <dt>Triggered by</dt><dd>STAFF FIN_MAKER, with <code>Idempotency-Key</code>.</dd>
           <dt>Rules</dt><dd>Only a CLOSED or CLOSED_WITH_EXCEPTIONS day of an OPEN period. <code>RestatementJob</code> re-runs close steps 1–7 as a new revision, then steps 3–7 for every later closed day (new balances and control totals, no new journal); certification of each re-versioned day goes back to PENDING (BR-GL-45). Approval <code>GlDayRestatement</code>/<code>RESTATE</code>, 1 level. Most restatements are automatic (late legs, re-keying, back-dated journals, past-effective rule sets, year-end close into a closed day).</dd>
           <dt>Errors</dt><dd><code>VALIDATION_FAILED</code>; <code>NOT_FOUND</code>; <code>STATE_CONFLICT</code> / <code>DAY_NOT_CLOSED</code>, <code>PERIOD_CLOSED</code>; <code>IDEMPOTENCY_CONFLICT</code>; <code>ACTOR_NOT_ALLOWED</code>; <code>DEPENDENCY_UNAVAILABLE</code></dd>
-          <dt>Emits</dt><dd><code>APPROVAL_REQUESTED</code>, audit <code>DAY_RESTATEMENT_PROPOSED</code>; on execution <code>GL_DAY_CLOSED</code> (<code>restated: true</code>, revision + 1), audit <code>DAY_RESTATED</code>, a new export version with <code>GL_EXPORT_READY</code> (<code>superseded = "true"</code>).</dd>
+          <dt>Emits</dt><dd><code>APPROVAL_REQUESTED</code>, audit <code>DAY_RESTATEMENT_PROPOSED</code>; on execution <code>GL_DAY_CLOSED</code> (<code>restated: true</code>, revision + 1), audit <code>DAY_RESTATED</code>.</dd>
         </dl>
         <details><summary>Example request / response</summary><pre><code>POST /v1/gl/days/2026-10-10:restate
 Idempotency-Key: rs-20261010
@@ -1484,92 +1477,7 @@ Idempotency-Key: fy-2026-27-close
    "runningNetDebitPoisha": -500, "narration": "P2P FEE", "product": "P2P"}]}</code></pre></details>
       </div>
 
-      <!-- ============ 4.8 Exports -->
-      <h3 id="mod-exports">4.8 ERP export</h3>
-      <p>After each close revision commits, <code>ExportJob</code> builds <code>GL_{yyyyMMdd}_v{n}.csv</code> (format <code>GENERIC_CSV_V1</code>, data contract <code>gl-export-generic-csv</code> v1) from every POSTED journal of the day. A restatement creates <code>v{n+1}</code> and marks <code>v{n}</code> SUPERSEDED. The export runs after the close transaction so a failed file never rolls back a correct close (ADR-GL-13).</p>
-
-      <div class="card" id="uc-32">
-        <div class="uc-head"><span class="uc-id">UC-32</span><span class="uc-title">List ERP exports</span><span class="tag">Exports</span></div>
-        <div class="endpoint"><span class="m GET">GET</span>/v1/gl/exports</div>
-        <p class="story">Nusrat lists the October files to upload to the ERP and sees <code>GL_20261009_v1.csv</code>, 23 lines, balanced at 1,102,375.09 Tk.</p>
-        <dl class="kv">
-          <dt>Triggered by</dt><dd>STAFF FIN_MAKER, FIN_CHECKER, AUDITOR.</dd>
-          <dt>Rules</dt><dd>Filters <code>fromDate</code>, <code>toDate</code>; ordered by businessDate desc then version desc; ≤ 400 days.</dd>
-          <dt>Errors</dt><dd><code>VALIDATION_FAILED</code> / <code>INVALID_CURSOR</code>, <code>RANGE_TOO_LARGE</code>; <code>ACTOR_NOT_ALLOWED</code>; <code>DEPENDENCY_UNAVAILABLE</code></dd>
-          <dt>Emits</dt><dd>Nothing.</dd>
-        </dl>
-        <details><summary>Example request / response</summary><pre><code>GET /v1/gl/exports?fromDate=2026-10-01&amp;toDate=2026-10-31
-
-200 GlExportPage
-{"items": [{"businessDate": "2026-10-09", "exportVersion": 1, "glDayRevision": 1, "status": "GENERATED",
-  "format": "GENERIC_CSV_V1", "fileName": "GL_20261009_v1.csv",
-  "sha256": "a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90", "lineCount": 23,
-  "totalDebitPoisha": 110237509, "totalCreditPoisha": 110237509, "failureReason": null,
-  "generatedAt": "2026-10-09T18:16:04.010Z"}],
- "nextCursor": null}</code></pre></details>
-      </div>
-
-      <div class="card" id="uc-33">
-        <div class="uc-head"><span class="uc-id">UC-33</span><span class="uc-title">Get the latest export of a day</span><span class="tag">Exports</span></div>
-        <div class="endpoint"><span class="m GET">GET</span>/v1/gl/exports/{businessDate}</div>
-        <p class="story">After the restatement of 2026-10-10, Nusrat checks which file is current: the latest version, with <code>glDayRevision</code> 2.</p>
-        <dl class="kv">
-          <dt>Triggered by</dt><dd>STAFF FIN_MAKER, FIN_CHECKER, AUDITOR.</dd>
-          <dt>Rules</dt><dd>Returns the latest version; <code>failureReason</code> set when FAILED (e.g. <code>UNBALANCED</code>).</dd>
-          <dt>Errors</dt><dd><code>VALIDATION_FAILED</code>; <code>NOT_FOUND</code>; <code>ACTOR_NOT_ALLOWED</code>; <code>DEPENDENCY_UNAVAILABLE</code></dd>
-          <dt>Emits</dt><dd>Nothing.</dd>
-        </dl>
-        <details><summary>Example request / response</summary><pre><code>GET /v1/gl/exports/2026-10-09
-
-200 GlExport
-{"businessDate": "2026-10-09", "exportVersion": 1, "glDayRevision": 1, "status": "GENERATED",
- "format": "GENERIC_CSV_V1", "fileName": "GL_20261009_v1.csv",
- "sha256": "a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90", "lineCount": 23,
- "totalDebitPoisha": 110237509, "totalCreditPoisha": 110237509, "failureReason": null,
- "generatedAt": "2026-10-09T18:16:04.010Z"}</code></pre></details>
-      </div>
-
-      <div class="card" id="uc-34">
-        <div class="uc-head"><span class="uc-id">UC-34</span><span class="uc-title">Download an export file</span><span class="tag">Exports</span></div>
-        <div class="endpoint"><span class="m GET">GET</span>/v1/gl/exports/{businessDate}/versions/{n}/file</div>
-        <p class="story">Nusrat downloads <code>GL_20261009_v1.csv</code> and uploads it to the ERP. Superseded versions stay downloadable for audit.</p>
-        <dl class="kv">
-          <dt>Triggered by</dt><dd>STAFF FIN_MAKER, FIN_CHECKER, AUDITOR.</dd>
-          <dt>Rules</dt><dd><code>text/csv</code>, UTF-8, LF, RFC 4180. Header exact; amounts Tk with 2 decimals (empty on the other side); <code>source_code</code> = transfer code for ledger lines, journal source otherwise; trailer <code>#TRAILER,lines=…,total_debit=…,total_credit=…,transfers=…,gl_revision=…,certification=…</code> (BR-GL-101).</dd>
-          <dt>Errors</dt><dd><code>VALIDATION_FAILED</code>; <code>NOT_FOUND</code>; <code>ACTOR_NOT_ALLOWED</code>; <code>DEPENDENCY_UNAVAILABLE</code></dd>
-          <dt>Emits</dt><dd>Nothing.</dd>
-        </dl>
-        <details><summary>Example request / response</summary><pre><code>GET /v1/gl/exports/2026-10-09/versions/1/file
-Accept: text/csv
-
-200 text/csv (abbreviated example from the data contract)
-journal_date,journal_ref,line_no,gl_account_code,gl_account_name,debit_amount,credit_amount,currency,narration,source_code,transfer_count
-2026-10-09,GLJ-20261009-L-R1,1,1101-01,Trust bank account #01,1000000.00,,BDT,EMONEY_ISSUE EMONEY_ISSUE,1008,1
-2026-10-09,GLJ-20261009-L-R1,2,2103,E-money liability - distributors,,1000000.00,BDT,EMONEY_ISSUE EMONEY_ISSUE,1008,1
-2026-10-09,GLJ-20261009-L-R1,3,2101,E-money liability - customers,5.00,,BDT,P2P FEE,2001,1
-2026-10-09,GLJ-20261009-L-R1,4,4101,Fee income - P2P,,5.00,BDT,P2P FEE,2001,1
-#TRAILER,lines=4,total_debit=1000005.00,total_credit=1000005.00,transfers=2,gl_revision=1,certification=CERTIFIED</code></pre></details>
-      </div>
-
-      <div class="card" id="uc-35">
-        <div class="uc-head"><span class="uc-id">UC-35</span><span class="uc-title">Regenerate a day's export</span><span class="tag">Exports</span></div>
-        <div class="endpoint"><span class="m POST">POST</span>/v1/gl/exports/{businessDate}:regenerate</div>
-        <p class="story">The ERP rejected version 1 because of an import setting. After the fix, Nusrat asks for a fresh file of the same revision; Tanvir approves and <code>v2</code> is produced; <code>v1</code> becomes SUPERSEDED.</p>
-        <dl class="kv">
-          <dt>Triggered by</dt><dd>STAFF FIN_MAKER, with <code>Idempotency-Key</code>.</dd>
-          <dt>Rules</dt><dd>Day must be CLOSED / CLOSED_WITH_EXCEPTIONS (else <code>DAY_NOT_CLOSED</code>); builds a new version of the current revision; unbalanced build → FAILED <code>UNBALANCED</code> + <code>GL_EXPORT_FAILED</code> (BR-GL-100/101). Approval <code>GlExport</code>/<code>REGENERATE</code>, 1 level.</dd>
-          <dt>Errors</dt><dd><code>VALIDATION_FAILED</code>; <code>NOT_FOUND</code>; <code>STATE_CONFLICT</code> / <code>DAY_NOT_CLOSED</code>; <code>IDEMPOTENCY_CONFLICT</code>; <code>ACTOR_NOT_ALLOWED</code>; <code>DEPENDENCY_UNAVAILABLE</code></dd>
-          <dt>Emits</dt><dd><code>APPROVAL_REQUESTED</code>, audit <code>EXPORT_REGENERATE_PROPOSED</code>; on build: notification <code>GL_EXPORT_READY</code> (or <code>GL_EXPORT_FAILED</code>), audit <code>EXPORT_GENERATED</code> / <code>EXPORT_FAILED</code>.</dd>
-        </dl>
-        <details><summary>Example request / response</summary><pre><code>POST /v1/gl/exports/2026-10-09:regenerate
-Idempotency-Key: exp-20261009-regen
-{"reason": "ERP import rejected version 1; regenerate after the fix"}
-
-202 ApprovalRef
-{"approvalId": "0192f701-0000-7000-8000-000000000001", "entityType": "GlExport", "entityId": "2026-10-09",
- "status": "PENDING", "requiredLevels": 1, "checkerRoles": ["FIN_CHECKER"],
- "expiresAt": "2026-10-13T09:30:00.120Z"}</code></pre></details>
-      </div>
+      <!-- 4.8 (journal file export, UC-32…UC-35) withdrawn by CR-GENERALLEDGER-2 -->
 
       <!-- ============ 4.9 Exceptions -->
       <h3 id="mod-exceptions">4.9 Exceptions</h3>
@@ -1631,7 +1539,6 @@ Idempotency-Key: exp-20261009-regen
         <tr><td><code>GlPeriodClose</code></td><td>CLOSE</td><td>2</td><td>UC-24</td></tr>
         <tr><td><code>GlPeriodReopen</code></td><td>REOPEN</td><td>2</td><td>UC-25</td></tr>
         <tr><td><code>GlYearClose</code></td><td>CLOSE</td><td>2</td><td>UC-27</td></tr>
-        <tr><td><code>GlExport</code></td><td>REGENERATE</td><td>1</td><td>UC-35</td></tr>
       </table></div>
 
       <div class="card" id="uc-38">
@@ -1869,7 +1776,7 @@ Idempotency-Key: exp-20261009-regen
 <line x1="102" y1="578" x2="279" y2="578" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-seq-close)"/>
 <text x="192" y="572" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">12. COMMIT (CLOSED / CLOSED_WITH_EXCEPTIONS)</text>
 <path d="M102,612 h30 v14 h-28" fill="none" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-seq-close)"/>
-<text x="138" y="623" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">13. after commit: AccrualReversalJob(d+1), ExportJob(d, r), create d+1</text>
+<text x="138" y="623" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">13. after commit: AccrualReversalJob(d+1), create d+1</text>
 </svg>
         <figcaption>Day close sequence (SPEC §3.4). Numbers match the steps below.</figcaption>
       </figure>
@@ -1886,9 +1793,9 @@ Idempotency-Key: exp-20261009-regen
   <li>A broken journal, trial balance or summary → ROLLBACK, day <code>FAILED</code>, CRITICAL <code>CLOSE_CHECK_FAILED</code>, <code>GL_DAY_CLOSED_WITH_EXCEPTIONS</code> notification; retried every 5 min.</li>
   <li>Write <code>GL_DAY_CLOSED</code>, any <code>GL_EXCEPTION_RAISED</code> (HIGH+) and <code>audit.events</code> to the outbox in the same transaction.</li>
   <li>COMMIT with status <code>CLOSED</code> (or <code>CLOSED_WITH_EXCEPTIONS</code> if GL-3/5/6 failed or HIGH+ exceptions are open), <code>dirty = false</code>, certification <code>PENDING</code>.</li>
-  <li>After the commit: accrual reversals for d+1, the ERP export of (d, revision), and day d+1 is created if missing.</li>
+  <li>After the commit: accrual reversals for d+1, and day d+1 is created if missing.</li>
 </ol>
-      <p><b>Restatement</b> reuses steps 7–12 for a dirty closed day of an OPEN period: revision + 1, the previous LEDGER_DAY journal becomes SUPERSEDED, <code>GL_DAY_CLOSED</code> is published with <code>restated: true</code>, a new export version replaces the old one, and the certification goes back to PENDING. Later closed days get new balances and control totals (but no new journal) (BR-GL-45).</p>
+      <p><b>Restatement</b> reuses steps 7–12 for a dirty closed day of an OPEN period: revision + 1, the previous LEDGER_DAY journal becomes SUPERSEDED, <code>GL_DAY_CLOSED</code> is published with <code>restated: true</code>, and the certification goes back to PENDING. Later closed days get new balances and control totals (but no new journal) (BR-GL-45).</p>
 
       <h3 id="wf-cert">5.3 Certification by reconciliation (recon.events)</h3>
       <p>The GL never certifies itself. finance-ops-service (reconciliation) compares the GL's control totals with its own projection of the ledger and announces the outcome on <code>recon.events</code> (BR-GL-70…72).</p>
@@ -2441,44 +2348,6 @@ Idempotency-Key: exp-20261009-regen
 <tr><td>2</td><td><code>DEFERRED</code></td><td><code>RESOLVED</code></td><td>the fact arrives before the wait ends</td></tr>
 <tr><td>3</td><td><code>DEFERRED</code></td><td><code>TIMEOUT_TO_1999</code></td><td>wait ends (1 h for an account, 10 min for a reason): booked to 1999 + CRITICAL</td></tr>
 <tr><td>4</td><td><code>TIMEOUT_TO_1999</code></td><td><code>REKEYED</code></td><td>the fact arrives later: moved out of 1999, day restated</td></tr></table></div>
-      <h3>6.8 ERP export (<code>gl_export.status</code>)</h3>
-      <figure class="diagram">
-<svg viewBox="0 0 780 240" role="img" aria-label="ERP export state machine" xmlns="http://www.w3.org/2000/svg">
-<defs><marker id="arr-st-export" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6475"/></marker></defs>
-<line x1="38.0" y1="70.0" x2="110.0" y2="70.0" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-st-export)"/>
-<line x1="250.0" y1="70.0" x2="375.0" y2="70.0" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-st-export)"/>
-<line x1="219.0" y1="88.0" x2="401.0" y2="172.0" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-st-export)"/>
-<line x1="505.0" y1="86.2" x2="607.0" y2="111.8" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-st-export)"/>
-<line x1="495.0" y1="176.2" x2="607.0" y2="148.2" stroke="#5b6475" stroke-width="1.4" marker-end="url(#arr-st-export)"/>
-<circle cx="30" cy="70" r="7" fill="#1f2430"/>
-<rect x="110" y="52" width="140" height="36" rx="10" fill="#fdf1e3" stroke="#b45309" stroke-width="1.5"/>
-<text x="180" y="74" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">GENERATING</text>
-<rect x="375" y="52" width="130" height="36" rx="10" fill="#fdf1e3" stroke="#b45309" stroke-width="1.5"/>
-<text x="440" y="74" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">GENERATED</text>
-<rect x="385" y="172" width="110" height="36" rx="10" fill="#fdf1e3" stroke="#b45309" stroke-width="1.5"/>
-<text x="440" y="194" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">FAILED</text>
-<rect x="610" y="112" width="140" height="36" rx="10" fill="#fdf1e3" stroke="#b45309" stroke-width="1.5"/>
-<rect x="607" y="109" width="146" height="42" rx="12" fill="none" stroke="#b45309" stroke-width="1.2"/>
-<text x="680" y="134" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">SUPERSEDED</text>
-<circle cx="74.0" cy="70.0" r="9" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/>
-<text x="74.0" y="74.0" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">1</text>
-<circle cx="312.5" cy="70.0" r="9" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/>
-<text x="312.5" y="74.0" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">2</text>
-<circle cx="310.0" cy="130.0" r="9" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/>
-<text x="310.0" y="134.0" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">3</text>
-<circle cx="556.0" cy="99.0" r="9" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/>
-<text x="556.0" y="103.0" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">4</text>
-<circle cx="551.0" cy="162.2" r="9" fill="#ffffff" stroke="#b45309" stroke-width="1.3"/>
-<text x="551.0" y="166.2" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309" font-family="-apple-system,Segoe UI,Arial,sans-serif">5</text>
-</svg>
-        <figcaption>ERP export state machine (SPEC §3.5)</figcaption>
-      </figure>
-<div class="tbl"><table><tr><th>#</th><th>From</th><th>To</th><th>When / trigger</th></tr>
-<tr><td>1</td><td><code>[start]</code></td><td><code>GENERATING</code></td><td>a close revision committed, or regenerate approved (UC-35)</td></tr>
-<tr><td>2</td><td><code>GENERATING</code></td><td><code>GENERATED</code></td><td>balanced file stored (<code>GL_EXPORT_READY</code>)</td></tr>
-<tr><td>3</td><td><code>GENERATING</code></td><td><code>FAILED</code></td><td>unbalanced or technical error (<code>GL_EXPORT_FAILED</code>)</td></tr>
-<tr><td>4</td><td><code>GENERATED</code></td><td><code>SUPERSEDED</code></td><td>a newer version of the same day is generated</td></tr>
-<tr><td>5</td><td><code>FAILED</code></td><td><code>SUPERSEDED</code></td><td>a newer version is generated</td></tr></table></div>
       <h3>6.9 Exception (<code>gl_exception.status</code>)</h3>
       <figure class="diagram">
 <svg viewBox="0 0 560 110" role="img" aria-label="Exception state machine" xmlns="http://www.w3.org/2000/svg">
@@ -2673,7 +2542,7 @@ Idempotency-Key: exp-20261009-regen
         <tr><th>Topic / eventType</th><th>Key</th><th>When</th><th>Content rules</th></tr>
         <tr><td><code>notification.requests</code> / <code>NOTIFICATION_REQUESTED</code></td><td><code>recipient.role</code></td><td>see templates below</td><td><code>recipient.role</code> ∈ {FIN_MAKER, FIN_CHECKER}, one request per role; no wallet/staff/MSISDN; <code>channels: []</code>, <code>priority: null</code>, <code>language: null</code>; <code>requestId</code> = UUIDv5 of <code>&lt;template&gt;:&lt;businessDate or periodId&gt;:&lt;revision&gt;:&lt;role&gt;</code>.</td></tr>
         <tr><td><code>approval.events</code> / <code>APPROVAL_REQUESTED</code>, <code>APPROVAL_DECIDED</code>, <code>APPROVAL_EXPIRED</code></td><td><code>approvalId</code></td><td>every maker-checker step</td><td><code>service = "general-ledger-service"</code>, no <code>module</code>; <code>checkerRoles: ["FIN_CHECKER"]</code>; <code>amountPoisha</code> for journal-like entities; <code>deepLink</code> <code>/v1/approvals/{approvalId}</code>.</td></tr>
-        <tr><td><code>audit.events</code> / <code>AUDIT_RECORDED</code></td><td><code>entityId</code></td><td>every state change (API and jobs); denied attempts with <code>outcome = DENIED</code></td><td>Actions: <code>GL_ACCOUNT_PROPOSED</code>, <code>GL_ACCOUNT_CREATED</code>, <code>GL_ACCOUNT_UPDATED</code>, <code>GL_ACCOUNT_DEACTIVATED</code>, <code>GL_ACCOUNT_INSTANTIATED</code>, <code>RULE_SET_PROPOSED</code>, <code>RULE_SET_APPROVED</code>, <code>JOURNAL_PROPOSED</code>, <code>JOURNAL_POSTED</code>, <code>JOURNAL_REJECTED</code>, <code>JOURNAL_CANCELLED</code>, <code>JOURNAL_REVERSAL_PROPOSED</code>, <code>OPENING_BALANCE_PROPOSED</code>, <code>DAY_CLOSED</code>, <code>DAY_CLOSE_FAILED</code>, <code>DAY_FORCE_CLOSE_PROPOSED</code>, <code>DAY_RESTATEMENT_PROPOSED</code>, <code>DAY_RESTATED</code>, <code>DAY_CERTIFIED</code>, <code>PERIOD_CLOSE_PROPOSED</code>, <code>PERIOD_CLOSED</code>, <code>PERIOD_REOPENED</code>, <code>FISCAL_YEAR_CLOSED</code>, <code>EXPORT_GENERATED</code>, <code>EXPORT_FAILED</code>, <code>EXPORT_REGENERATE_PROPOSED</code>, <code>EXCEPTION_RAISED</code>, <code>EXCEPTION_RESOLVED</code>, <code>APPROVAL_APPROVED</code>, <code>APPROVAL_REJECTED</code>, <code>APPROVAL_EXPIRED</code>.</td></tr>
+        <tr><td><code>audit.events</code> / <code>AUDIT_RECORDED</code></td><td><code>entityId</code></td><td>every state change (API and jobs); denied attempts with <code>outcome = DENIED</code></td><td>Actions: <code>GL_ACCOUNT_PROPOSED</code>, <code>GL_ACCOUNT_CREATED</code>, <code>GL_ACCOUNT_UPDATED</code>, <code>GL_ACCOUNT_DEACTIVATED</code>, <code>GL_ACCOUNT_INSTANTIATED</code>, <code>RULE_SET_PROPOSED</code>, <code>RULE_SET_APPROVED</code>, <code>JOURNAL_PROPOSED</code>, <code>JOURNAL_POSTED</code>, <code>JOURNAL_REJECTED</code>, <code>JOURNAL_CANCELLED</code>, <code>JOURNAL_REVERSAL_PROPOSED</code>, <code>OPENING_BALANCE_PROPOSED</code>, <code>DAY_CLOSED</code>, <code>DAY_CLOSE_FAILED</code>, <code>DAY_FORCE_CLOSE_PROPOSED</code>, <code>DAY_RESTATEMENT_PROPOSED</code>, <code>DAY_RESTATED</code>, <code>DAY_CERTIFIED</code>, <code>PERIOD_CLOSE_PROPOSED</code>, <code>PERIOD_CLOSED</code>, <code>PERIOD_REOPENED</code>, <code>FISCAL_YEAR_CLOSED</code>, <code>EXCEPTION_RAISED</code>, <code>EXCEPTION_RESOLVED</code>, <code>APPROVAL_APPROVED</code>, <code>APPROVAL_REJECTED</code>, <code>APPROVAL_EXPIRED</code>.</td></tr>
       </table></div>
       <h4>Notification templates sent (category INTERNAL, <code>notificationTemplates</code> in codes.yaml)</h4>
       <div class="tbl"><table><tr><th>Template</th><th>Recipient</th><th>Trigger</th><th>Variables</th></tr>
@@ -2682,8 +2551,6 @@ Idempotency-Key: exp-20261009-regen
         <tr><td><code>GL_DAY_CERTIFICATION_FAILED</code></td><td>recipient.role FIN_CHECKER</td><td>reconciliation GL tie-out for the current revision did not match</td><td><code>businessDate</code> (DATE), <code>revision</code> (INT), <code>breakCount</code> (INT), <code>reconRunId</code> (TEXT)</td></tr>
         <tr><td><code>GL_UNMAPPED_POSTING</code></td><td>recipient.role FIN_MAKER</td><td>a close books a leg combination to 1999 (one per combination and day)</td><td><code>businessDate</code> (DATE), <code>amountPoisha</code> (MONEY), <code>combination</code> (TEXT)</td></tr>
         <tr><td><code>GL_PERIOD_CLOSED</code></td><td>recipient.role FIN_MAKER and FIN_CHECKER</td><td>a month or fiscal year is closed</td><td><code>periodId</code> (TEXT), <code>periodKind</code> (TEXT), <code>netResultPoisha</code> (MONEY)</td></tr>
-        <tr><td><code>GL_EXPORT_READY</code></td><td>recipient.role FIN_MAKER</td><td>an ERP export version is generated</td><td><code>businessDate</code> (DATE), <code>exportVersion</code> (INT), <code>fileName</code> (TEXT), <code>lineCount</code> (INT), <code>totalDebitPoisha</code> (MONEY), <code>superseded</code> (TEXT)</td></tr>
-        <tr><td><code>GL_EXPORT_FAILED</code></td><td>recipient.role FIN_MAKER</td><td>an ERP export build fails (unbalanced or technical error)</td><td><code>businessDate</code> (DATE), <code>exportVersion</code> (INT), <code>variant</code> (TEXT), <code>errorCode</code> (TEXT)</td></tr>
       </table></div>
 
       <h3 id="ev-consumed">7.3 Consumed events (SPEC §6.1–6.9)</h3>
@@ -2737,14 +2604,14 @@ Idempotency-Key: exp-20261009-regen
         <tr><td><code>VALIDATION_FAILED</code></td><td><code>NARRATION_TOO_SHORT</code></td><td>narration shorter than 20 chars</td><td><code>POST /v1/gl/journals</code><br><code>POST /v1/gl/opening-balances</code></td><td>—</td></tr>
         <tr><td><code>VALIDATION_FAILED</code></td><td><code>TOO_MANY_LINES</code></td><td>fewer than 2 or more than 200 lines</td><td><code>POST /v1/gl/journals</code><br><code>POST /v1/gl/opening-balances</code></td><td>—</td></tr>
         <tr><td><code>VALIDATION_FAILED</code></td><td><code>RULE_SET_INVALID</code></td><td>validation found at least one ERROR (errors[] lists them)</td><td><code>POST /v1/gl/rule-sets</code></td><td>—</td></tr>
-        <tr><td><code>VALIDATION_FAILED</code></td><td><code>RANGE_TOO_LARGE</code></td><td>date range longer than 400 days</td><td><code>GET /v1/gl/reports/trial-balance</code><br><code>GET /v1/gl/reports/profit-and-loss</code><br><code>GET /v1/gl/reports/account-ledger/{code}</code><br><code>GET /v1/gl/journals</code><br><code>GET /v1/gl/days</code><br><code>GET /v1/gl/exports</code></td><td>—</td></tr>
+        <tr><td><code>VALIDATION_FAILED</code></td><td><code>RANGE_TOO_LARGE</code></td><td>date range longer than 400 days</td><td><code>GET /v1/gl/reports/trial-balance</code><br><code>GET /v1/gl/reports/profit-and-loss</code><br><code>GET /v1/gl/reports/account-ledger/{code}</code><br><code>GET /v1/gl/journals</code><br><code>GET /v1/gl/days</code></td><td>—</td></tr>
         <tr><td><code>VALIDATION_FAILED</code></td><td><code>PARENT_CLASS_MISMATCH</code></td><td>parent is not a non-postable header of the same class</td><td><code>POST /v1/gl/accounts</code><br><code>PATCH /v1/gl/accounts/{code}</code></td><td>—</td></tr>
         <tr><td><code>VALIDATION_FAILED</code></td><td><code>INVALID_CURSOR</code></td><td>cursor expired (24 h) or from another endpoint/actor/filter</td><td><code>*list operations</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>PERIOD_CLOSED</code></td><td>the date (or effectiveFrom) lies in a CLOSED period</td><td><code>POST /v1/gl/journals</code><br><code>POST /v1/gl/journals/{journalId}:reverse</code><br><code>POST /v1/gl/rule-sets</code><br><code>POST /v1/gl/accounts</code><br><code>POST /v1/gl/days/{businessDate}:force-close</code><br><code>POST /v1/gl/days/{businessDate}:restate</code><br><code>POST /v1/internal/jobs/gl-day-close:run</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>FUTURE_DATE</code></td><td>businessDate after the current business date</td><td><code>POST /v1/gl/journals</code><br><code>POST /v1/gl/journals/{journalId}:reverse</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>BEFORE_GL_START</code></td><td>businessDate before bitspay.gl.start-date</td><td><code>POST /v1/gl/journals</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>GL_ALREADY_STARTED</code></td><td>the GL start day is already closed</td><td><code>POST /v1/gl/opening-balances</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>—</td></tr>
-        <tr><td><code>STATE_CONFLICT</code></td><td><code>DAY_NOT_CLOSED</code></td><td>the day is not CLOSED / CLOSED_WITH_EXCEPTIONS</td><td><code>GET /v1/gl/days/{businessDate}/control-totals</code><br><code>POST /v1/gl/days/{businessDate}:restate</code><br><code>POST /v1/gl/exports/{businessDate}:regenerate</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>—</td></tr>
+        <tr><td><code>STATE_CONFLICT</code></td><td><code>DAY_NOT_CLOSED</code></td><td>the day is not CLOSED / CLOSED_WITH_EXCEPTIONS</td><td><code>GET /v1/gl/days/{businessDate}/control-totals</code><br><code>POST /v1/gl/days/{businessDate}:restate</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>DAY_NOT_READY</code></td><td>watermark, deferred-leg or previous-day condition not met</td><td><code>POST /v1/internal/jobs/gl-day-close:run</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>ACCOUNT_IN_USE</code></td><td>non-zero balance or targeted by an approved rule set</td><td><code>POST /v1/gl/accounts/{code}:deactivate</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>—</td></tr>
         <tr><td><code>STATE_CONFLICT</code></td><td><code>DAYS_NOT_CLOSED</code></td><td>some days of the month are not closed (or dirty)</td><td><code>POST /v1/gl/periods/{periodId}:close</code><br><code>POST /v1/approvals/{id}:approve</code></td><td>blockingItems</td></tr>
@@ -2801,12 +2668,10 @@ Idempotency-Key: exp-20261009-regen
         <tr><td><code>exceptionSeverity</code></td><td><code>CRITICAL</code>, <code>HIGH</code>, <code>INFO</code></td><td>GL exception severity (gl.events carries CRITICAL and HIGH only)</td></tr>
         <tr><td><code>controlTotalBucket</code></td><td><code>WALLET:C</code>, <code>WALLET:A</code>, <code>WALLET:D</code>, <code>WALLET:M</code>, <code>WALLET:I</code>, <code>SYS:FEE_INCOME</code>, <code>SYS:VAT_PAYABLE</code>, <code>SYS:COMMISSION_PAYABLE</code>, <code>SYS:AIT_PAYABLE</code>, <code>SYS:CAMPAIGN_FUNDING</code>, <code>SYS:SUSPENSE</code>, <code>SYS:ADJUSTMENT_CLEARING</code>, <code>SYS:HOLD_CONTROL</code>, <code>TRUST</code></td><td>ControlTotalItem.bucket — ledger buckets, named exactly as reconciliation names them</td></tr>
         <tr><td><code>ruleSetStatus</code></td><td><code>DRAFT</code>, <code>PENDING_APPROVAL</code>, <code>APPROVED</code>, <code>SUPERSEDED</code>, <code>REJECTED</code>, <code>CANCELLED</code></td><td>Posting rule set status</td></tr>
-        <tr><td><code>exportStatus</code></td><td><code>GENERATING</code>, <code>GENERATED</code>, <code>FAILED</code>, <code>SUPERSEDED</code></td><td>GlExport.status</td></tr>
-        <tr><td><code>exportFormat</code></td><td><code>GENERIC_CSV_V1</code></td><td>ERP export format (format SPI)</td></tr>
       </table></div>
       <h3>8.6 Other contract names (<code>txnRefPrefixes</code>, <code>metrics</code>)</h3>
       <p>Reference prefix <code>GLJ</code>: GLJ-{yyyyMMdd}-L-R{revision} for LEDGER_DAY; GLJ-{yyyyMMdd}-{M|A|X|R|I|Y|O}-{6-digit seq per day} otherwise. Never a ledger <code>txnRef</code>.</p>
-      <p>Metrics: <code>bitspay_gl_ingest_lag_seconds</code> (gauge), <code>bitspay_gl_ingested_legs_total</code> (counter), <code>bitspay_gl_ingest_batch_seconds</code> (histogram), <code>bitspay_gl_deferred_transfers</code> (gauge), <code>bitspay_gl_unmapped_legs_total</code> (counter), <code>bitspay_gl_day_close_seconds</code> (histogram), <code>bitspay_gl_day_status</code> (gauge), <code>bitspay_gl_control_breaks_total</code> (counter), <code>bitspay_gl_open_exceptions</code> (gauge), <code>bitspay_gl_export_last_success_timestamp_seconds</code> (gauge).</p>
+      <p>Metrics: <code>bitspay_gl_ingest_lag_seconds</code> (gauge), <code>bitspay_gl_ingested_legs_total</code> (counter), <code>bitspay_gl_ingest_batch_seconds</code> (histogram), <code>bitspay_gl_deferred_transfers</code> (gauge), <code>bitspay_gl_unmapped_legs_total</code> (counter), <code>bitspay_gl_day_close_seconds</code> (histogram), <code>bitspay_gl_day_status</code> (gauge), <code>bitspay_gl_control_breaks_total</code> (counter), <code>bitspay_gl_open_exceptions</code> (gauge).</p>
     </section>
 
     <!-- ===================================================== 9 -->
@@ -2822,7 +2687,7 @@ Idempotency-Key: exp-20261009-regen
         <tr><td>Calendar</td><td><code>gl_fiscal_year</code>, <code>gl_period</code>, <code>gl_day</code></td><td>day holds status, revision, dirty, forced, certification, checks.</td></tr>
         <tr><td>Journals</td><td><code>gl_journal</code>, <code>gl_journal_line</code></td><td>header CHECK debit = credit; one LEDGER_DAY journal per (date, revision); lines never updated or deleted.</td></tr>
         <tr><td>Balances &amp; control</td><td><code>gl_daily_balance</code>, <code>gl_control_total</code></td><td>per account / per bucket per day revision; <code>closing = opening + debit − credit</code> CHECK.</td></tr>
-        <tr><td>Export, exceptions</td><td><code>gl_export</code>, <code>gl_exception</code></td><td>file content stored in the table (kilobytes); exception categories CHECK-constrained.</td></tr>
+        <tr><td>Exceptions</td><td><code>gl_exception</code></td><td>exception categories CHECK-constrained.</td></tr>
         <tr><td>Standard</td><td><code>approval_request</code>, <code>outbox</code>, <code>processed_event</code>, <code>idempotency_record</code>, <code>shedlock</code>, <code>system_param</code></td><td>kernel K5, K8.2, K3.3; <code>system_param</code> = refdata projection.</td></tr>
       </table></div>
       <figure class="diagram">
@@ -2834,8 +2699,6 @@ Idempotency-Key: exp-20261009-regen
 <text x="110" y="111" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">gl_period</text>
 <rect x="20" y="160" width="180" height="34" rx="8" fill="#fdf1e3" stroke="#b45309" stroke-width="1.5"/>
 <text x="110" y="181" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">gl_day</text>
-<rect x="20" y="230" width="180" height="34" rx="4" fill="#f3f4f7" stroke="#98a2b3" stroke-width="1.5"/>
-<text x="110" y="251" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">gl_export</text>
 <rect x="20" y="300" width="180" height="34" rx="4" fill="#f3f4f7" stroke="#98a2b3" stroke-width="1.5"/>
 <text x="110" y="321" text-anchor="middle" font-size="12" fill="#1f2430" font-family="-apple-system,Segoe UI,Arial,sans-serif">gl_exception</text>
 <rect x="235" y="90" width="180" height="34" rx="4" fill="#f3f4f7" stroke="#98a2b3" stroke-width="1.5"/>
@@ -2870,7 +2733,6 @@ Idempotency-Key: exp-20261009-regen
 <line x1="415" y1="177" x2="448" y2="177" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
 <line x1="540" y1="124" x2="540" y2="158" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
 <line x1="325" y1="124" x2="325" y2="158" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
-<line x1="110" y1="194" x2="110" y2="228" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
 <line x1="200" y1="190" x2="233" y2="240" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
 <line x1="200" y1="194" x2="233" y2="306" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
 <line x1="755" y1="54" x2="755" y2="88" stroke="#5b6475" stroke-width="1.3" marker-end="url(#arr-erd)"/>
@@ -2884,8 +2746,8 @@ Idempotency-Key: exp-20261009-regen
 </svg>
         <figcaption>Main relationships (SPEC §4). Arrows point from the "one" side to the "many" side; dashed = written in the same DB transaction; the loop on gl_account is the parent_code hierarchy.</figcaption>
       </figure>
-      <p><b>Retention</b> (§4.3): journals, balances, summary, exports, exceptions, CoA, rules, calendar: 10 years online; approvals 10 years; idempotency records 7 days; resolved deferred rows and command reasons 30 days; <code>processed_event</code> 14 days; outbox 3 days; offsets permanent, snapshots 10 years.</p>
-      <p><b>Scheduled jobs</b> (ShedLock): <code>DayCloseOrchestrator</code> (1 min), <code>RestatementJob</code> (10 min), <code>DeferredResolverJob</code> (30 s), <code>CalendarJob</code> (00:05 + start-up), <code>AccrualReversalJob</code> (after each close + hourly), <code>ExportJob</code> (after each close revision), <code>ApprovalExpiryJob</code> (5 min, 72 h expiry), <code>RetentionJob</code> (03:00).</p>
+      <p><b>Retention</b> (§4.3): journals, balances, summary, exceptions, CoA, rules, calendar: 10 years online; approvals 10 years; idempotency records 7 days; resolved deferred rows and command reasons 30 days; <code>processed_event</code> 14 days; outbox 3 days; offsets permanent, snapshots 10 years.</p>
+      <p><b>Scheduled jobs</b> (ShedLock): <code>DayCloseOrchestrator</code> (1 min), <code>RestatementJob</code> (10 min), <code>DeferredResolverJob</code> (30 s), <code>CalendarJob</code> (00:05 + start-up), <code>AccrualReversalJob</code> (after each close + hourly), <code>ApprovalExpiryJob</code> (5 min, 72 h expiry), <code>RetentionJob</code> (03:00).</p>
     </section>
 
     <!-- ===================================================== 10 -->
