@@ -1,0 +1,1779 @@
+openapi: 3.1.0
+info:
+  title: transaction-service (SVC-02)
+  version: 1.0.0
+  description: |
+    Payment orchestrator of Bits Pay. Every operation served by transaction-service, including staff,
+    internal and local-test operations. Kernel 1.0 rules apply (headers K3.1, idempotency K3.3,
+    pagination K3.4, money K3.5, problem+json K3.6, product switches K3.7).
+
+    - Money is int64 poisha. IDs are canonical lower-case UUIDs. Timestamps are ISO-8601 UTC with milliseconds and `Z`.
+    - Every response for a request whose payment intent was **persisted** carries the transaction:
+      top-level on 200, as the problem member `transaction` otherwise. Refusals decided before persistence carry none.
+    - `x-audience` = primary audience; `x-actors` = allowed `X-Actor-Type` values with roles / `X-Actor-Id` values and binding rules.
+    - Problem extension members owned by this service: `transaction`, `limitCode`, `limitParty`, `remainingPoisha`,
+      `remainingCount`, `resetsAt`, `walletId`, `walletStatus` (see `codes.yaml → problemExtensions`).
+  x-service: transaction-service
+  x-contract-version: 1.0.0
+  x-kernel: "1.0"
+servers:
+  - url: http://localhost:8102
+    description: local / Compose (management port 9102)
+tags:
+  - {name: payments, description: Money-moving payment APIs}
+  - {name: quote, description: Read-only fee quote}
+  - {name: reversals, description: Internal reversal executor}
+  - {name: transactions, description: Transaction queries}
+  - {name: merchant-refund-requests, description: Merchant refund maker-checker requests}
+  - {name: approvals, description: Local maker-checker engine (kernel K5)}
+  - {name: beneficiaries, description: Saved beneficiaries (PAY-009)}
+  - {name: admin, description: Staff operations (internal)}
+  - {name: dev, description: Local/test profile only}
+
+paths:
+  /v1/payments/quote:
+    parameters: &commonHeaders
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+    post:
+      operationId: quotePayment
+      tags: [quote]
+      summary: Wallet-based fee quote (no money moves, no persistence, no Idempotency-Key)
+      description: |
+        Reads both wallets' status (types and direction validated as for the payment), reads the sender's
+        monthly count from limits-risk usage (300 ms, no retry) and evaluates the pricing algorithm.
+        If the count cannot be read, evaluates without the free allowance and returns `feeIsUpperBound: true` (OPEN D-17).
+        No risk evaluation, no reservation. p99 30 ms (+ <= 300 ms usage call).
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "txnType P2P, CASH_OUT, MERCHANT_PAYMENT; X-Actor-Wallet-Id = fromWalletId"}
+        - {type: AGENT, rule: "txnType CASH_IN, FLOAT_TRANSFER; X-Actor-Wallet-Id = fromWalletId"}
+        - {type: DISTRIBUTOR, rule: "txnType FLOAT_TRANSFER; X-Actor-Wallet-Id = fromWalletId"}
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER], rule: "txnType FLOAT_TRANSFER"}
+      x-idempotency: none (read-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QuoteRequest'}
+            examples:
+              cashOut:
+                value: {txnType: CASH_OUT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 50000}
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/QuoteResult'}
+              examples:
+                cashOut:
+                  value: {txnType: CASH_OUT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 50000, feePoisha: 750, vatPoisha: 112, feeBearer: PAYER, totalDebitPoisha: 50862, creditToPayeePoisha: 50000, commissionPoisha: 300, aitPoisha: 30, pricingPlanId: PLN-CASHOUT-STD, pricingPlanVersion: 2, feeIsUpperBound: false, currency: BDT, quotedAt: '2026-10-09T08:03:20.002Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422':
+          description: "WALLET_NOT_TRANSACTABLE (ext walletId, walletStatus) or SERVICE_DISABLED. Never carries `transaction`."
+          x-codes: [WALLET_NOT_TRANSACTABLE, SERVICE_DISABLED]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWallet'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/payments/p2p:
+    parameters: *commonHeaders
+    post:
+      operationId: payP2p
+      tags: [payments]
+      summary: P2P transfer (customer to customer)
+      description: |
+        Synchronous final status. Delegated P2P: disbursement-service may call with the payer's CUSTOMER headers
+        and `X-Channel: SYSTEM`; treated as a normal P2P (OPEN D-33). p99 300 ms.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = fromWalletId (also delegated calls by disbursement-service with the payer's CUSTOMER headers)"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key); retained >= 7 days (OPEN D-01)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/P2pRequest'}
+            examples:
+              rahimToKarim:
+                value: {fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, amountPoisha: 50000, purposeCode: FAMILY_SUPPORT, note: for Eid shopping}
+      responses:
+        '200': {$ref: '#/components/responses/PaymentOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/cash-in:
+    parameters: *commonHeaders
+    post:
+      operationId: payCashIn
+      tags: [payments]
+      summary: Cash-in at an agent (agent to customer)
+      x-audience: partner
+      x-actors:
+        - {type: AGENT, rule: "X-Actor-Wallet-Id = agentWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CashInRequest'}
+            examples:
+              salmaToRahim:
+                value: {agentWalletId: 0192f2cc-0003-7000-8000-00000000c003, customerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 100000}
+      responses:
+        '200':
+          description: COMPLETED
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: CI26100900B7N2K8QD, txnId: 0192f3c5-1a00-7c00-9a51-3f2c8e1d0a21, txnType: CASH_IN, status: COMPLETED, failureCode: null, amountPoisha: 100000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 100000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2cc-0003-7000-8000-00000000c003, toWalletId: 0192f2aa-0001-7000-8000-00000000a001, createdAt: '2026-10-09T10:15:00.120Z', completedAt: '2026-10-09T10:15:00.170Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/cash-out:
+    parameters: *commonHeaders
+    post:
+      operationId: payCashOut
+      tags: [payments]
+      summary: Customer-initiated cash-out (customer to agent)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = customerWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CashOutRequest'}
+            examples:
+              karimAtSalma:
+                value: {customerWalletId: 0192f2bb-0002-7000-8000-00000000b002, agentWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 50000}
+      responses:
+        '200':
+          description: COMPLETED
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: CO26100900H4W8P2ZN, txnId: 0192f3d0-0000-7000-8000-000000000001, txnType: CASH_OUT, status: COMPLETED, failureCode: null, amountPoisha: 50000, feePoisha: 750, vatPoisha: 112, totalDebitPoisha: 50862, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, createdAt: '2026-10-09T11:00:00.010Z', completedAt: '2026-10-09T11:00:00.075Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/merchant:
+    parameters: *commonHeaders
+    post:
+      operationId: payMerchant
+      tags: [payments]
+      summary: Merchant payment (customer to merchant, Bangla QR on-us)
+      description: "With PAYEE-borne MDR the response has feeBearer PAYEE and totalDebitPoisha = amountPoisha."
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = customerWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MerchantPaymentRequest'}
+            examples:
+              rahimAtNirob:
+                value: {customerWalletId: 0192f2aa-0001-7000-8000-00000000a001, merchantWalletId: 0192f2dd-0004-7000-8000-00000000d004, amountPoisha: 35000, merchantReference: INV-2026-0042, qrPayloadId: 0192f3b0-0000-7000-8000-0000000000f1}
+      responses:
+        '200':
+          description: COMPLETED
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: MP26100900H8N2KQ5X, txnId: 0192f3e0-0000-7000-8000-000000000001, txnType: MERCHANT_PAYMENT, status: COMPLETED, failureCode: null, amountPoisha: 35000, feePoisha: 525, vatPoisha: 79, totalDebitPoisha: 35000, feeBearer: PAYEE, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2dd-0004-7000-8000-00000000d004, createdAt: '2026-10-09T12:00:00.010Z', completedAt: '2026-10-09T12:00:00.068Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/merchant-refund:
+    parameters: *commonHeaders
+    post:
+      operationId: payMerchantRefund
+      tags: [payments]
+      summary: Direct merchant refund (full or partial) of a MERCHANT_PAYMENT
+      description: |
+        MERCHANT only. A merchant whose sub-type requires maker-checker (seed ENTERPRISE) gets 422 MAKER_CHECKER_VIOLATION
+        and must use /v1/merchant-refund-requests. STAFF refunds only through an approval (entityType MerchantRefund).
+        Excess amount -> 422 REFUND_EXCEEDS_ORIGINAL with `remainingPoisha` (not persisted). p99 400 ms.
+      x-audience: partner
+      x-actors:
+        - {type: MERCHANT, rule: "X-Actor-Wallet-Id = original.toWalletId"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MerchantRefundRequest'}
+            examples:
+              partial:
+                value: {originalTxnRef: MP26100900H8N2KQ5W, amountPoisha: 40000, reasonCode: CUSTOMER_RETURN}
+      responses:
+        '200':
+          description: COMPLETED
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: MR26101200A7K2M9QX, txnId: 0192f5b0-0000-7000-8000-000000000001, txnType: MERCHANT_REFUND, status: COMPLETED, failureCode: null, amountPoisha: 40000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 40000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2dd-0004-7000-8000-00000000d004, toWalletId: 0192f2aa-0001-7000-8000-00000000a001, createdAt: '2026-10-12T06:15:00.120Z', completedAt: '2026-10-12T06:15:00.210Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/RefundUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/payments/float-transfer:
+    parameters: *commonHeaders
+    post:
+      operationId: payFloatTransfer
+      tags: [payments]
+      summary: Float transfer (top-up or return between direct parent and child)
+      description: |
+        DISTRIBUTOR or AGENT owning fromWalletId (hierarchy: direct parent <-> child, else 403), or STAFF OPS_CHECKER/FIN_CHECKER
+        (hierarchy overridden and audited; requestId mandatory). treasury-service forwards the context of the actor owning
+        fromWalletId (TOP_UP: approving parent; RETURN: requester) or the STAFF approver, with Idempotency-Key = float request id.
+        SERVICE actors -> 403. Pair outside float.allowedPairs -> 400.
+      x-audience: partner
+      x-actors:
+        - {type: DISTRIBUTOR, rule: "X-Actor-Wallet-Id = fromWalletId; direct parent/child of toWalletId"}
+        - {type: AGENT, rule: "X-Actor-Wallet-Id = fromWalletId; direct parent/child of toWalletId"}
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER], rule: "requestId mandatory; hierarchy override audited"}
+        - {forwardedBy: treasury-service, rule: "forwards the owning actor's or STAFF approver's X-Actor-* headers unchanged"}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FloatTransferRequest'}
+            examples:
+              distributorToSalma:
+                value: {fromWalletId: 0192f4a1-0d03-7c00-8a00-00000000d003, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, amountPoisha: 5000000, requestId: 0192f6a0-0000-7000-8000-000000000001}
+      responses:
+        '200':
+          description: COMPLETED
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: FT26100900P3X8K2NM, txnId: 0192f6a1-0000-7000-8000-000000000001, txnType: FLOAT_TRANSFER, status: COMPLETED, failureCode: null, amountPoisha: 5000000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 5000000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f4a1-0d03-7c00-8a00-00000000d003, toWalletId: 0192f2cc-0003-7000-8000-00000000c003, createdAt: '2026-10-09T13:00:00.010Z', completedAt: '2026-10-09T13:00:00.060Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/PaymentConflict'}
+        '422': {$ref: '#/components/responses/PaymentUnprocessable'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/internal/reversals:
+    parameters: *commonHeaders
+    post:
+      operationId: executeReversal
+      tags: [reversals]
+      summary: Execute a support-approved reversal (full or partial principal)
+      description: |
+        X-Actor-Type SERVICE with X-Actor-Id in reversal.allowedServices; others -> 403. No wallet-status gate, no risk,
+        no pricing, no max-balance constraint. Caller key per attempt: `rev-{reversalRequestId}-{attempt}`; the same key is
+        re-sent only after 503/timeout/5xx/connection failure. Partial (amountPoisha < original principal) requires
+        reverseFee = reverseCommission = false, else 400. The original ends REVERSED in both cases. p99 400 ms.
+      x-audience: service
+      x-actors:
+        - {type: SERVICE, ids: [support-service]}
+      x-idempotency: "Idempotency-Key required (rev-{reversalRequestId}-{attempt}); scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReversalRequest'}
+            examples:
+              full:
+                value: {originalTxnRef: PP26100900K3M9QX2A, reasonCode: WRONG_TRANSFER, reverseFee: true, reverseCommission: true, releaseHoldCommandId: 8d3c1f0e-2b4a-5c6d-9e8f-0a1b2c3d4e5f, approvalId: 0192f8bb-0000-7000-8000-000000000001, amountPoisha: null}
+              partial:
+                value: {originalTxnRef: PP26100900K3M9QX2A, reasonCode: DISPUTE_UPHELD, reverseFee: false, reverseCommission: false, approvalId: 0192f8bb-0000-7000-8000-000000000002, amountPoisha: 20000}
+      responses:
+        '200':
+          description: "PaymentResult of the REVERSAL (RV...): from = original.to, to = original.from, totalDebitPoisha = amountPoisha, feeBearer = original's."
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResult'}
+              examples:
+                completed:
+                  value: {txnRef: RV26100900Q2D5M8XT, txnId: 0192f4a0-0000-7000-8000-000000000001, txnType: REVERSAL, status: COMPLETED, failureCode: null, amountPoisha: 50000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 50000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2bb-0002-7000-8000-00000000b002, toWalletId: 0192f2aa-0001-7000-8000-00000000a001, createdAt: '2026-10-09T09:30:00.000Z', completedAt: '2026-10-09T09:30:00.040Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: |
+            IDEMPOTENCY_CONFLICT (no transaction); STATE_CONFLICT original not reversible (not persisted, no transaction);
+            STATE_CONFLICT from ledger REJECTED ORIGINAL_NOT_FOUND / ALREADY_REVERSED / HOLD_NOT_FOUND / INVALID_AMOUNT / OTHER
+            or ledger HTTP 400/403 (persisted FAILED, carries `transaction` with failureCode LEDGER_*).
+          x-codes: [IDEMPOTENCY_CONFLICT, STATE_CONFLICT]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemPayment'}
+        '422':
+          description: "INSUFFICIENT_FUNDS or WALLET_NOT_TRANSACTABLE (ledger ACCOUNT_CLOSED/ACCOUNT_NOT_FOUND) with `transaction`; SERVICE_DISABLED (FEATURE.REVERSAL off, before any side effect, no transaction)."
+          x-codes: [INSUFFICIENT_FUNDS, WALLET_NOT_TRANSACTABLE, SERVICE_DISABLED]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemPayment'}
+        '503': {$ref: '#/components/responses/PaymentUnavailable'}
+
+  /v1/transactions/{txnRef}:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - name: txnRef
+        in: path
+        required: true
+        description: "Opaque reference 1..32 [A-Z0-9-]. A non-transaction prefix (other owners' namespaces) -> 404."
+        schema: {type: string, minLength: 1, maxLength: 32, pattern: '^[A-Z0-9-]{1,32}$'}
+        example: PP26100900K3M9QX2A
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Lookup by txnRef (current lifecycle state)
+      description: |
+        Available while online (bitspay.txn.query.onlineMonths, default 24, OPEN D-24); older or archived -> 404 (history lives in reporting).
+        support-service may forward a CUSTOMER/MERCHANT/AGENT caller's own headers. p95 20 ms.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id in {fromWalletId, toWalletId}, else 404"}
+        - {type: AGENT, rule: "party wallet only"}
+        - {type: MERCHANT, rule: "party wallet only"}
+        - {type: DISTRIBUTOR, rule: "party wallet only"}
+        - {type: INSTITUTION, rule: "party wallet only"}
+        - {type: STAFF, roles: ["*"]}
+        - {type: SERVICE, ids: ["*"]}
+        - {type: SYSTEM, ids: ["*"]}
+      responses:
+        '200':
+          description: TransactionView
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransactionView'}
+              examples:
+                reversedP2p:
+                  value: {txnRef: PP26100900K3M9QX2A, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11, txnType: P2P, status: REVERSED, failureCode: null, amountPoisha: 50000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 50575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:03:22.101Z', completedAt: '2026-10-09T08:03:22.161Z', channel: APP, initiatorActorType: CUSTOMER, clientReference: req-7f3a9c, purposeCode: FAMILY_SUPPORT, note: for Eid shopping, merchantReference: null, qrPayloadId: null, requestId: null, commissionPoisha: 0, aitPoisha: 0, commissionBeneficiaryWalletId: null, pricingPlanId: PLN-P2P-STD, pricingPlanVersion: 3, reasonCode: null, originalTxnRef: null, reversalTxnRef: RV26100900Q2D5M8XT, reversedAmountPoisha: 50000, refundedTotalPoisha: 0}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/transactions:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: Wallet history (hot window, last 30 days)
+      description: |
+        Ordered createdAt desc, txnId desc. fromTs earlier than now - 30 d is clamped (never rejected). Older history lives in reporting.
+        `clientReference` (with walletId = the debited wallet) resolves an Idempotency-Key to its transaction (0..1 items; kernel K3.3 rule 4).
+        p95 300 ms.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = walletId"}
+        - {type: AGENT, rule: "X-Actor-Wallet-Id = walletId"}
+        - {type: MERCHANT, rule: "X-Actor-Wallet-Id = walletId"}
+        - {type: DISTRIBUTOR, rule: "X-Actor-Wallet-Id = walletId"}
+        - {type: INSTITUTION, rule: "X-Actor-Wallet-Id = walletId"}
+        - {type: STAFF, roles: ["*"]}
+        - {type: SERVICE, ids: ["*"]}
+      x-pagination: "cursor (kernel K3.4), default limit 50, max 200"
+      parameters:
+        - {name: walletId, in: query, required: true, schema: {type: string, format: uuid}, example: 0192f2aa-0001-7000-8000-00000000a001}
+        - {name: fromTs, in: query, required: false, description: "default now - 30 d; earlier values are clamped", schema: {type: string, format: date-time}}
+        - {name: toTs, in: query, required: false, description: "default now", schema: {type: string, format: date-time}}
+        - {name: txnType, in: query, required: false, schema: {$ref: '#/components/schemas/TxnType'}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/TransactionStatus'}}
+        - {name: originalTxnRef, in: query, required: false, description: "lists refunds / reversal of a payment", schema: {type: string, pattern: '^[A-Z0-9-]{1,32}$'}}
+        - {name: clientReference, in: query, required: false, description: "caller's Idempotency-Key; with walletId = the debited wallet; returns 0..1 items", schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]{1,64}$'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of TransactionView + direction
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransactionPage'}
+              examples:
+                refundsOfPayment:
+                  value:
+                    items:
+                      - {txnRef: MR26101200A7K2M9QX, txnId: 0192f5b0-0000-7000-8000-000000000001, txnType: MERCHANT_REFUND, status: COMPLETED, failureCode: null, amountPoisha: 40000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 40000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2dd-0004-7000-8000-00000000d004, toWalletId: 0192f2aa-0001-7000-8000-00000000a001, createdAt: '2026-10-12T06:15:00.120Z', completedAt: '2026-10-12T06:15:00.210Z', channel: PARTNER_APP, initiatorActorType: MERCHANT, clientReference: mr-77a0, purposeCode: null, note: null, merchantReference: null, qrPayloadId: null, requestId: null, commissionPoisha: 0, aitPoisha: 0, commissionBeneficiaryWalletId: null, pricingPlanId: null, pricingPlanVersion: null, reasonCode: CUSTOMER_RETURN, originalTxnRef: MP26100900H8N2KQ5W, reversalTxnRef: null, reversedAmountPoisha: null, refundedTotalPoisha: 0, direction: CREDIT}
+                    nextCursor: null
+        '400': {$ref: '#/components/responses/BadRequestList'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/merchant-refund-requests:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+    post:
+      operationId: createMerchantRefundRequest
+      tags: [merchant-refund-requests]
+      summary: Create a merchant refund request (maker-checker, entityType MerchantRefund)
+      description: |
+        Validation identical to the direct refund (read-only: original type/state/window, remaining amount, reason code).
+        Creates approval_request PENDING (1 or 2 levels by amount) and publishes APPROVAL_REQUESTED + audit REFUND_REQUESTED.
+      x-audience: partner
+      x-actors:
+        - {type: MERCHANT, rule: "X-Actor-Wallet-Id = original.toWalletId"}
+        - {type: STAFF, roles: [OPS_MAKER, SUP_MAKER]}
+      x-idempotency: "Idempotency-Key required; scope (X-Actor-Id, key)"
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MerchantRefundRequest'}
+            examples:
+              enterpriseRefund:
+                value: {originalTxnRef: MP26100900H8N2KQ5W, amountPoisha: 80000, reasonCode: ORDER_CANCELLED}
+      responses:
+        '201':
+          description: Request created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MerchantRefundRequestCreated'}
+              examples:
+                created:
+                  value: {requestId: 0192f7a0-0000-7000-8000-000000000001, approvalId: 0192f7a1-0000-7000-8000-000000000001, status: PENDING, expiresAt: '2026-10-15T06:00:00.000Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422':
+          description: "REFUND_EXCEEDS_ORIGINAL (ext remainingPoisha) or SERVICE_DISABLED (FEATURE.MERCHANT_REFUND off)."
+          x-codes: [REFUND_EXCEEDS_ORIGINAL, SERVICE_DISABLED]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemRefund'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+    get:
+      operationId: listMerchantRefundRequests
+      tags: [merchant-refund-requests]
+      summary: List refund requests
+      x-audience: partner
+      x-actors:
+        - {type: MERCHANT, rule: "merchantWalletId = X-Actor-Wallet-Id"}
+        - {type: STAFF, roles: ["*"]}
+      x-pagination: "cursor (kernel K3.4), ordered createdAt desc"
+      parameters:
+        - {name: merchantWalletId, in: query, required: false, description: "required for MERCHANT actors (= own wallet)", schema: {type: string, format: uuid}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/MerchantRefundRequestStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MerchantRefundRequestPage'}
+              examples:
+                page:
+                  value:
+                    items:
+                      - {requestId: 0192f7a0-0000-7000-8000-000000000001, approvalId: 0192f7a1-0000-7000-8000-000000000001, originalTxnRef: MP26100900H8N2KQ5W, merchantWalletId: 0192f2dd-0004-7000-8000-00000000d004, amountPoisha: 80000, reasonCode: ORDER_CANCELLED, status: PENDING, resultTxnRef: null, resultCode: null, createdAt: '2026-10-12T06:00:00.000Z', expiresAt: '2026-10-15T06:00:00.000Z'}
+                    nextCursor: null
+        '400': {$ref: '#/components/responses/BadRequestList'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/merchant-refund-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - {name: id, in: path, required: true, description: requestId, schema: {type: string, format: uuid}, example: 0192f7a0-0000-7000-8000-000000000001}
+    get:
+      operationId: getMerchantRefundRequest
+      tags: [merchant-refund-requests]
+      summary: Refund request status (incl. resultTxnRef)
+      x-audience: partner
+      x-actors:
+        - {type: MERCHANT, rule: "own requests only (else 404)"}
+        - {type: STAFF, roles: ["*"]}
+      responses:
+        '200':
+          description: Request
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MerchantRefundRequestView'}
+              examples:
+                executed:
+                  value: {requestId: 0192f7a0-0000-7000-8000-000000000001, approvalId: 0192f7a1-0000-7000-8000-000000000001, originalTxnRef: MP26100900H8N2KQ5W, merchantWalletId: 0192f2dd-0004-7000-8000-00000000d004, amountPoisha: 80000, reasonCode: ORDER_CANCELLED, status: EXECUTED, resultTxnRef: MR26101300C4D8N2QX, resultCode: null, createdAt: '2026-10-12T06:00:00.000Z', expiresAt: '2026-10-15T06:00:00.000Z'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/approvals:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+    get:
+      operationId: listApprovals
+      tags: [approvals]
+      summary: List approval requests (kernel K5)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER, SUP_MAKER, SUP_CHECKER, ADMIN, AUDITOR]}
+        - {type: MERCHANT, rule: "own requests only; only when bitspay.txn.refund.merchantSelfApproval = true"}
+      x-pagination: "cursor (kernel K3.4), ordered createdAt desc"
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [PENDING, APPROVED, REJECTED, EXPIRED, EXECUTED, EXECUTION_FAILED]}}
+        - {name: entityType, in: query, required: false, schema: {type: string, enum: [MerchantRefund]}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalPage'}
+              examples:
+                pending:
+                  value:
+                    items:
+                      - {approvalId: 0192f7a1-0000-7000-8000-000000000001, entityType: MerchantRefund, entityId: MP26100900H8N2KQ5W, action: REFUND, makerId: 0192f4a0-0a04-7c00-8a00-00000000d004, makerActorType: MERCHANT, status: PENDING, level: 1, requiredLevels: 1, checkerRoles: [OPS_CHECKER, SUP_CHECKER], amountPoisha: 80000, payload: {originalTxnRef: MP26100900H8N2KQ5W, amountPoisha: 80000, reasonCode: ORDER_CANCELLED, requestId: 0192f7a0-0000-7000-8000-000000000001}, createdAt: '2026-10-12T06:00:00.000Z', expiresAt: '2026-10-15T06:00:00.000Z', decidedBy: [], decidedAt: null}
+                    nextCursor: null
+        '400': {$ref: '#/components/responses/BadRequestList'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/approvals/{id}:approve:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - {name: id, in: path, required: true, description: approvalId, schema: {type: string, format: uuid}, example: 0192f7a1-0000-7000-8000-000000000001}
+    post:
+      operationId: approveApproval
+      tags: [approvals]
+      summary: Approve the current level; the final level executes the refund synchronously
+      description: |
+        Checker != maker (and != any earlier-level checker; X-Actor-User-Id compared when both present).
+        Final approval executes the refund with Idempotency-Key apr-{approvalId}, initiator = the maker's identity.
+        The response carries the refund's PaymentResult when executed; a refused execution returns 200 with requestStatus
+        EXECUTION_FAILED and `transaction` (FAILED) when persisted. An unknown execution outcome (dependency unavailable) returns 200
+        with requestStatus APPROVED and `transaction` null or INITIATED; the approval-execution job completes it with the same key.
+        503 only when the decision itself could not be recorded.
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, SUP_CHECKER]}
+        - {type: MERCHANT, rule: "only when bitspay.txn.refund.merchantSelfApproval = true: X-Actor-Id = owning partner and X-Actor-User-Id present and != maker's"}
+      x-idempotency: "natural (state machine); repeated approve on a decided level -> 409 STATE_CONFLICT"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApproveRequest'}
+            examples:
+              approve:
+                value: {comment: "Order cancelled, verified with merchant"}
+      responses:
+        '200':
+          description: Decision result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalDecisionResult'}
+              examples:
+                executed:
+                  value: {approvalId: 0192f7a1-0000-7000-8000-000000000001, status: APPROVED, requestStatus: EXECUTED, resultTxnRef: MR26101300C4D8N2QX, transaction: {txnRef: MR26101300C4D8N2QX, txnId: 0192f7b0-0000-7000-8000-000000000001, txnType: MERCHANT_REFUND, status: COMPLETED, failureCode: null, amountPoisha: 80000, feePoisha: 0, vatPoisha: 0, totalDebitPoisha: 80000, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2dd-0004-7000-8000-00000000d004, toWalletId: 0192f2aa-0001-7000-8000-00000000a001, createdAt: '2026-10-13T04:00:00.010Z', completedAt: '2026-10-13T04:00:00.090Z'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422':
+          description: "MAKER_CHECKER_VIOLATION (checker = maker, or same checker on two levels)."
+          x-codes: [MAKER_CHECKER_VIOLATION]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemBase'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/approvals/{id}:reject:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - {name: id, in: path, required: true, description: approvalId, schema: {type: string, format: uuid}, example: 0192f7a1-0000-7000-8000-000000000001}
+    post:
+      operationId: rejectApproval
+      tags: [approvals]
+      summary: Reject a pending approval
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, SUP_CHECKER]}
+        - {type: MERCHANT, rule: "only when bitspay.txn.refund.merchantSelfApproval = true (same identification as approve)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RejectRequest'}
+            examples:
+              reject:
+                value: {comment: Goods were not returned, reasonCode: null}
+      responses:
+        '200':
+          description: Decision result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalDecisionResult'}
+              examples:
+                rejected:
+                  value: {approvalId: 0192f7a1-0000-7000-8000-000000000001, status: REJECTED, requestStatus: REJECTED, resultTxnRef: null, transaction: null}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422':
+          description: "MAKER_CHECKER_VIOLATION (checker = maker)."
+          x-codes: [MAKER_CHECKER_VIOLATION]
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemBase'}
+
+  /v1/beneficiaries:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+    get:
+      operationId: listBeneficiaries
+      tags: [beneficiaries]
+      summary: Saved beneficiaries of a wallet (not paged; bounded at 50 per wallet)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = walletId"}
+      x-pagination: "not paged; max 50 items (bitspay.txn.beneficiary.maxPerWallet), ordered nickname asc"
+      parameters:
+        - {name: walletId, in: query, required: true, schema: {type: string, format: uuid}, example: 0192f2aa-0001-7000-8000-00000000a001}
+      responses:
+        '200':
+          description: Beneficiaries
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BeneficiaryList'}
+              examples:
+                list:
+                  value:
+                    items:
+                      - {id: 0192f9c0-0000-7000-8000-000000000001, ownerWalletId: 0192f2aa-0001-7000-8000-00000000a001, beneficiaryWalletId: 0192f2bb-0002-7000-8000-00000000b002, txnType: P2P, nickname: Karim bhai, lastUsedAt: null, createdAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createBeneficiary
+      tags: [beneficiaries]
+      summary: Save a beneficiary
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = ownerWalletId"}
+      x-idempotency: "natural (unique ownerWalletId, beneficiaryWalletId, txnType -> 409 STATE_CONFLICT)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BeneficiaryCreate'}
+            examples:
+              karim:
+                value: {ownerWalletId: 0192f2aa-0001-7000-8000-00000000a001, beneficiaryWalletId: 0192f2bb-0002-7000-8000-00000000b002, txnType: P2P, nickname: Karim bhai}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Beneficiary'}
+              examples:
+                created:
+                  value: {id: 0192f9c0-0000-7000-8000-000000000001, ownerWalletId: 0192f2aa-0001-7000-8000-00000000a001, beneficiaryWalletId: 0192f2bb-0002-7000-8000-00000000b002, txnType: P2P, nickname: Karim bhai, lastUsedAt: null, createdAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/beneficiaries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorWalletId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XDeviceId'
+      - {name: id, in: path, required: true, description: beneficiary id, schema: {type: string, format: uuid}, example: 0192f9c0-0000-7000-8000-000000000001}
+    patch:
+      operationId: updateBeneficiary
+      tags: [beneficiaries]
+      summary: Rename a beneficiary
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = beneficiary.ownerWalletId (else 404)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BeneficiaryUpdate'}
+            examples:
+              rename:
+                value: {nickname: Karim (office)}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Beneficiary'}
+              examples:
+                updated:
+                  value: {id: 0192f9c0-0000-7000-8000-000000000001, ownerWalletId: 0192f2aa-0001-7000-8000-00000000a001, beneficiaryWalletId: 0192f2bb-0002-7000-8000-00000000b002, txnType: P2P, nickname: Karim (office), lastUsedAt: null, createdAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-02T09:00:00.000Z'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: deleteBeneficiary
+      tags: [beneficiaries]
+      summary: Delete a beneficiary
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = beneficiary.ownerWalletId (else 404)"}
+      responses:
+        '204': {description: Deleted}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/internal/admin/pricing/plans:
+    parameters: &adminHeaders
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+    get:
+      operationId: getPricingSnapshot
+      tags: [admin]
+      summary: Inspect the in-memory pricing snapshot (source, offsets, age, plans)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [ADMIN, PRICING_CHECKER]}
+      responses:
+        '200':
+          description: Snapshot
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PricingSnapshotView'}
+              examples:
+                snapshot:
+                  value: {source: TOPIC, ready: true, plansLoaded: 6, builtAt: '2026-10-09T08:00:00.000Z', ageSeconds: 183, topicOffset: 42, topicEndOffset: 42, plans: [{planId: PLN-P2P-STD, version: 3, txnType: P2P, status: ACTIVE, priority: 100, effectiveFrom: '2026-10-01T00:00:00.000Z', effectiveTo: null}]}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/internal/admin/pricing:reload:
+    parameters: *adminHeaders
+    post:
+      operationId: reloadPricing
+      tags: [admin]
+      summary: Force a bootstrap of the pricing snapshot from pricing-service
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [ADMIN, PRICING_CHECKER]}
+      x-idempotency: "naturally idempotent (rebuilds the snapshot)"
+      responses:
+        '200':
+          description: Reloaded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PricingSnapshotView'}
+              examples:
+                reloaded:
+                  value: {source: BOOTSTRAP, ready: true, plansLoaded: 6, builtAt: '2026-10-09T08:05:00.000Z', ageSeconds: 0, topicOffset: 42, topicEndOffset: 42, plans: []}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/UnavailableNoTxn'}
+
+  /v1/internal/admin/sweeper:
+    parameters: *adminHeaders
+    get:
+      operationId: getSweeperStatus
+      tags: [admin]
+      summary: Sweeper and late-post verifier status (leader, last run, backlog)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [ADMIN, OPS_CHECKER]}
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SweeperStatus'}
+              examples:
+                status:
+                  value: {jobs: [{job: SWEEPER, leader: transaction-service-7d9f-abcde, lastRunAt: '2026-10-09T08:10:05.000Z', scanned: 3, completed: 2, failed: 0, pending: 1}], initiatedBacklog: 1, oldestInitiatedAgeSeconds: 41}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/internal/admin/sweeper:run:
+    parameters: *adminHeaders
+    post:
+      operationId: runSweeper
+      tags: [admin]
+      summary: Force one sweeper pass (only on the current leader; others return the leader's last run)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [ADMIN, OPS_CHECKER]}
+      x-idempotency: "safe to repeat (sweeper is idempotent)"
+      responses:
+        '200':
+          description: Run result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SweeperStatus'}
+              examples:
+                run:
+                  value: {jobs: [{job: SWEEPER, leader: transaction-service-7d9f-abcde, lastRunAt: '2026-10-09T08:10:09.000Z', scanned: 1, completed: 1, failed: 0, pending: 0}], initiatedBacklog: 0, oldestInitiatedAgeSeconds: 0}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/internal/admin/anomalies:
+    parameters: *adminHeaders
+    get:
+      operationId: listAnomalies
+      tags: [admin]
+      summary: Exception queue (LED-010)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER, ADMIN, AUDITOR]}
+      x-pagination: "cursor (kernel K3.4), ordered createdAt desc"
+      parameters:
+        - {name: resolved, in: query, required: false, schema: {type: boolean, default: false}}
+        - {name: kind, in: query, required: false, schema: {$ref: '#/components/schemas/AnomalyKind'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AnomalyPage'}
+              examples:
+                page:
+                  value:
+                    items:
+                      - {id: 0192fa00-0000-7000-8000-000000000001, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0e44, txnRef: PP26100900T5R2M8XA, kind: LATE_POST_DETECTED, detail: {ledgerResult: OK, sweptFailedAt: '2026-10-09T08:00:30.000Z'}, createdAt: '2026-10-09T08:11:00.000Z', resolvedAt: null, resolvedBy: null, resolution: null}
+                    nextCursor: null
+        '400': {$ref: '#/components/responses/BadRequestList'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /v1/internal/admin/anomalies/{id}:resolve:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, example: 0192fa00-0000-7000-8000-000000000001}
+    post:
+      operationId: resolveAnomaly
+      tags: [admin]
+      summary: Resolve an exception-queue item (resolution text only; no money effect)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER]}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AnomalyResolve'}
+            examples:
+              resolve:
+                value: {resolution: Reversed via support ticket T-2026-0042}
+      responses:
+        '200':
+          description: Resolved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Anomaly'}
+              examples:
+                resolved:
+                  value: {id: 0192fa00-0000-7000-8000-000000000001, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0e44, txnRef: PP26100900T5R2M8XA, kind: LATE_POST_DETECTED, detail: {ledgerResult: OK}, createdAt: '2026-10-09T08:11:00.000Z', resolvedAt: '2026-10-09T09:00:00.000Z', resolvedBy: 0192f002-0000-7000-8000-000000000002, resolution: Reversed via support ticket T-2026-0042}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /v1/internal/dev/fake-ledger/accounts/{id}:fund:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - {name: id, in: path, required: true, description: account (wallet) id, schema: {type: string, format: uuid}, example: 0192f2aa-0001-7000-8000-00000000a001}
+    post:
+      operationId: devFundFakeLedgerAccount
+      tags: [dev]
+      summary: "Fund an account of the Fake ledger (profiles local/test only; bean absent otherwise)"
+      x-audience: internal
+      x-actors:
+        - {type: "*", rule: "profiles local and test only"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FakeLedgerFund'}
+            examples:
+              fund:
+                value: {amountPoisha: 10000000}
+      responses:
+        '200':
+          description: Balance after funding
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FakeLedgerAccount'}
+              examples:
+                funded:
+                  value: {accountId: 0192f2aa-0001-7000-8000-00000000a001, creditsPostedPoisha: 10000000, debitsPostedPoisha: 0, availablePoisha: 10000000}
+
+  /v1/internal/dev/fake-ledger/accounts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, example: 0192f2aa-0001-7000-8000-00000000a001}
+    get:
+      operationId: devGetFakeLedgerAccount
+      tags: [dev]
+      summary: Read a Fake ledger account (profiles local/test only)
+      x-audience: internal
+      x-actors:
+        - {type: "*", rule: "profiles local and test only"}
+      responses:
+        '200':
+          description: Account
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FakeLedgerAccount'}
+              examples:
+                account:
+                  value: {accountId: 0192f2aa-0001-7000-8000-00000000a001, creditsPostedPoisha: 10000000, debitsPostedPoisha: 50575, availablePoisha: 9949425}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/internal/dev/fake-ledger/chaos:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+    post:
+      operationId: devSetFakeLedgerChaos
+      tags: [dev]
+      summary: Set the Fake ledger chaos mode (profiles local/test only)
+      x-audience: internal
+      x-actors:
+        - {type: "*", rule: "profiles local and test only"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FakeLedgerChaos'}
+            examples:
+              failAfterPost:
+                value: {mode: FAIL_AFTER_POST, rate: 1.0, delayMs: 0}
+      responses:
+        '200':
+          description: Chaos mode in force
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FakeLedgerChaos'}
+              examples:
+                set:
+                  value: {mode: FAIL_AFTER_POST, rate: 1.0, delayMs: 0}
+
+  /v1/internal/dev/wallet-cache/{walletId}:
+    parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - {name: walletId, in: path, required: true, schema: {type: string, format: uuid}, example: 0192f2aa-0001-7000-8000-00000000a001}
+    put:
+      operationId: devPutWalletCacheEntry
+      tags: [dev]
+      summary: Write a wallet status cache entry in the local Redis cache (profiles local/test only)
+      x-audience: internal
+      x-actors:
+        - {type: "*", rule: "profiles local and test only"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WalletCacheEntry'}
+            examples:
+              rahim:
+                value: {version: 8813, status: A, kycTier: 2, walletType: C, categoryCode: 0, flags: 0}
+      responses:
+        '200':
+          description: Written
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WalletCacheEntry'}
+              examples:
+                written:
+                  value: {version: 8813, status: A, kycTier: 2, walletType: C, categoryCode: 0, flags: 0}
+
+components:
+  parameters:
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: "Generated if absent; echoed; <= 64 [A-Za-z0-9._-]"
+      schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9._-]{1,64}$'}
+    XActorType:
+      name: X-Actor-Type
+      in: header
+      required: true
+      schema: {type: string, enum: [CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, STAFF, SYSTEM, SERVICE]}
+    XActorId:
+      name: X-Actor-Id
+      in: header
+      required: true
+      description: "Canonical UUID for CUSTOMER/partner/STAFF actors; bare service name for SERVICE/SYSTEM"
+      schema: {type: string, maxLength: 64}
+    XActorWalletId:
+      name: X-Actor-Wallet-Id
+      in: header
+      required: false
+      description: "Required for wallet-holder actors; must be the debited (from) wallet on payments"
+      schema: {type: string, format: uuid}
+    XActorRoles:
+      name: X-Actor-Roles
+      in: header
+      required: false
+      description: "Required for STAFF; comma-separated kernel K7 role codes"
+      schema: {type: string}
+    XActorUserId:
+      name: X-Actor-User-Id
+      in: header
+      required: false
+      description: "Partner sub-user; maker != checker and audit only"
+      schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]{1,64}$'}
+    XChannel:
+      name: X-Channel
+      in: header
+      required: true
+      schema: {type: string, enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM]}
+    XDeviceId:
+      name: X-Device-Id
+      in: header
+      required: false
+      schema: {type: string, maxLength: 128}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: "Client-generated; scope (X-Actor-Id, key); retained >= 7 days (OPEN D-01); missing -> 400"
+      schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]{1,64}$'}
+      example: req-7f3a9c
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: {type: integer, format: int32, minimum: 1, maximum: 200, default: 50}
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: "Opaque; valid 24 h for the same endpoint, actor and filters; invalid -> 400 reason INVALID_CURSOR"
+      schema: {type: string}
+
+  responses:
+    PaymentOk:
+      description: COMPLETED (PaymentResult)
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/PaymentResult'}
+          examples:
+            completed:
+              value: {txnRef: PP26100900K3M9QX2A, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11, txnType: P2P, status: COMPLETED, failureCode: null, amountPoisha: 50000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 50575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:03:22.101Z', completedAt: '2026-10-09T08:03:22.161Z'}
+    BadRequest:
+      description: VALIDATION_FAILED (errors[] present). Never carries `transaction`.
+      x-codes: [VALIDATION_FAILED]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+          examples:
+            missingKey:
+              value: {type: about:blank, title: Validation failed, status: 400, code: VALIDATION_FAILED, correlationId: c-0f3e9a, instance: /v1/payments/p2p, errors: [{field: Idempotency-Key, message: required}]}
+    BadRequestList:
+      description: VALIDATION_FAILED; reason INVALID_CURSOR for an expired, tampered or foreign cursor.
+      x-codes: [VALIDATION_FAILED]
+      x-reasons: [INVALID_CURSOR]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemList'}
+    Forbidden:
+      description: ACTOR_NOT_ALLOWED (actor type, role, caller, wallet binding, float hierarchy).
+      x-codes: [ACTOR_NOT_ALLOWED]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+    NotFound:
+      description: NOT_FOUND (unknown wallet, original txn, txnRef, request, approval, beneficiary; or caller not a party).
+      x-codes: [NOT_FOUND]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+    Conflict:
+      description: IDEMPOTENCY_CONFLICT or STATE_CONFLICT (not persisted).
+      x-codes: [IDEMPOTENCY_CONFLICT, STATE_CONFLICT]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+    PaymentConflict:
+      description: |
+        IDEMPOTENCY_CONFLICT (same key, different body; no transaction). STATE_CONFLICT refund state/window/concurrency
+        (not persisted; no transaction). STATE_CONFLICT from a ledger REJECTED ORIGINAL_NOT_FOUND / ALREADY_REVERSED /
+        HOLD_NOT_FOUND / INVALID_AMOUNT / OTHER or ledger HTTP 400/403 (persisted FAILED; carries `transaction`).
+      x-codes: [IDEMPOTENCY_CONFLICT, STATE_CONFLICT]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemPayment'}
+    PaymentUnprocessable:
+      description: |
+        Money decisions, all persisted FAILED with `transaction`: WALLET_NOT_TRANSACTABLE (walletId, walletStatus),
+        LIMIT_EXCEEDED (limitCode, limitParty, remainingPoisha, remainingCount, resetsAt), RISK_BLOCKED,
+        RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED (risk decision), INSUFFICIENT_FUNDS,
+        MAX_BALANCE_EXCEEDED. SERVICE_DISABLED from the product switch (before any side effect) carries no transaction.
+      x-codes: [WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemPayment'}
+          examples:
+            limitExceeded:
+              value: {type: about:blank, title: Limit exceeded, status: 422, code: LIMIT_EXCEEDED, limitCode: P2P_SEND_DAILY_AMOUNT, limitParty: FROM, remainingPoisha: 120000, remainingCount: null, resetsAt: '2026-10-09T18:00:00.000Z', instance: /v1/payments/p2p, correlationId: c-0f3e9b, transaction: {txnRef: PP26100900R8T2WQ4M, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0f55, txnType: P2P, status: FAILED, failureCode: LIMIT_EXCEEDED, amountPoisha: 500000, feePoisha: 2500, vatPoisha: 375, totalDebitPoisha: 502875, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:05:00.101Z', completedAt: '2026-10-09T08:05:00.140Z'}}
+            insufficientFunds:
+              value: {type: about:blank, title: Insufficient balance, status: 422, code: INSUFFICIENT_FUNDS, detail: Ledger rejected the transfer, instance: /v1/payments/p2p, correlationId: c-0f3e9c, transaction: {txnRef: PP26100900R8T2WQ4N, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0f66, txnType: P2P, status: FAILED, failureCode: INSUFFICIENT_FUNDS, amountPoisha: 5000000, feePoisha: 2500, vatPoisha: 375, totalDebitPoisha: 5002875, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:06:00.101Z', completedAt: '2026-10-09T08:06:00.150Z'}}
+    RefundUnprocessable:
+      description: |
+        As PaymentUnprocessable, plus REFUND_EXCEEDS_ORIGINAL (remainingPoisha; not persisted) and
+        MAKER_CHECKER_VIOLATION (refund requires approval; not persisted).
+      x-codes: [WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, REFUND_EXCEEDS_ORIGINAL, MAKER_CHECKER_VIOLATION]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemPayment'}
+          examples:
+            exceeds:
+              value: {type: about:blank, title: Refund exceeds original, status: 422, code: REFUND_EXCEEDS_ORIGINAL, remainingPoisha: 80000, instance: /v1/payments/merchant-refund, correlationId: c-5d2e11}
+    PaymentUnavailable:
+      description: |
+        DEPENDENCY_UNAVAILABLE, retryable true. Before intent: no `transaction`. After intent (ledger outcome unknown):
+        `transaction` with status INITIATED; retry with the same Idempotency-Key.
+      x-codes: [DEPENDENCY_UNAVAILABLE]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemPayment'}
+          examples:
+            afterIntent:
+              value: {type: about:blank, title: Dependency unavailable, status: 503, code: DEPENDENCY_UNAVAILABLE, retryable: true, instance: /v1/payments/p2p, correlationId: c-0f3e9d, transaction: {txnRef: PP26100900W2X7K4QB, txnId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0f77, txnType: P2P, status: INITIATED, failureCode: null, amountPoisha: 50000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 50575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: '2026-10-09T08:07:00.101Z', completedAt: null}}
+    UnavailableNoTxn:
+      description: DEPENDENCY_UNAVAILABLE, retryable true, no `transaction`.
+      x-codes: [DEPENDENCY_UNAVAILABLE]
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ProblemBase'}
+
+  schemas:
+    Uuid:
+      type: string
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    Timestamp:
+      type: string
+      description: ISO-8601 UTC with milliseconds and Z (producers always emit 3 ms digits)
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$'
+    Poisha:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 10000000000000
+    AmountPoisha:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 10000000000000
+    TxnType:
+      type: string
+      enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]
+    TransactionStatus:
+      type: string
+      enum: [INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED]
+    FailureCode:
+      type: string
+      enum: [WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, LEDGER_ORIGINAL_NOT_FOUND, LEDGER_ALREADY_REVERSED, LEDGER_HOLD_NOT_FOUND, LEDGER_INVALID_AMOUNT, LEDGER_OTHER, LEDGER_NOT_POSTED]
+    FeeBearer:
+      type: string
+      description: "SHARED is reserved and never produced (OPEN D-03)"
+      enum: [PAYER, PAYEE, OPERATOR]
+    Channel:
+      type: string
+      enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM]
+    ActorType:
+      type: string
+      enum: [CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, STAFF, SYSTEM, SERVICE]
+    TxnRef:
+      type: string
+      description: "18 chars {prefix}{yyMMdd}00{8 Crockford}. Consumers treat it as opaque 1..32 [A-Z0-9-] (OPEN D-10)."
+      pattern: '^(PP|CI|CO|MP|MR|FT|RV)\d{6}00[0-9A-HJKMNP-TV-Z]{8}$'
+    OpaqueRef:
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: '^[A-Z0-9-]{1,32}$'
+    MerchantRefundReason:
+      type: string
+      description: "Merchant refund group (OPEN D-32); validated against the REASON_CODE projection once non-empty"
+      pattern: '^[A-Z_]{3,40}$'
+      examples: [CUSTOMER_RETURN, DUPLICATE_PAYMENT, ORDER_CANCELLED, PRICE_ADJUSTMENT, OTHER]
+    ReversalReason:
+      type: string
+      enum: [WRONG_TRANSFER, DISPUTE_UPHELD, SYSTEM_ERROR, FRAUD_CONFIRMED]
+    MerchantRefundRequestStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, EXPIRED, EXECUTED, EXECUTION_FAILED]
+    AnomalyKind:
+      type: string
+      enum: [LATE_POST_DETECTED, STUCK_INITIATED, LEDGER_STATE_MISMATCH]
+
+    PaymentResult:
+      type: object
+      description: "Response of every payment POST except quote; also the problem member `transaction`."
+      additionalProperties: false
+      required: [txnRef, txnId, txnType, status, failureCode, amountPoisha, feePoisha, vatPoisha, totalDebitPoisha, feeBearer, currency, fromWalletId, toWalletId, createdAt, completedAt]
+      properties:
+        txnRef: {$ref: '#/components/schemas/TxnRef'}
+        txnId: {$ref: '#/components/schemas/Uuid', description: "UUIDv7 = ledger commandId"}
+        txnType: {$ref: '#/components/schemas/TxnType'}
+        status: {type: string, enum: [COMPLETED, FAILED, INITIATED], description: "INITIATED only inside a 503 problem; replay = outcome of that request"}
+        failureCode: {oneOf: [{$ref: '#/components/schemas/FailureCode'}, {type: 'null'}], description: "null unless FAILED"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha', description: "REVERSAL: principal reversed"}
+        feePoisha: {$ref: '#/components/schemas/Poisha', description: "REVERSAL: fee reversed"}
+        vatPoisha: {$ref: '#/components/schemas/Poisha', description: "REVERSAL: VAT reversed"}
+        totalDebitPoisha: {$ref: '#/components/schemas/Poisha', description: "amount + (feeBearer = PAYER ? fee + vat : 0); REVERSAL = amount"}
+        feeBearer: {$ref: '#/components/schemas/FeeBearer', description: "PAYER when no plan; REVERSAL = original's"}
+        currency: {type: string, const: BDT}
+        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "internal from"}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "internal to"}
+        createdAt: {$ref: '#/components/schemas/Timestamp', description: "= UUIDv7 time of txnId"}
+        completedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}], description: "null while INITIATED"}
+
+    QuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [txnType, fromWalletId, toWalletId, amountPoisha]
+      properties:
+        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER], description: "MERCHANT_REFUND, REVERSAL -> 400"}
+        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "debited side (agent for CASH_IN, customer for CASH_OUT/MERCHANT_PAYMENT)"}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "!= fromWalletId"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+    QuoteResult:
+      type: object
+      additionalProperties: false
+      required: [txnType, fromWalletId, toWalletId, amountPoisha, feePoisha, vatPoisha, feeBearer, totalDebitPoisha, creditToPayeePoisha, commissionPoisha, aitPoisha, pricingPlanId, pricingPlanVersion, feeIsUpperBound, currency, quotedAt]
+      properties:
+        txnType: {type: string, enum: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, FLOAT_TRANSFER]}
+        fromWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        feePoisha: {$ref: '#/components/schemas/Poisha', description: "0 when no plan or feeBearer = OPERATOR"}
+        vatPoisha: {$ref: '#/components/schemas/Poisha'}
+        feeBearer: {$ref: '#/components/schemas/FeeBearer', description: "PAYER when no plan matched"}
+        totalDebitPoisha: {$ref: '#/components/schemas/Poisha', description: "amount + (feeBearer = PAYER ? fee + vat : 0)"}
+        creditToPayeePoisha: {$ref: '#/components/schemas/Poisha', description: "amount - (feeBearer = PAYEE ? fee + vat : 0)"}
+        commissionPoisha: {$ref: '#/components/schemas/Poisha', description: "gross"}
+        aitPoisha: {$ref: '#/components/schemas/Poisha', description: "0..commissionPoisha"}
+        pricingPlanId: {type: ['string', 'null'], pattern: '^PLN-[A-Z0-9-]{2,60}$'}
+        pricingPlanVersion: {type: ['integer', 'null'], format: int32, minimum: 1}
+        feeIsUpperBound: {type: boolean, description: "true => the sender's monthly count could not be read; the fee ignores any free allowance (actual fee <= shown)"}
+        currency: {type: string, const: BDT}
+        quotedAt: {$ref: '#/components/schemas/Timestamp'}
+
+    P2pRequest:
+      type: object
+      additionalProperties: false
+      required: [fromWalletId, toWalletId, amountPoisha]
+      properties:
+        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "type C, debit-allowed status"}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "type C, credit-allowed status (P only if WALLET.ALLOW_INBOUND_BEFORE_KYC)"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        purposeCode: {type: ['string', 'null'], maxLength: 32, description: "an active PURPOSE_CODE when that list is non-empty"}
+        note: {type: ['string', 'null'], maxLength: 140, description: "control characters stripped; never logged"}
+    CashInRequest:
+      type: object
+      additionalProperties: false
+      required: [agentWalletId, customerWalletId, amountPoisha]
+      properties:
+        agentWalletId: {$ref: '#/components/schemas/Uuid', description: "type A; from"}
+        customerWalletId: {$ref: '#/components/schemas/Uuid', description: "type C; to"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+    CashOutRequest:
+      type: object
+      additionalProperties: false
+      required: [customerWalletId, agentWalletId, amountPoisha]
+      properties:
+        customerWalletId: {$ref: '#/components/schemas/Uuid', description: "type C; from"}
+        agentWalletId: {$ref: '#/components/schemas/Uuid', description: "type A; to"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+    MerchantPaymentRequest:
+      type: object
+      additionalProperties: false
+      required: [customerWalletId, merchantWalletId, amountPoisha]
+      properties:
+        customerWalletId: {$ref: '#/components/schemas/Uuid', description: "type C; from"}
+        merchantWalletId: {$ref: '#/components/schemas/Uuid', description: "type M; to"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        merchantReference: {type: ['string', 'null'], maxLength: 64, description: "Bangla QR tag 62.01 <= 25; never logged"}
+        qrPayloadId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "id of the decoded QR payload"}
+    MerchantRefundRequest:
+      type: object
+      additionalProperties: false
+      required: [originalTxnRef, amountPoisha, reasonCode]
+      properties:
+        originalTxnRef: {$ref: '#/components/schemas/OpaqueRef', description: "a MERCHANT_PAYMENT in COMPLETED/PARTIALLY_REFUNDED within refund.windowDays of completedAt; unknown -> 404; window/status -> 409"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha', description: "1..original.amount - refunded - pending, else 422 REFUND_EXCEEDS_ORIGINAL + remainingPoisha"}
+        reasonCode: {$ref: '#/components/schemas/MerchantRefundReason'}
+    FloatTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [fromWalletId, toWalletId, amountPoisha]
+      properties:
+        fromWalletId: {$ref: '#/components/schemas/Uuid', description: "type D or A"}
+        toWalletId: {$ref: '#/components/schemas/Uuid', description: "(from, to) pair in float.allowedPairs (default D>A, A>D, A:SUPER_AGENT>A, A>A:SUPER_AGENT; D>D only when enabled); refused -> 400"}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        requestId: {type: ['string', 'null'], maxLength: 64, pattern: '^[A-Za-z0-9_-]{1,64}$', description: "mandatory for STAFF; echoed on txn.events"}
+    ReversalRequest:
+      type: object
+      additionalProperties: false
+      required: [originalTxnRef, reasonCode, reverseFee, reverseCommission, approvalId]
+      properties:
+        originalTxnRef: {$ref: '#/components/schemas/OpaqueRef', description: "original COMPLETED, txnType not REVERSAL/MERCHANT_REFUND, nothing refunded or pending, no reversal pending; unknown -> 404; else 409"}
+        reasonCode: {$ref: '#/components/schemas/ReversalReason'}
+        reverseFee: {type: boolean, description: "must be false when partial"}
+        reverseCommission: {type: boolean, description: "must be false when partial"}
+        releaseHoldCommandId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "an OPEN support hold on the original's credited (to) account; voided first in the chain"}
+        approvalId: {$ref: '#/components/schemas/Uuid', description: "support approval (recorded, not re-verified)"}
+        amountPoisha: {oneOf: [{$ref: '#/components/schemas/AmountPoisha'}, {type: 'null'}], description: "0 < x <= original principal; x < principal => partial; x > principal -> 400"}
+
+    TransactionView:
+      type: object
+      description: "All PaymentResult fields with status widened to the lifecycle enum, plus read-only extras. Open for composition (list items add `direction`)."
+      required: [txnRef, txnId, txnType, status, failureCode, amountPoisha, feePoisha, vatPoisha, totalDebitPoisha, feeBearer, currency, fromWalletId, toWalletId, createdAt, completedAt, channel, initiatorActorType, clientReference, purposeCode, note, merchantReference, qrPayloadId, requestId, commissionPoisha, aitPoisha, commissionBeneficiaryWalletId, pricingPlanId, pricingPlanVersion, reasonCode, originalTxnRef, reversalTxnRef, reversedAmountPoisha, refundedTotalPoisha]
+      properties:
+        txnRef: {$ref: '#/components/schemas/TxnRef'}
+        txnId: {$ref: '#/components/schemas/Uuid'}
+        txnType: {$ref: '#/components/schemas/TxnType'}
+        status: {$ref: '#/components/schemas/TransactionStatus'}
+        failureCode: {oneOf: [{$ref: '#/components/schemas/FailureCode'}, {type: 'null'}]}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        feePoisha: {$ref: '#/components/schemas/Poisha'}
+        vatPoisha: {$ref: '#/components/schemas/Poisha'}
+        totalDebitPoisha: {$ref: '#/components/schemas/Poisha'}
+        feeBearer: {$ref: '#/components/schemas/FeeBearer'}
+        currency: {type: string, const: BDT}
+        fromWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        completedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        channel: {$ref: '#/components/schemas/Channel'}
+        initiatorActorType: {$ref: '#/components/schemas/ActorType', description: "refund via approval = maker's"}
+        clientReference: {type: string, maxLength: 64, description: "= the Idempotency-Key as received (OPEN D-13)"}
+        purposeCode: {type: ['string', 'null'], maxLength: 32, description: "P2P only"}
+        note: {type: ['string', 'null'], maxLength: 140, description: "P2P only"}
+        merchantReference: {type: ['string', 'null'], maxLength: 64, description: "MERCHANT_PAYMENT only"}
+        qrPayloadId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "MERCHANT_PAYMENT only"}
+        requestId: {type: ['string', 'null'], maxLength: 64, description: "FLOAT_TRANSFER only"}
+        commissionPoisha: {$ref: '#/components/schemas/Poisha', description: "gross; REVERSAL: reversed"}
+        aitPoisha: {$ref: '#/components/schemas/Poisha', description: "0..commissionPoisha; REVERSAL: reversed"}
+        commissionBeneficiaryWalletId: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}], description: "null when commission 0; REVERSAL: original's beneficiary"}
+        pricingPlanId: {type: ['string', 'null'], description: "null: no plan, or REVERSAL"}
+        pricingPlanVersion: {type: ['integer', 'null'], format: int32, minimum: 1}
+        reasonCode: {type: ['string', 'null'], maxLength: 40, description: "REVERSAL / MERCHANT_REFUND only"}
+        originalTxnRef: {oneOf: [{$ref: '#/components/schemas/OpaqueRef'}, {type: 'null'}], description: "REVERSAL / MERCHANT_REFUND only"}
+        reversalTxnRef: {oneOf: [{$ref: '#/components/schemas/TxnRef'}, {type: 'null'}], description: "non-null only when status = REVERSED"}
+        reversedAmountPoisha: {oneOf: [{$ref: '#/components/schemas/AmountPoisha'}, {type: 'null'}], description: "non-null only when status = REVERSED"}
+        refundedTotalPoisha: {$ref: '#/components/schemas/Poisha', description: "0 unless refunded (MERCHANT_PAYMENT)"}
+    TransactionListItem:
+      allOf:
+        - $ref: '#/components/schemas/TransactionView'
+      type: object
+      required: [direction]
+      properties:
+        direction: {type: string, enum: [DEBIT, CREDIT], description: "relative to walletId; DEBIT when walletId = fromWalletId"}
+    TransactionPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/TransactionListItem'}}
+        nextCursor: {type: ['string', 'null']}
+
+    MerchantRefundRequestCreated:
+      type: object
+      additionalProperties: false
+      required: [requestId, approvalId, status, expiresAt]
+      properties:
+        requestId: {$ref: '#/components/schemas/Uuid'}
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [PENDING]}
+        expiresAt: {$ref: '#/components/schemas/Timestamp', description: "requestedAt + 72 h"}
+    MerchantRefundRequestView:
+      type: object
+      additionalProperties: false
+      required: [requestId, approvalId, originalTxnRef, merchantWalletId, amountPoisha, reasonCode, status, resultTxnRef, resultCode, createdAt, expiresAt]
+      properties:
+        requestId: {$ref: '#/components/schemas/Uuid'}
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        originalTxnRef: {$ref: '#/components/schemas/OpaqueRef'}
+        merchantWalletId: {$ref: '#/components/schemas/Uuid'}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        reasonCode: {$ref: '#/components/schemas/MerchantRefundReason'}
+        status: {$ref: '#/components/schemas/MerchantRefundRequestStatus'}
+        resultTxnRef: {oneOf: [{$ref: '#/components/schemas/TxnRef'}, {type: 'null'}], description: "MR... when executed"}
+        resultCode: {type: ['string', 'null'], description: "problem code or failureCode when EXECUTION_FAILED"}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        expiresAt: {$ref: '#/components/schemas/Timestamp'}
+    MerchantRefundRequestPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/MerchantRefundRequestView'}}
+        nextCursor: {type: ['string', 'null']}
+
+    ApprovalView:
+      type: object
+      additionalProperties: false
+      required: [approvalId, entityType, entityId, action, makerId, makerActorType, status, level, requiredLevels, checkerRoles, amountPoisha, payload, createdAt, expiresAt, decidedBy, decidedAt]
+      properties:
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        entityType: {type: string, enum: [MerchantRefund]}
+        entityId: {type: string, maxLength: 128, description: "= originalTxnRef"}
+        action: {type: string, enum: [REFUND]}
+        makerId: {type: string, maxLength: 64}
+        makerActorType: {$ref: '#/components/schemas/ActorType'}
+        status: {type: string, enum: [PENDING, APPROVED, REJECTED, EXPIRED, EXECUTED, EXECUTION_FAILED]}
+        level: {type: integer, format: int32, minimum: 1, description: "1-based level awaiting decision or just decided"}
+        requiredLevels: {type: integer, format: int32, minimum: 1, maximum: 2}
+        checkerRoles: {type: array, minItems: 1, items: {type: string, enum: [OPS_CHECKER, SUP_CHECKER]}}
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+        payload: {type: object, description: "{originalTxnRef, amountPoisha, reasonCode, requestId}"}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        expiresAt: {$ref: '#/components/schemas/Timestamp'}
+        decidedBy: {type: array, items: {type: string}}
+        decidedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    ApprovalPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ApprovalView'}}
+        nextCursor: {type: ['string', 'null']}
+    ApproveRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        comment: {type: ['string', 'null'], minLength: 1, maxLength: 500}
+    RejectRequest:
+      type: object
+      additionalProperties: false
+      required: [comment]
+      properties:
+        comment: {type: string, minLength: 1, maxLength: 500}
+        reasonCode: {type: ['string', 'null'], pattern: '^[A-Z_]{3,40}$'}
+    ApprovalDecisionResult:
+      type: object
+      additionalProperties: false
+      required: [approvalId, status, requestStatus, resultTxnRef, transaction]
+      properties:
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED], description: "approval status (PENDING when level 1 of 2 approved)"}
+        requestStatus: {$ref: '#/components/schemas/MerchantRefundRequestStatus'}
+        resultTxnRef: {oneOf: [{$ref: '#/components/schemas/TxnRef'}, {type: 'null'}]}
+        transaction: {oneOf: [{$ref: '#/components/schemas/PaymentResult'}, {type: 'null'}], description: "null unless executed (COMPLETED) or persisted FAILED"}
+
+    Beneficiary:
+      type: object
+      additionalProperties: false
+      required: [id, ownerWalletId, beneficiaryWalletId, txnType, nickname, lastUsedAt, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        ownerWalletId: {$ref: '#/components/schemas/Uuid'}
+        beneficiaryWalletId: {$ref: '#/components/schemas/Uuid'}
+        txnType: {type: string, enum: [P2P, MERCHANT_PAYMENT, CASH_OUT]}
+        nickname: {type: string, minLength: 1, maxLength: 40}
+        lastUsedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        updatedAt: {$ref: '#/components/schemas/Timestamp'}
+    BeneficiaryList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/Beneficiary'}}
+    BeneficiaryCreate:
+      type: object
+      additionalProperties: false
+      required: [ownerWalletId, beneficiaryWalletId, txnType, nickname]
+      properties:
+        ownerWalletId: {$ref: '#/components/schemas/Uuid'}
+        beneficiaryWalletId: {$ref: '#/components/schemas/Uuid', description: "must exist with a type valid for txnType (P2P -> C, MERCHANT_PAYMENT -> M, CASH_OUT -> A)"}
+        txnType: {type: string, enum: [P2P, MERCHANT_PAYMENT, CASH_OUT]}
+        nickname: {type: string, minLength: 1, maxLength: 40}
+    BeneficiaryUpdate:
+      type: object
+      additionalProperties: false
+      required: [nickname]
+      properties:
+        nickname: {type: string, minLength: 1, maxLength: 40}
+
+    PricingSnapshotView:
+      type: object
+      additionalProperties: false
+      required: [source, ready, plansLoaded, builtAt, ageSeconds, topicOffset, topicEndOffset, plans]
+      properties:
+        source: {type: string, enum: [BOOTSTRAP, TOPIC, NONE]}
+        ready: {type: boolean}
+        plansLoaded: {type: integer, format: int32, minimum: 0}
+        builtAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        ageSeconds: {type: integer, format: int64, minimum: 0}
+        topicOffset: {type: ['integer', 'null'], format: int64}
+        topicEndOffset: {type: ['integer', 'null'], format: int64}
+        plans:
+          type: array
+          items:
+            type: object
+            required: [planId, version, txnType, status, priority, effectiveFrom, effectiveTo]
+            properties:
+              planId: {type: string}
+              version: {type: integer, format: int32}
+              txnType: {$ref: '#/components/schemas/TxnType'}
+              status: {type: string}
+              priority: {type: integer, format: int32}
+              effectiveFrom: {$ref: '#/components/schemas/Timestamp'}
+              effectiveTo: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    SweeperStatus:
+      type: object
+      additionalProperties: false
+      required: [jobs, initiatedBacklog, oldestInitiatedAgeSeconds]
+      properties:
+        jobs:
+          type: array
+          items:
+            type: object
+            required: [job, leader, lastRunAt, scanned, completed, failed, pending]
+            properties:
+              job: {type: string, enum: [SWEEPER, LATE_POST_VERIFIER, PARTITION_MAINTENANCE, APPROVAL_EXPIRY, APPROVAL_EXECUTION, OUTBOX_CLEANUP]}
+              leader: {type: ['string', 'null']}
+              lastRunAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+              scanned: {type: integer, format: int32}
+              completed: {type: integer, format: int32}
+              failed: {type: integer, format: int32}
+              pending: {type: integer, format: int32}
+        initiatedBacklog: {type: integer, format: int64, minimum: 0}
+        oldestInitiatedAgeSeconds: {type: integer, format: int64, minimum: 0}
+    Anomaly:
+      type: object
+      additionalProperties: false
+      required: [id, txnId, txnRef, kind, detail, createdAt, resolvedAt, resolvedBy, resolution]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        txnId: {$ref: '#/components/schemas/Uuid'}
+        txnRef: {$ref: '#/components/schemas/TxnRef'}
+        kind: {$ref: '#/components/schemas/AnomalyKind'}
+        detail: {type: object}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        resolvedAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        resolvedBy: {type: ['string', 'null']}
+        resolution: {type: ['string', 'null'], maxLength: 500}
+    AnomalyPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/Anomaly'}}
+        nextCursor: {type: ['string', 'null']}
+    AnomalyResolve:
+      type: object
+      additionalProperties: false
+      required: [resolution]
+      properties:
+        resolution: {type: string, minLength: 1, maxLength: 500}
+
+    FakeLedgerFund:
+      type: object
+      additionalProperties: false
+      required: [amountPoisha]
+      properties:
+        amountPoisha: {$ref: '#/components/schemas/AmountPoisha'}
+    FakeLedgerAccount:
+      type: object
+      additionalProperties: false
+      required: [accountId, creditsPostedPoisha, debitsPostedPoisha, availablePoisha]
+      properties:
+        accountId: {$ref: '#/components/schemas/Uuid'}
+        creditsPostedPoisha: {type: integer, format: int64}
+        debitsPostedPoisha: {type: integer, format: int64}
+        availablePoisha: {type: integer, format: int64}
+    FakeLedgerChaos:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode: {type: string, enum: [NONE, LATENCY, FAIL_BEFORE_POST, FAIL_AFTER_POST, UNAVAILABLE]}
+        rate: {type: number, minimum: 0, maximum: 1, default: 1}
+        delayMs: {type: integer, format: int32, minimum: 0, default: 0}
+    WalletCacheEntry:
+      type: object
+      additionalProperties: false
+      required: [version, status, kycTier, walletType, categoryCode, flags]
+      properties:
+        version: {type: integer, format: int64, minimum: 1}
+        status: {type: string, enum: [P, A, D, X, C, F, Q, Z]}
+        kycTier: {type: integer, format: int32, minimum: 0, maximum: 2}
+        walletType: {type: string, enum: [C, A, D, M, I]}
+        categoryCode: {type: integer, format: int32, minimum: 0, maximum: 99999}
+        flags: {type: integer, format: int32, minimum: 0, maximum: 31}
+
+    ProblemBase:
+      type: object
+      description: "Kernel K3.6 problem body"
+      additionalProperties: true
+      required: [type, title, status, code, correlationId]
+      properties:
+        type: {type: string, default: about:blank}
+        title: {type: string, maxLength: 200}
+        status: {type: integer, format: int32}
+        code: {type: string, enum: [VALIDATION_FAILED, ACTOR_NOT_ALLOWED, NOT_FOUND, IDEMPOTENCY_CONFLICT, STATE_CONFLICT, SOD_VIOLATION, INSUFFICIENT_FUNDS, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_STEP_UP_REQUIRED, RISK_HELD_FOR_REVIEW, WALLET_NOT_TRANSACTABLE, MAX_BALANCE_EXCEEDED, REFUND_EXCEEDS_ORIGINAL, SERVICE_DISABLED, MAKER_CHECKER_VIOLATION, DEPENDENCY_UNAVAILABLE]}
+        detail: {type: ['string', 'null'], maxLength: 1000}
+        instance: {type: ['string', 'null']}
+        correlationId: {type: string}
+        reason: {type: ['string', 'null'], pattern: '^[A-Z][A-Z0-9_]*$'}
+        errors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: {type: string}
+              message: {type: string}
+        retryable: {type: boolean, const: true}
+    ProblemList:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            reason: {type: ['string', 'null'], enum: [INVALID_CURSOR, null]}
+    ProblemWallet:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            walletId: {$ref: '#/components/schemas/Uuid', description: "with WALLET_NOT_TRANSACTABLE"}
+            walletStatus: {type: string, description: "status NAME, e.g. DEBIT_BLOCKED, CLOSED (with WALLET_NOT_TRANSACTABLE)", enum: [PENDING_KYC, ACTIVE, DORMANT, DEBIT_BLOCKED, CREDIT_BLOCKED, BLOCKED, PENDING_CLOSURE, CLOSED]}
+    ProblemRefund:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            remainingPoisha: {type: integer, format: int64, minimum: 0, description: "with REFUND_EXCEEDS_ORIGINAL: refundable remainder (never null)"}
+    ProblemPayment:
+      allOf:
+        - $ref: '#/components/schemas/ProblemBase'
+        - type: object
+          properties:
+            transaction: {$ref: '#/components/schemas/PaymentResult', description: "present iff the payment intent was persisted"}
+            limitCode: {type: string, description: "with LIMIT_EXCEEDED; <SCOPE>_<SEND|RECEIVE|ANY>_<DIMENSION>"}
+            limitParty: {type: string, enum: [FROM, TO], description: "with LIMIT_EXCEEDED"}
+            remainingPoisha: {type: ['integer', 'null'], format: int64, minimum: 0, description: "LIMIT_EXCEEDED: headroom for *_AMOUNT / MAX_BALANCE dimensions else null; REFUND_EXCEEDS_ORIGINAL: refundable remainder (never null)"}
+            remainingCount: {type: ['integer', 'null'], format: int32, minimum: 0, description: "with LIMIT_EXCEEDED: headroom for *_COUNT dimensions else null"}
+            resetsAt: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}], description: "with LIMIT_EXCEEDED: window reset; null for per-txn / TXN_ALLOWED / MAX_BALANCE"}
+            walletId: {$ref: '#/components/schemas/Uuid', description: "with WALLET_NOT_TRANSACTABLE"}
+            walletStatus: {type: string, enum: [PENDING_KYC, ACTIVE, DORMANT, DEBIT_BLOCKED, CREDIT_BLOCKED, BLOCKED, PENDING_CLOSURE, CLOSED], description: "with WALLET_NOT_TRANSACTABLE; status NAME"}

@@ -1,0 +1,34 @@
+# limits-risk-service version catalog. Libraries managed by the Spring Boot BOM have no version.
+[versions]
+java        = "25"
+spring-boot = "4.1.1"
+archunit    = "1.5.1"   # not managed by the Spring Boot BOM
+# ---- service-specific ----
+
+[libraries]
+spring-boot-bom                = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+spring-boot-starter-webmvc     = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-actuator   = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-data-jpa   = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-flyway     = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-kafka      = { module = "org.springframework.boot:spring-boot-starter-kafka" }
+flyway-postgresql              = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql                     = { module = "org.postgresql:postgresql" }
+spring-boot-starter-test       = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-testcontainers     = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-postgresql      = { module = "org.testcontainers:testcontainers-postgresql" }
+testcontainers-junit-jupiter   = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+junit-platform-launcher        = { module = "org.junit.platform:junit-platform-launcher" }
+archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+# ---- service-specific ----
+
+[bundles]
+service-runtime = ["spring-boot-starter-webmvc", "spring-boot-starter-actuator", "spring-boot-starter-validation",
+                   "spring-boot-starter-data-jpa", "spring-boot-starter-flyway", "spring-boot-starter-kafka",
+                   "flyway-postgresql", "postgresql"]
+service-test    = ["spring-boot-starter-test", "spring-boot-testcontainers", "testcontainers-postgresql",
+                   "testcontainers-junit-jupiter", "archunit-junit5"]
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/post-campaign-reward → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-campaign\\-reward(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "4e7b2a10-6c3d-5f8e-9a1b-2c3d4e5f6a70",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "61f7c834-d2ef-3a1d-c980-7509e1b6ea53"
+      ],
+      "postedAt": "2026-10-09T10:00:00.250Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

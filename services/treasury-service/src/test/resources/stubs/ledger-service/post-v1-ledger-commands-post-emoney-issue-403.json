@@ -1,0 +1,34 @@
+{
+  "name": "POST /v1/ledger/commands/post-emoney-issue → 403",
+  "priority": 9,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-emoney\\-issue(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "403"
+      }
+    }
+  },
+  "response": {
+    "status": 403,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "Actor not allowed",
+      "status": 403,
+      "code": "ACTOR_NOT_ALLOWED",
+      "detail": null,
+      "instance": "/v1/ledger/commands/post-p2p",
+      "correlationId": "c-0f3e9a",
+      "reason": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

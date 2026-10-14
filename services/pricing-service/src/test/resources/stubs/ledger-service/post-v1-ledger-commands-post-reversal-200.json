@@ -1,0 +1,32 @@
+{
+  "name": "POST /v1/ledger/commands/post-reversal → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-reversal(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f4a0-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "c6d74bfc-9f92-5091-7130-6843b971ba38",
+        "a66ac277-0275-9166-f478-3d0c830b968b",
+        "b065c298-89d5-243b-c4ee-6cdce0f44029",
+        "8c5abd7a-5677-220e-a280-773632c60302"
+      ],
+      "postedAt": "2026-10-09T09:20:41.007Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

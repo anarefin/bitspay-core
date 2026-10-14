@@ -1,0 +1,60 @@
+{
+  "name": "GET /v1/transactions → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/transactions(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "txnRef": "MR26101200A7K2M9QX",
+          "txnId": "0192f5b0-0000-7000-8000-000000000001",
+          "txnType": "MERCHANT_REFUND",
+          "status": "COMPLETED",
+          "failureCode": null,
+          "amountPoisha": 40000,
+          "feePoisha": 0,
+          "vatPoisha": 0,
+          "totalDebitPoisha": 40000,
+          "feeBearer": "PAYER",
+          "currency": "BDT",
+          "fromWalletId": "0192f2dd-0004-7000-8000-00000000d004",
+          "toWalletId": "0192f2aa-0001-7000-8000-00000000a001",
+          "createdAt": "2026-10-12T06:15:00.120Z",
+          "completedAt": "2026-10-12T06:15:00.210Z",
+          "channel": "PARTNER_APP",
+          "initiatorActorType": "MERCHANT",
+          "clientReference": "mr-77a0",
+          "purposeCode": null,
+          "note": null,
+          "merchantReference": null,
+          "qrPayloadId": null,
+          "requestId": null,
+          "commissionPoisha": 0,
+          "aitPoisha": 0,
+          "commissionBeneficiaryWalletId": null,
+          "pricingPlanId": null,
+          "pricingPlanVersion": null,
+          "reasonCode": "CUSTOMER_RETURN",
+          "originalTxnRef": "MP26100900H8N2KQ5W",
+          "reversalTxnRef": null,
+          "reversedAmountPoisha": null,
+          "refundedTotalPoisha": 0,
+          "direction": "CREDIT"
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "transaction-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

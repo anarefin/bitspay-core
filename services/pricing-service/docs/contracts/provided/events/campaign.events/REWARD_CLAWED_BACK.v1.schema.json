@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/pricing-service/campaign.events/REWARD_CLAWED_BACK.v1.schema.json",
+  "title": "RewardClawedBack",
+  "description": "Clawback confirmed (ledger post-reversal OK/EXISTS/REJECTED ALREADY_REVERSED, or a recorded manual recovery); key = walletId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "campaignId",
+    "walletId",
+    "rewardPoisha",
+    "triggerTxnRef",
+    "commandId",
+    "clawbackCommandId",
+    "reasonCode",
+    "clawbackMode",
+    "clawbackTxnRef"
+  ],
+  "properties": {
+    "campaignId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "walletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= key"
+    },
+    "rewardPoisha": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "full reward; no partial clawback"
+    },
+    "triggerTxnRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z0-9-]{1,32}$"
+    },
+    "commandId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "the original reward's successful commandId"
+    },
+    "clawbackCommandId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "LEDGER_REVERSAL: successful post-reversal attempt; MANUAL: recorded manual ledger commandId"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "TRANSACTION_REVERSED",
+        "TRANSACTION_REFUNDED",
+        "FRAUD_CONFIRMED"
+      ]
+    },
+    "clawbackMode": {
+      "type": "string",
+      "enum": [
+        "LEDGER_REVERSAL",
+        "MANUAL"
+      ]
+    },
+    "clawbackTxnRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^CC[0-9]{6}00[0-9A-HJKMNP-TV-Z]{8}$",
+      "description": "CC reference when LEDGER_REVERSAL; null when MANUAL"
+    }
+  }
+}

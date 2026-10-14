@@ -1,0 +1,56 @@
+{
+  "name": "GET /v1/limits/wallets/{walletId}/usage → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/limits/wallets/[^/]+/usage(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "walletId": "0192f2aa-0000-7000-8000-00000000a001",
+      "asOf": "2026-10-09T08:05:00.000Z",
+      "userCategory": "CUSTOMER",
+      "kycTier": 2,
+      "riskGrade": "LOW",
+      "maxBalancePoisha": 50000000,
+      "items": [
+        {
+          "txnType": "P2P",
+          "direction": "SEND",
+          "allowed": true,
+          "perTxnMinPoisha": 1000,
+          "perTxnMaxPoisha": 2500000,
+          "monthlyCountUsed": 7,
+          "daily": {
+            "countLimit": 50,
+            "countUsed": 3,
+            "countRemaining": 47,
+            "amountLimitPoisha": 5000000,
+            "amountUsedPoisha": 350000,
+            "amountRemainingPoisha": 4650000,
+            "resetsAt": "2026-10-09T18:00:00.000Z"
+          },
+          "weekly": null,
+          "monthly": {
+            "countLimit": 300,
+            "countUsed": 7,
+            "countRemaining": 293,
+            "amountLimitPoisha": 30000000,
+            "amountUsedPoisha": 900000,
+            "amountRemainingPoisha": 29100000,
+            "resetsAt": "2026-10-31T18:00:00.000Z"
+          }
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

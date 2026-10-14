@@ -1,0 +1,74 @@
+{
+  "name": "GET /v1/pricing/plans → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/pricing/plans(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "planId": "PLN-P2P-STD",
+          "version": 3,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": "C",
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "SLAB",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [
+              {
+                "fromPoisha": 1,
+                "toPoisha": 100000,
+                "fixedPoisha": 500,
+                "percentBps": 0
+              },
+              {
+                "fromPoisha": 100001,
+                "toPoisha": null,
+                "fixedPoisha": 0,
+                "percentBps": 50
+              }
+            ],
+            "minPoisha": 0,
+            "maxPoisha": 2500
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "pricing-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

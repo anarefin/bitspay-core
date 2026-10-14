@@ -1,0 +1,24 @@
+{
+  "eventId": "0192f530-0000-7000-8000-000000000001",
+  "eventType": "RECON_RUN_COMPLETED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T18:41:38.002Z",
+  "producer": "finance-ops-service",
+  "aggregateType": "ReconRun",
+  "aggregateId": "0192f500-0a1b-7c2d-8e3f-4a5b6c7d8e9f",
+  "correlationId": "c-eod-2026-10-09",
+  "data": {
+    "runId": "0192f500-0a1b-7c2d-8e3f-4a5b6c7d8e9f",
+    "type": "EOD",
+    "businessDate": "2026-10-09",
+    "matched": 1843211,
+    "exceptions": 0,
+    "status": "COMPLETED",
+    "revision": 1,
+    "summary": {
+      "trialBalance": "OK",
+      "emoney": "MATCHED",
+      "glSummaryReady": false
+    }
+  }
+}

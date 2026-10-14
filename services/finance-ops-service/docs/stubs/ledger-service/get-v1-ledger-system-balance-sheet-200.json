@@ -1,0 +1,107 @@
+{
+  "name": "GET /v1/ledger/system-balance-sheet → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/ledger/system\\-balance\\-sheet(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "asOf": "2026-10-09T08:05:00.000Z",
+      "trustMirrorTotalPoisha": 100000000,
+      "trustAccounts": [
+        {
+          "accountId": "00000000-0000-0000-0000-000000030001",
+          "trustIndex": 1,
+          "mirrorBalancePoisha": 100000000,
+          "debitsPostedPoisha": 100000000,
+          "creditsPostedPoisha": 0
+        }
+      ],
+      "systemAccounts": [
+        {
+          "accountType": "FEE_INCOME",
+          "accountId": "00000000-0000-0000-0000-000000000200",
+          "balancePoisha": 500
+        },
+        {
+          "accountType": "VAT_PAYABLE",
+          "accountId": "00000000-0000-0000-0000-000000000210",
+          "balancePoisha": 75
+        },
+        {
+          "accountType": "COMMISSION_PAYABLE",
+          "accountId": "00000000-0000-0000-0000-000000000220",
+          "balancePoisha": -400
+        },
+        {
+          "accountType": "AIT_PAYABLE",
+          "accountId": "00000000-0000-0000-0000-000000000230",
+          "balancePoisha": 40
+        },
+        {
+          "accountType": "CAMPAIGN_FUNDING",
+          "accountId": "00000000-0000-0000-0000-000000000240",
+          "balancePoisha": 0
+        },
+        {
+          "accountType": "SUSPENSE",
+          "accountId": "00000000-0000-0000-0000-000000000400",
+          "balancePoisha": 0
+        },
+        {
+          "accountType": "ADJUSTMENT_CLEARING",
+          "accountId": "00000000-0000-0000-0000-000000000410",
+          "balancePoisha": 0
+        },
+        {
+          "accountType": "HOLD_CONTROL",
+          "accountId": "00000000-0000-0000-0000-000000000420",
+          "balancePoisha": 0,
+          "pendingInPoisha": 50000
+        }
+      ],
+      "walletsTotalPoisha": 99999785,
+      "eMoneyLiabilityPoisha": 100000000,
+      "byWalletType": [
+        {
+          "accountType": "CUSTOMER_WALLET",
+          "balancePoisha": 99000000,
+          "source": "PROJECTION"
+        },
+        {
+          "accountType": "AGENT_WALLET",
+          "balancePoisha": 999785,
+          "source": "PROJECTION"
+        },
+        {
+          "accountType": "DISTRIBUTOR_WALLET",
+          "balancePoisha": 0,
+          "source": "PROJECTION"
+        },
+        {
+          "accountType": "MERCHANT_WALLET",
+          "balancePoisha": 0,
+          "source": "PROJECTION"
+        },
+        {
+          "accountType": "INSTITUTION_WALLET",
+          "balancePoisha": 0,
+          "source": "PROJECTION"
+        }
+      ],
+      "projectionAsOf": "2026-10-09T08:04:59.870Z",
+      "projectionLagMs": 130,
+      "identityHolds": true
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

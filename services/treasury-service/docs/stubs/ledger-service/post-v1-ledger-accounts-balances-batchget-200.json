@@ -1,0 +1,35 @@
+{
+  "name": "POST /v1/ledger/accounts/balances:batchGet → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/accounts/balances:batchGet(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "accountId": "00000000-0000-0000-0000-000000000200",
+          "ledgerBalancePoisha": 1000,
+          "availableBalancePoisha": 1000,
+          "heldPoisha": 0,
+          "asOf": "2026-10-09T18:00:00.000Z",
+          "accountType": "FEE_INCOME",
+          "closed": false
+        }
+      ],
+      "notFound": [
+        "0192f2cc-0000-7000-8000-00000000c009"
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

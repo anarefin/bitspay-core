@@ -1,0 +1,18 @@
+{
+  "eventId": "0192f5ab-0000-7000-8000-0000000000e2",
+  "eventType": "BLACKLIST_ENTRY_UPSERTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T11:20:00.000Z",
+  "producer": "limits-risk-service",
+  "aggregateType": "BlacklistEntry",
+  "aggregateId": "0192f5aa-0000-7000-8000-0000000000e1",
+  "correlationId": "c-bl-77a1",
+  "data": {
+    "entryId": "0192f5aa-0000-7000-8000-0000000000e1",
+    "type": "NID",
+    "valueHash": "9f2c0e7a1b3d5f7091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708",
+    "active": true,
+    "expiresAt": null,
+    "reasonCode": "FRAUD_CONFIRMED"
+  }
+}

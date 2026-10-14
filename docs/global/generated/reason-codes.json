@@ -1,0 +1,253 @@
+[
+  {
+    "group": "Hold",
+    "field": "create-hold reasonCode; GET /v1/ledger/holds items[].reasonCode",
+    "values": [
+      "DISPUTE_HOLD",
+      "AML_LIEN",
+      "WRONG_TRANSFER_HOLD"
+    ],
+    "notes": "DISPUTE_HOLD and WRONG_TRANSFER_HOLD are support holds and are the only holds a post-reversal may void; AML_LIEN is the compliance lien. An unknown hold code is accepted and logged (metric), never rejected. Each code matches ^[A-Z_]{3,40}$.",
+    "owner": "ledger-service"
+  },
+  {
+    "group": "Reversal",
+    "description": "reasonCode of POST /v1/internal/reversals and of REVERSAL rows on txn.events. A value outside this list -> 400 VALIDATION_FAILED.",
+    "values": [
+      "WRONG_TRANSFER",
+      "DISPUTE_UPHELD",
+      "SYSTEM_ERROR",
+      "FRAUD_CONFIRMED"
+    ],
+    "owner": "transaction-service"
+  },
+  {
+    "group": "Merchant refund",
+    "description": "reasonCode of POST /v1/payments/merchant-refund and /v1/merchant-refund-requests, and of MERCHANT_REFUND rows on txn.events. Validated against the REASON_CODE projection once it is non-empty. Seed pending governance sign-off (OPEN D-32).",
+    "values": [
+      "CUSTOMER_RETURN",
+      "DUPLICATE_PAYMENT",
+      "ORDER_CANCELLED",
+      "PRICE_ADJUSTMENT",
+      "OTHER"
+    ],
+    "owner": "transaction-service"
+  },
+  {
+    "group": "Wallet status",
+    "field": "wallet statusReasonCode / status-changes reasonCode",
+    "values": [
+      "KYC_APPROVED",
+      "KYC_EXPIRED",
+      "DORMANCY",
+      "CUSTOMER_REQUEST",
+      "FRAUD_FREEZE",
+      "AML_FREEZE",
+      "COURT_ORDER",
+      "REGULATORY_INSTRUCTION",
+      "CLOSURE",
+      "WALLET_CREATED",
+      "PRE_REGISTRATION",
+      "REACTIVATION",
+      "KYC_UPGRADE",
+      "RISK_REGRADE",
+      "SCREENING_REJECT",
+      "PARTNER_SUSPENDED",
+      "PARTNER_REACTIVATED",
+      "PARTNER_TERMINATED"
+    ],
+    "displayOnly": [
+      "RESTRICTED"
+    ],
+    "notes": "Customer notification of AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER (and lifts) is suppressed; FRAUD_FREEZE is notified (OPEN D-06). RESTRICTED is returned to holder actors by GET /v1/wallets/{walletId} instead of those three; never stored or emitted.",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Partner status",
+    "field": "partner statusReasonCode / partner status-changes reasonCode",
+    "values": [
+      "AML_FREEZE",
+      "FRAUD_FREEZE",
+      "SCREENING_REJECTED",
+      "RISK_PERFORMANCE",
+      "DISTRIBUTOR_SUSPENSION",
+      "BLACKLIST_MATCH",
+      "ONBOARDING_APPROVED",
+      "SUSPENSION_EXPIRED",
+      "NAME_CHANGED",
+      "PARTNER_REJECTED",
+      "BLACKLISTED"
+    ],
+    "notes": "ONBOARDING_APPROVED .. BLACKLISTED pending governance sign-off (OPEN D-32).",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "KYC",
+    "field": "customer.events reasonCode (KYC_* types); KYC decision reasonCode",
+    "values": [
+      "KYC_SUBMITTED",
+      "KYC_APPROVED",
+      "KYC_UPGRADE",
+      "RISK_REGRADE",
+      "NID_MISMATCH",
+      "IMAGE_UNCLEAR",
+      "SELFIE_MISMATCH",
+      "INCOMPLETE",
+      "DUPLICATE",
+      "SCREENING_REJECT",
+      "BLACKLISTED",
+      "FRAUD_SUSPECTED",
+      "UNDERAGE",
+      "OTHER"
+    ],
+    "notes": "OPEN D-32",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Customer profile",
+    "field": "customer.events reasonCode (CUSTOMER_REGISTERED, CUSTOMER_PROFILE_UPDATED)",
+    "values": [
+      "REGISTERED",
+      "PROFILE_UPDATED",
+      "PREFERENCES_UPDATED",
+      "NOMINEES_UPDATED",
+      "KYC_REVIEW_DUE",
+      "KYC_REVIEW_OVERDUE"
+    ],
+    "notes": "CUSTOMER_REGISTERED also uses PRE_REGISTRATION (Wallet status group). OPEN D-32",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Wallet flag",
+    "field": "POST /v1/wallets/{walletId}/flags reasonCode",
+    "values": [
+      "AML_WATCH",
+      "AML_LIEN",
+      "PIN_RESET",
+      "NEW_DEVICE"
+    ],
+    "notes": "Also accepts the Hold group codes owned by ledger-service (DISPUTE_HOLD, AML_LIEN, WRONG_TRANSFER_HOLD). OPEN D-32",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Partner application",
+    "field": "stage return / reject reasonCode; PARTNER_APPLICATION_RETURNED / _REJECTED variable reason",
+    "values": [
+      "INCOMPLETE_KYB",
+      "DOCUMENT_UNREADABLE",
+      "DOCUMENT_EXPIRED",
+      "SITE_VISIT_FAILED",
+      "DUPLICATE_PARTNER",
+      "SCREENING_REJECTED",
+      "BLACKLISTED",
+      "OTHER"
+    ],
+    "notes": "new seed introduced by this pack (OPEN D-32)",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Partner change",
+    "field": "hierarchy / category / territory change reasonCode",
+    "values": [
+      "TERRITORY_REALIGNMENT",
+      "BUSINESS_GROWTH",
+      "SHOP_MOVED",
+      "CORRECTION",
+      "OTHER"
+    ],
+    "notes": "new seed (OPEN D-32)",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "QR revoke",
+    "field": "POST /v1/qr/{qrPayloadId}:revoke reasonCode",
+    "values": [
+      "LOST_STICKER",
+      "DAMAGED",
+      "NAME_CHANGED",
+      "REGENERATED",
+      "OUTLET_CLOSED",
+      "PARTNER_TERMINATED",
+      "OTHER"
+    ],
+    "notes": "new seed (OPEN D-32)",
+    "owner": "wallet-service"
+  },
+  {
+    "group": "Blacklist entry",
+    "field": "POST /v1/blacklist/entries req.reasonCode; blacklist.events BLACKLIST_ENTRY_UPSERTED reasonCode; check entries[].reasonCode",
+    "values": [
+      "FRAUD_CONFIRMED",
+      "MULE_ACCOUNT",
+      "IDENTITY_FRAUD",
+      "AML_SUSPICION",
+      "REGULATORY_INSTRUCTION",
+      "SANCTIONS",
+      "OTHER"
+    ],
+    "status": "OPEN D-32 (seed pending governance sign-off)",
+    "owner": "limits-risk-service"
+  },
+  {
+    "group": "Commission adjustment",
+    "values": [
+      "MISSED_ACCRUAL",
+      "WRONG_RATE",
+      "DISPUTE_UPHELD",
+      "CLAWBACK_RECOVERY_WAIVED",
+      "FRAUD_RECOVERY",
+      "OTHER"
+    ],
+    "governance": false,
+    "owner": "pricing-service"
+  },
+  {
+    "group": "Reward clawback",
+    "values": [
+      "TRANSACTION_REVERSED",
+      "TRANSACTION_REFUNDED",
+      "FRAUD_CONFIRMED"
+    ],
+    "governance": false,
+    "owner": "pricing-service"
+  },
+  {
+    "group": "E-money redemption",
+    "note": "OPEN D-32 (seed pending governance sign-off); CLOSURE_PAYOUT only for a source wallet in Q",
+    "values": [
+      "FLOAT_RETURN_TO_BANK",
+      "MERCHANT_SETTLEMENT",
+      "REVENUE_SWEEP",
+      "VAT_REMITTANCE",
+      "AIT_REMITTANCE",
+      "CAMPAIGN_FUNDING_RETURN",
+      "CLOSURE_PAYOUT",
+      "OTHER"
+    ],
+    "owner": "treasury-service"
+  },
+  {
+    "group": "Manual journal",
+    "note": "OPEN D-32; OTHER requires narrative ≥ 20 chars",
+    "values": [
+      "FEE_CORRECTION",
+      "VAT_RECLASS",
+      "SUSPENSE_CLEARING",
+      "COMMISSION_FUNDING",
+      "CAMPAIGN_FUNDING_TRANSFER",
+      "OTHER"
+    ],
+    "owner": "treasury-service"
+  },
+  {
+    "group": "Risk regrade",
+    "field": "case.events RISK_REGRADE_RECOMMENDED.reasonCode",
+    "values": [
+      "AML_CASE_SUSPICIOUS",
+      "FRAUD_CONFIRMED",
+      "PERIODIC_REVIEW"
+    ],
+    "status": "OPEN D-32 (seed pending governance sign-off)",
+    "owner": "compliance-service"
+  }
+]

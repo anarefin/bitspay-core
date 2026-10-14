@@ -1,0 +1,30 @@
+{
+  "name": "POST /v1/risk/evaluate → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/risk/evaluate(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "decision": "ALLOW",
+      "reasonCodes": [],
+      "riskScore": 12,
+      "reservationId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "receiverMaxBalancePoisha": 10000000,
+      "usage": {
+        "senderMonthlyCountForTxnType": 7
+      },
+      "violatedLimit": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

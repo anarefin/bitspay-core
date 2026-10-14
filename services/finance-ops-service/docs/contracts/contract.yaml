@@ -1,0 +1,1449 @@
+# finance-ops-service manifest (CONTRACT-MODEL §3). Generated layout; edit only through a change request.
+service: finance-ops-service
+number: '12'
+modules:
+- reconciliation
+- reporting
+contractVersion: 1.0.0
+kernel: '1.0'
+owner: Dev-6
+moduleOwners:
+  reconciliation: Dev-6
+  reporting: Dev-7
+provides:
+  apis:
+  - openapi: provided/openapi.yaml
+    major: 1
+    note: every operation is provided; x-audience customer|partner|staff|internal, x-module reconciliation|reporting|approvals
+  events:
+  - topic: recon.events
+    module: reconciliation
+    key: runId (all three eventTypes; exceptions outside a run attach to the day's LEDGER_TXN run)
+    compacted: false
+    tombstones: false
+    partitions:
+      dev: 1
+      prod: 3
+    retention: 14d
+    transport: outbox
+    eventTypes:
+    - type: RECON_RUN_COMPLETED
+      version: 1
+      aggregateType: ReconRun
+      schema: provided/events/recon.events/RECON_RUN_COMPLETED.v1.schema.json
+      example: provided/events/recon.events/RECON_RUN_COMPLETED.v1.example.json
+    - type: EMONEY_VARIANCE_DETECTED
+      version: 1
+      aggregateType: ReconRun
+      schema: provided/events/recon.events/EMONEY_VARIANCE_DETECTED.v1.schema.json
+      example: provided/events/recon.events/EMONEY_VARIANCE_DETECTED.v1.example.json
+    - type: RECON_EXCEPTION_RAISED
+      version: 1
+      aggregateType: ReconRun
+      schema: provided/events/recon.events/RECON_EXCEPTION_RAISED.v1.schema.json
+      example: provided/events/recon.events/RECON_EXCEPTION_RAISED.v1.example.json
+  inboundTopics: []
+  data: []
+  codes: provided/codes.yaml
+consumes:
+  apis:
+  - producer: ledger-service
+    operation: POST /v1/ledger/accounts/balances:batchGet
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: both
+    purpose: 'reconciliation: projection verification (BR-REC-27); reporting: daily-close spot check and RR-01 cross-check (BR-RPT-42)'
+    fieldsUsed:
+    - req.accountIds
+    - res.items[].accountId
+    - res.items[].ledgerBalancePoisha
+    - res.items[].heldPoisha
+    - res.items[].asOf
+    - res.items[].accountType
+    - res.notFound
+    codesUsed: []
+    resilience:
+      timeoutMs: 2000
+      connectTimeoutMs: 300
+      circuitBreaker: ledger (shared by both modules)
+      rateLimitRps: 50
+      onFailure: check SKIPPED; run summary partial=true; never blocks EOD
+  - producer: ledger-service
+    operation: GET /v1/ledger/accounts/{id}/transfers
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: posting-sum check on sampled accounts (REL-002); trust-movement backfill for file recon
+    fieldsUsed:
+    - path.id
+    - query.fromTs
+    - query.toTs
+    - query.limit
+    - query.cursor
+    - res.items[].transferId
+    - res.items[].commandId
+    - res.items[].commandType
+    - res.items[].legIndex
+    - res.items[].code
+    - res.items[].direction
+    - res.items[].debitAccountId
+    - res.items[].creditAccountId
+    - res.items[].amountPoisha
+    - res.items[].pendingId
+    - res.items[].flags
+    - res.items[].timestamp
+    - res.items[].postedAt
+    - res.items[].balanceAfterPoisha
+    - res.nextCursor
+    codesUsed: []
+    resilience:
+      timeoutMs: 3000
+      connectTimeoutMs: 300
+      circuitBreaker: ledger
+      rateLimitRps: 50
+      onFailure: posting-sum check SKIPPED; 400 INVALID_CURSOR → restart from fromTs
+  - producer: ledger-service
+    operation: GET /v1/ledger/commands/{commandId}
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: investigate MISSING_IN_LEDGER; original legs of a reversal; resolve unknown adjustment outcome
+    fieldsUsed:
+    - path.commandId
+    - res.found
+    - res.result
+    - res.rejectionCode
+    - res.transfers[].transferId
+    - res.transfers[].legIndex
+    - res.transfers[].code
+    - res.transfers[].commandType
+    - res.transfers[].debitAccountId
+    - res.transfers[].creditAccountId
+    - res.transfers[].amountPoisha
+    - res.transfers[].pendingId
+    - res.transfers[].flags
+    - res.transfers[].timestamp
+    - res.transfers[].postedAt
+    codesUsed: []
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: ledger
+      onFailure: exception stays open; retried by job
+  - producer: ledger-service
+    operation: GET /v1/ledger/system-balance-sheet
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: e-money LIVE mode (EMY-004 on demand); informational EOD cross-check
+    fieldsUsed:
+    - res.asOf
+    - res.trustMirrorTotalPoisha
+    - res.trustAccounts[].accountId
+    - res.trustAccounts[].trustIndex
+    - res.trustAccounts[].mirrorBalancePoisha
+    - res.systemAccounts[].accountType
+    - res.systemAccounts[].accountId
+    - res.systemAccounts[].balancePoisha
+    - res.walletsTotalPoisha
+    - res.eMoneyLiabilityPoisha
+    - res.byWalletType
+    - res.projectionLagMs
+    codesUsed: []
+    resilience:
+      timeoutMs: 2000
+      connectTimeoutMs: 300
+      circuitBreaker: ledger
+      onFailure: LIVE run FAILED → 503 DEPENDENCY_UNAVAILABLE to the caller; EOD unaffected
+  - producer: ledger-service
+    operation: POST /v1/ledger/commands/post-adjustment
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: post an APPROVED reconciliation adjustment (command 11, RCA- reference)
+    fieldsUsed:
+    - header.Idempotency-Key
+    - req.commandId
+    - req.txnRef
+    - req.debitAccountId
+    - req.creditAccountId
+    - req.amountPoisha
+    - req.reasonCode
+    - res.commandId
+    - res.result
+    - res.rejectionCode
+    - res.detail
+    - res.transferIds
+    - res.postedAt
+    codesUsed:
+    - set: commandResult
+      values:
+      - OK
+      - EXISTS
+      - REJECTED
+    resilience:
+      timeoutMs: 2000
+      connectTimeoutMs: 300
+      circuitBreaker: ledger
+      inlineRetry: false
+      onFailure: timeout/503/5xx → POSTING, retried with the same commandId and body (1, 2, 5, 10 min…); REJECTED → FAILED; 400/403/409 → FAILED + CRITICAL alert
+  - producer: transaction-service
+    operation: GET /v1/transactions/{txnRef}
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: enrich exceptions; resolve a reversal's original txnId
+    fieldsUsed:
+    - path.txnRef
+    - res.txnId
+    - res.txnType
+    - res.status
+    - res.originalTxnRef
+    - res.reversalTxnRef
+    codesUsed: []
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: transaction
+      onFailure: 404 or failure → enrichment omitted
+  - producer: wallet-service
+    operation: GET /v1/wallets/{walletId}
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reporting
+    purpose: statement header when wallet_dim lacks the wallet (new wallet, ingest lag)
+    fieldsUsed:
+    - path.walletId
+    - res.walletId
+    - res.displayName
+    - res.msisdn
+    - res.walletType
+    - res.status
+    - res.version
+    codesUsed: []
+    resilience:
+      timeoutMs: 300
+      connectTimeoutMs: 300
+      circuitBreaker: wallet
+      onFailure: holder.displayName = null; statement still served
+  - producer: admin-service
+    operation: GET /v1/notifications/logs
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reporting
+    purpose: ad-hoc RPT-005 notification-delivery views (owner of the report OPEN D-37)
+    fieldsUsed:
+    - query.walletId
+    - query.msisdn
+    - query.txnRef
+    - query.staffUserId
+    - query.from
+    - query.to
+    - query.channel
+    - query.status
+    - query.cursor
+    - query.limit
+    - res.items[].notificationId
+    - res.items[].createdAt
+    - res.items[].templateCode
+    - res.items[].category
+    - res.items[].recipient
+    - res.items[].txnRef
+    - res.items[].deliveries
+    - res.nextCursor
+    codesUsed: []
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: notification
+      onFailure: view shows 'delivery data unavailable'
+  - producer: admin-service
+    operation: GET /v1/notifications/{notificationId}
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reporting
+    purpose: detail of one notification in the RPT-005 ad-hoc view
+    fieldsUsed:
+    - path.notificationId
+    - res.notificationId
+    - res.createdAt
+    - res.templateCode
+    - res.category
+    - res.recipient
+    - res.txnRef
+    - res.deliveries
+    codesUsed: []
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: notification
+      onFailure: 404/failure shown to the staff user
+  - producer: general-ledger-service
+    operation: GET /v1/gl/days/{businessDate}/control-totals
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reconciliation
+    purpose: GL tie-out run (GL_TIEOUT, CCR-GL-05)
+    fieldsUsed:
+    - path.businessDate
+    - query.revision
+    - res.businessDate
+    - res.revision
+    - res.dayStatus
+    - res.items[].bucket
+    - res.items[].trustIndex
+    - res.items[].ledgerAccountId
+    - res.items[].debitsPostedPoisha
+    - res.items[].creditsPostedPoisha
+    - res.totals
+    codesUsed: []
+    resilience:
+      timeoutMs: 2000
+      connectTimeoutMs: 300
+      circuitBreaker: generalledger
+      onFailure: 409 DAY_NOT_CLOSED → run WAITING_FOR_DATA, retried on the next GL_DAY_CLOSED or every 10 min; 503/timeout → run FAILED, retried every 10 min
+  - producer: general-ledger-service
+    operation: GET /v1/gl/accounts
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: reporting
+    purpose: 'R2 (optional, CCR-GL-08): GL account names for GL-based regulatory datasets'
+    fieldsUsed:
+    - query.status
+    - query.limit
+    - query.cursor
+    - res.items[].code
+    - res.items[].nameEn
+    - res.items[].nameBn
+    - res.items[].accountClass
+    - res.items[].normalSide
+    - res.items[].parentCode
+    - res.items[].level
+    - res.items[].status
+    - res.items[].version
+    - res.nextCursor
+    codesUsed: []
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: generalledger
+      onFailure: dataset run FAILED, retried
+    release: R2
+  events:
+  - producer: ledger-service
+    topic: ledger.changes
+    eventType: LEDGER_TRANSFER_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-ledger
+    module: reconciliation
+    purpose: balance projection, ledger side of recon_item, watched transfers, watermarks, late-event restatement
+    fieldsUsed:
+    - transferId
+    - commandId
+    - commandType
+    - legIndex
+    - code
+    - debitAccountId
+    - creditAccountId
+    - amountPoisha
+    - pendingId
+    - flags
+    - timestamp
+    - debitAccountBalanceAfter
+    - creditAccountBalanceAfter
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-txn
+    module: reconciliation
+    purpose: 'business side of recon_item: expected legs (commands 1–7); wallet-type registry'
+    fieldsUsed:
+    - txnId
+    - txnRef
+    - txnType
+    - status
+    - fromWalletId
+    - fromWalletType
+    - toWalletId
+    - toWalletType
+    - amountPoisha
+    - feePoisha
+    - vatPoisha
+    - feeBearer
+    - commissionPoisha
+    - aitPoisha
+    - commissionBeneficiaryWalletId
+    - originalTxnRef
+    - ledgerTransferIds
+    - completedAt
+    codesUsed:
+    - set: txnType
+      values: '*'
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-txn
+    module: reconciliation
+    purpose: 'EXPECT_NONE: a failed transaction must have no posted ledger legs'
+    fieldsUsed:
+    - txnId
+    - txnRef
+    - txnType
+    - status
+    - failureCode
+    - ledgerTransferIds
+    - completedAt
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REVERSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-txn
+    module: reconciliation
+    purpose: original item business_status → REVERSED (informational)
+    fieldsUsed:
+    - txnId
+    - txnRef
+    - status
+    - reversalTxnRef
+    - reversedAmountPoisha
+    - reverseFee
+    - reverseCommission
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REFUNDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-txn
+    module: reconciliation
+    purpose: original item business_status → PARTIALLY_REFUNDED/REFUNDED
+    fieldsUsed:
+    - txnId
+    - txnRef
+    - status
+    - refundedTotalPoisha
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_PAID
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-disbursement
+    module: reconciliation
+    purpose: business side of command 8 (EXPECT_POSTED)
+    fieldsUsed:
+    - commandId
+    - amountPoisha
+    - payerWalletId
+    - walletId
+    - rowRef
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-disbursement
+    module: reconciliation
+    purpose: EXPECT_NONE for the attempt's commandId (null → ignored)
+    fieldsUsed:
+    - commandId
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_ISSUED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: business side of command 9
+    fieldsUsed:
+    - ledgerCommandId
+    - txnRef
+    - amountPoisha
+    - ledgerTrustAccountId
+    - destinationAccountId
+    - bankReference
+    - businessDate
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEEMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: business side of command 10
+    fieldsUsed:
+    - ledgerCommandId
+    - txnRef
+    - amountPoisha
+    - sourceAccountId
+    - ledgerTrustAccountId
+    - bankReference
+    - businessDate
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEMPTION_PAID_OUT
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: matching reference of the redemption's trust movement
+    fieldsUsed:
+    - ledgerCommandId
+    - payoutReference
+    - bankReference
+    - paidOutAt
+    - businessDate
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: MANUAL_JOURNAL_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: business side of command 11 (MJ journals)
+    fieldsUsed:
+    - ledgerCommandId
+    - txnRef
+    - debitAccountId
+    - creditAccountId
+    - amountPoisha
+    - businessDate
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_REBALANCED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: business side of command 16
+    fieldsUsed:
+    - ledgerCommandId
+    - txnRef
+    - ledgerFromTrustAccountId
+    - ledgerToTrustAccountId
+    - amountPoisha
+    - bankReference
+    - businessDate
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_BALANCE_CONFIRMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-treasury
+    module: reconciliation
+    purpose: trust_confirmation (CLOSING only, greatest balanceAsOf wins); re-run e-money of a closed date
+    fieldsUsed:
+    - trustAccountId
+    - ledgerTrustAccountId
+    - confirmationId
+    - businessDate
+    - confirmedBalancePoisha
+    - bankCode
+    - source
+    - balanceKind
+    - balanceAsOf
+    codesUsed:
+    - set: balanceKind
+      values:
+      - CLOSING
+      - INTRADAY
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_GRANTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-campaign
+    module: reconciliation
+    purpose: business side of command 12
+    fieldsUsed:
+    - commandId
+    - rewardPoisha
+    - walletId
+    - txnRef
+    codesUsed: []
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_CLAWED_BACK
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-campaign
+    module: reconciliation
+    purpose: LEDGER_REVERSAL → command 7 mirror of the reward; MANUAL → informational
+    fieldsUsed:
+    - commandId
+    - clawbackCommandId
+    - clawbackMode
+    - clawbackTxnRef
+    - rewardPoisha
+    - walletId
+    codesUsed:
+    - set: clawbackMode
+      values:
+      - LEDGER_REVERSAL
+      - MANUAL
+  - producer: pricing-service
+    topic: commission.events
+    eventType: COMMISSION_SETTLED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-commission
+    module: reconciliation
+    purpose: 'business side of command 13 (multiset: net leg + AIT leg)'
+    fieldsUsed:
+    - ledgerCommandId
+    - beneficiaryWalletId
+    - netPoisha
+    - aitPoisha
+    - txnRef
+    codesUsed: []
+  - producer: admin-service
+    topic: refdata.events
+    eventType: REFDATA_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-refdata
+    module: reconciliation
+    purpose: CUTOFF.EOD, CUTOFF.EOD_GRACE_MINUTES, CALENDAR.*, HOLIDAY, RETENTION.RECON
+    fieldsUsed:
+    - type
+    - code
+    - attributes
+    - version
+    - active
+    codesUsed:
+    - set: refdataType
+      values:
+      - SYSTEM_PARAM
+      - HOLIDAY
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_DAY_CLOSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reconciliation-gl
+    module: reconciliation
+    purpose: trigger the GL tie-out run for (businessDate, revision) (CCR-GL-05)
+    fieldsUsed:
+    - businessDate
+    - revision
+    - status
+    - restated
+    codesUsed:
+    - set: dayCloseStatus
+      values:
+      - CLOSED
+      - CLOSED_WITH_EXCEPTIONS
+  - producer: ledger-service
+    topic: ledger.changes
+    eventType: LEDGER_TRANSFER_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-ledger-sink
+    module: reporting
+    purpose: 'sink: rpt.ledger_transfers → postings, balances'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-txn-sink
+    module: reporting
+    purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-txn-sink
+    module: reporting
+    purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REVERSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-txn-sink
+    module: reporting
+    purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REFUNDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-txn-sink
+    module: reporting
+    purpose: 'sink: rpt.txn_facts, wallet_txn, command_ref(TRANSACTION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: wallet.events
+    eventType: WALLET_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-wallet-sink
+    module: reporting
+    purpose: 'sink: rpt.wallet_dim, wallet_status_history'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: CUSTOMER_REGISTERED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_SUBMITTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_APPROVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_REJECTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_TIER_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: RISK_GRADE_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: customer.events
+    eventType: CUSTOMER_PROFILE_UPDATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-customer-sink
+    module: reporting
+    purpose: 'sink: rpt.customer_dim (NID never stored; dob → birth_year)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: wallet-service
+    topic: partner.events
+    eventType: PARTNER_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-partner-sink
+    module: reporting
+    purpose: 'sink: rpt.partner_dim, partner_dim_history'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: pricing-service
+    topic: fee.rules
+    eventType: PRICING_PLAN_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-pricing-sink
+    module: reporting
+    purpose: 'sink: rpt.pricing_plan_dim (tombstone → deleted = 1)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: pricing-service
+    topic: commission.events
+    eventType: COMMISSION_ACCRUED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-commission-sink
+    module: reporting
+    purpose: 'sink: rpt.commission_facts, command_ref(COMMISSION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: pricing-service
+    topic: commission.events
+    eventType: COMMISSION_SETTLED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-commission-sink
+    module: reporting
+    purpose: 'sink: rpt.commission_facts, command_ref(COMMISSION)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_ISSUED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEEMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEMPTION_PAID_OUT
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_BALANCE_CONFIRMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: FLOAT_REQUEST_UPDATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: LIQUIDITY_THRESHOLD_BREACHED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: MANUAL_JOURNAL_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_REBALANCED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_INTEREST_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(TREASURY), mart_emoney_daily, RR-01'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_SUBMITTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_APPROVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_PAID
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: SCHEDULED_TRANSFER_EXECUTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_CREATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_ACCEPTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_DECLINED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(DISBURSEMENT, ref = rowRef)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_GRANTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(CAMPAIGN)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_CLAWED_BACK
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events, command_ref(CAMPAIGN)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: TICKET_CREATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: TICKET_STATUS_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: DISPUTE_OPENED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: DISPUTE_RESOLVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: REVERSAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: support-service
+    topic: support.events
+    eventType: REVERSAL_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-005, RR-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: SCREENING_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: SCREENING_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: CASE_OPENED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: CASE_CLOSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: FREEZE_APPLIED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: FREEZE_LIFTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: RISK_REGRADE_RECOMMENDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: compliance-service
+    topic: case.events
+    eventType: REVERSAL_RECOMMENDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-domain-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: limits-risk-service
+    topic: risk.alerts
+    eventType: RISK_ALERT_RAISED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-audit-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-001 suspicious indicators)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-audit-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-audit-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_EXPIRED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-audit-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-004 maker-checker reports); schema owner admin-service (K4.4)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: admin-service
+    topic: audit.events
+    eventType: AUDIT_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-audit-sink
+    module: reporting
+    purpose: 'sink: rpt.domain_events (RPT-004 audit reports); schema owner admin-service (K4.4)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: admin-service
+    topic: refdata.events
+    eventType: REFDATA_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-refdata
+    module: reporting
+    purpose: 'sink: rpt.refdata_dim (GEO, MCC, REASON_CODE, HOLIDAY, CUTOFF.EOD, CALENDAR.*, RETENTION.*)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_DAY_CLOSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_DAY_CERTIFIED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_PERIOD_STATUS_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_JOURNAL_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_ACCOUNT_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_EXCEPTION_RAISED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: finance-ops-service.reporting-gl-sink
+    module: reporting
+    purpose: 'sink: R2 (optional, CCR-GL-08): rpt.domain_events for GL-based regulatory datasets; disabled by default'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    release: R2
+  inboundTopics:
+  - owner: admin-service
+    topic: notification.requests
+    eventType: NOTIFICATION_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    fieldsUsed:
+    - '*'
+    templates:
+    - EMONEY_VARIANCE
+    - TRIAL_BALANCE_BREAK
+    - EOD_FAILED
+    - RECON_CRITICAL_EXCEPTION
+    - REPORT_READY
+    - STATEMENT_READY
+    - REGULATORY_REVIEW_PENDING
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    fieldsUsed:
+    - '*'
+    entityTypes: codes.yaml → entityTypes
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    fieldsUsed:
+    - '*'
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_EXPIRED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    fieldsUsed:
+    - '*'
+  - owner: admin-service
+    topic: audit.events
+    eventType: AUDIT_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    fieldsUsed:
+    - '*'
+  data: []
+  codes:
+  - producer: admin-service
+    set: refdataType
+    values:
+    - SYSTEM_PARAM
+    - HOLIDAY
+    - GEO
+    - MCC
+    - REASON_CODE
+  refdata:
+  - type: SYSTEM_PARAM
+    codes:
+    - CUTOFF.EOD
+    - CUTOFF.EOD_GRACE_MINUTES
+    - CALENDAR.*
+    - RETENTION.*
+    readers:
+      CUTOFF.EOD: both modules
+      CUTOFF.EOD_GRACE_MINUTES: reconciliation
+      CALENDAR.*: both modules
+      RETENTION.RECON: reconciliation
+      RETENTION.*: reporting
+    fallback:
+      CUTOFF.EOD: 00:00
+      CUTOFF.EOD_GRACE_MINUTES: 15
+      CALENDAR.TIMEZONE: Asia/Dhaka
+      CALENDAR.WEEKEND_DAYS: FRI,SAT
+  - type: HOLIDAY
+    codes:
+    - '*'
+    readers: both modules
+  - type: GEO
+    codes:
+    - '*'
+    readers: reporting
+  - type: MCC
+    codes:
+    - '*'
+    readers: reporting
+  - type: REASON_CODE
+    codes:
+    - '*'
+    readers: reporting
+internal:
+  note: Own-topic consumption inside this service (not a cross-service pin)
+  events:
+  - topic: recon.events
+    eventTypes:
+    - RECON_RUN_COMPLETED
+    - EMONEY_VARIANCE_DETECTED
+    - RECON_EXCEPTION_RAISED
+    groupId: finance-ops-service.reporting-recon
+    module: reporting
+    purpose: marts / daily-close trigger (RECON_RUN_COMPLETED type EOD) and rpt.domain_events

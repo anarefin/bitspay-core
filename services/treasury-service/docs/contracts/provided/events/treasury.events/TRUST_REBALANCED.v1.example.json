@@ -1,0 +1,31 @@
+{
+  "eventId": "0192f107-1000-7000-8000-000000000e01",
+  "eventType": "TRUST_REBALANCED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T13:00:00.044Z",
+  "producer": "treasury-service",
+  "aggregateType": "TrustRebalance",
+  "aggregateId": "0192f100-0000-7000-8000-000000000001",
+  "correlationId": "c-7e2a01",
+  "data": {
+    "rebalanceId": "0192f107-0000-7000-8000-000000000001",
+    "txnRef": "TR2610090P4N7W2QXA",
+    "fromTrustAccountId": "0192f100-0000-7000-8000-000000000001",
+    "toTrustAccountId": "0192f100-0000-7000-8000-000000000002",
+    "ledgerFromTrustAccountId": "00000000-0000-0000-0000-000000030001",
+    "ledgerToTrustAccountId": "00000000-0000-0000-0000-000000030002",
+    "amountPoisha": 5000000,
+    "bankReference": "TRF-20261009-000777",
+    "makerId": "0192f0a1-0000-7000-8000-0000000000f1",
+    "checkerIds": [
+      "0192f0a1-0000-7000-8000-0000000000f2",
+      "0192f0a1-0000-7000-8000-0000000000f3"
+    ],
+    "ledgerCommandId": "0192f107-0000-7000-8000-000000000001",
+    "ledgerTransferIds": [
+      "7c8d9e0f-1a2b-8c3d-9e4f-5a6b7c8d9e0f"
+    ],
+    "businessDate": "2026-10-09",
+    "postedAt": "2026-10-09T13:00:00.000Z"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "POST /v1/ledger/commands/post-disbursement-batch → 503",
+  "priority": 9,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-disbursement\\-batch(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "503"
+      }
+    }
+  },
+  "response": {
+    "status": 503,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "Dependency unavailable",
+      "status": 503,
+      "code": "DEPENDENCY_UNAVAILABLE",
+      "detail": "TigerBeetle did not answer in time",
+      "instance": "/v1/ledger/commands/post-p2p",
+      "correlationId": "c-0f3e9a",
+      "reason": null,
+      "retryable": true
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

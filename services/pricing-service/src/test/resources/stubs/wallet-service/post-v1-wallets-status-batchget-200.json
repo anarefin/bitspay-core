@@ -1,0 +1,44 @@
+{
+  "name": "POST /v1/wallets/status:batchGet → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/wallets/status:batchGet(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "walletId": "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+          "version": 8813,
+          "status": "A",
+          "kycTier": 2,
+          "walletType": "C",
+          "categoryCode": 0,
+          "flags": 0
+        },
+        {
+          "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+          "version": 8812,
+          "status": "A",
+          "kycTier": 1,
+          "walletType": "C",
+          "categoryCode": 0,
+          "flags": 0
+        }
+      ],
+      "notFound": [
+        "0192f2ff-0000-7000-8000-000000000999"
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

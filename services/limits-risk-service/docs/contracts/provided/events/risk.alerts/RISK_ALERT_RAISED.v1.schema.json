@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/limits-risk-service/risk.alerts/RISK_ALERT_RAISED.v1.schema.json",
+  "title": "risk.alerts RISK_ALERT_RAISED v1 (envelope.data)",
+  "description": "aggregateType RiskAlert; key = aggregateId = sender (from) walletId. Emitted in the same DB transaction as the risk decision, before the HTTP response, when the final decision is ALLOW_AND_ALERT, STEP_UP, HOLD or BLOCK caused by ENFORCE rules or the blacklist (single or batch evaluate), or LIMIT_EXCEEDED when risk setting alertOnLimitExceeded = true.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["alertId", "txnId", "txnRef", "walletId", "decision", "ruleIds", "riskScore", "details"],
+  "$defs": {
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"},
+    "violatedLimit": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["limitCode", "party", "walletId", "scope", "direction", "dimension", "layer", "limitValue", "currentValue", "attemptedValue", "remainingValue", "resetsAt"],
+      "properties": {
+        "limitCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*_(SEND|RECEIVE|ANY)_(TXN_ALLOWED|PER_TXN_MIN|PER_TXN_MAX|DAILY_COUNT|DAILY_AMOUNT|WEEKLY_COUNT|WEEKLY_AMOUNT|MONTHLY_COUNT|MONTHLY_AMOUNT|MAX_BALANCE)$"},
+        "party": {"type": "string", "enum": ["FROM", "TO"]},
+        "walletId": {"$ref": "#/$defs/uuid"},
+        "scope": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "direction": {"type": "string", "enum": ["SEND", "RECEIVE", "ANY"]},
+        "dimension": {"type": "string", "enum": ["TXN_ALLOWED", "PER_TXN_MIN", "PER_TXN_MAX", "DAILY_COUNT", "DAILY_AMOUNT", "WEEKLY_COUNT", "WEEKLY_AMOUNT", "MONTHLY_COUNT", "MONTHLY_AMOUNT", "MAX_BALANCE"]},
+        "layer": {"type": "string", "enum": ["REGULATORY_CAP", "TIER", "PRODUCT_CHANNEL", "OVERRIDE", "SELF"]},
+        "limitValue": {"type": "integer", "minimum": 0},
+        "currentValue": {"type": ["integer", "null"], "minimum": 0},
+        "attemptedValue": {"type": "integer", "minimum": 1},
+        "remainingValue": {"type": ["integer", "null"], "minimum": 0},
+        "resetsAt": {"oneOf": [{"$ref": "#/$defs/timestamp"}, {"type": "null"}]}
+      }
+    }
+  },
+  "properties": {
+    "alertId": {"$ref": "#/$defs/uuid", "description": "consumer dedupe key"},
+    "txnId": {"$ref": "#/$defs/uuid", "description": "evaluate txnId (batch: the row's ledger commandId)"},
+    "txnRef": {"type": "null", "description": "always null (unknown at evaluate time); correlate by txnId"},
+    "walletId": {"$ref": "#/$defs/uuid", "description": "sender (from) walletId = key"},
+    "decision": {"type": "string", "enum": ["ALLOW_AND_ALERT", "STEP_UP", "HOLD", "BLOCK", "LIMIT_EXCEEDED"]},
+    "ruleIds": {"type": "array", "items": {"type": "string", "pattern": "^FR-[A-Z]{2,6}-[0-9]{3}$"}, "description": "matched ENFORCE ruleIds, weight desc; [] for blacklist-only / limit-only"},
+    "riskScore": {"type": "integer", "minimum": 0, "maximum": 100},
+    "details": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["txnType", "channel", "amountPoisha", "deviceId", "counterpartyWalletId", "matchedRules", "blacklistHits", "reasonCodes", "violatedLimit", "configVersion", "evaluatedAt"],
+      "properties": {
+        "txnType": {"type": "string", "enum": ["P2P", "CASH_IN", "CASH_OUT", "MERCHANT_PAYMENT", "MERCHANT_REFUND", "FLOAT_TRANSFER", "REVERSAL", "DISBURSEMENT", "CAMPAIGN_REWARD"]},
+        "channel": {"type": "string", "enum": ["APP", "USSD", "PARTNER_APP", "PORTAL", "BACKOFFICE", "API", "SYSTEM"]},
+        "amountPoisha": {"type": "integer", "exclusiveMinimum": 0, "maximum": 10000000000000},
+        "deviceId": {"type": ["string", "null"], "maxLength": 128},
+        "counterpartyWalletId": {"$ref": "#/$defs/uuid", "description": "to walletId"},
+        "matchedRules": {
+          "type": "array",
+          "description": "ENFORCE rules only",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["ruleId", "ruleVersion", "weight", "action", "category"],
+            "properties": {
+              "ruleId": {"type": "string", "pattern": "^FR-[A-Z]{2,6}-[0-9]{3}$"},
+              "ruleVersion": {"type": "integer", "minimum": 1},
+              "weight": {"type": "integer", "minimum": 0, "maximum": 1000},
+              "action": {"type": ["string", "null"], "enum": ["ALERT", "STEP_UP", "HOLD", "BLOCK", null]},
+              "category": {"type": "string", "enum": ["VELOCITY", "PROFILE", "DEVICE", "BENEFICIARY", "STRUCTURING", "PASS_THROUGH", "DORMANT", "MERCHANT", "AGENT", "GEO", "AUTH", "SIM", "LIST"]}
+            }
+          }
+        },
+        "blacklistHits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["type", "party", "entryId"],
+            "properties": {
+              "type": {"type": "string", "enum": ["NID", "MSISDN", "DEVICE", "WALLET", "BANK_ACCOUNT", "IP", "PARTNER"]},
+              "party": {"type": "string", "enum": ["FROM", "TO"]},
+              "entryId": {"$ref": "#/$defs/uuid"}
+            }
+          }
+        },
+        "reasonCodes": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "same vocabulary as evaluate reasonCodes"},
+        "violatedLimit": {"oneOf": [{"$ref": "#/$defs/violatedLimit"}, {"type": "null"}], "description": "non-null only for LIMIT_EXCEEDED"},
+        "configVersion": {"type": "integer", "minimum": 1},
+        "evaluatedAt": {"$ref": "#/$defs/timestamp", "description": "effective evaluate at"}
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "GET /v1/retention/legal-holds → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/retention/legal\\-holds(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "holdId": "0192f700-0000-7000-8000-0000000000a1",
+          "category": "AML_CASE",
+          "subjectType": "CASE",
+          "subjectId": "CASE-2026-000123",
+          "reason": "Court order 12/2026",
+          "reference": "CO-12-2026",
+          "status": "ACTIVE",
+          "placedAt": "2026-10-01T05:00:00.000Z"
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "admin-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

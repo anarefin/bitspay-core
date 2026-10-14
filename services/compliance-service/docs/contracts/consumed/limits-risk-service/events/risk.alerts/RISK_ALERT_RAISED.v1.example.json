@@ -1,0 +1,35 @@
+{
+  "eventId": "0192f3c2-0000-7000-8000-0000000000aa",
+  "eventType": "RISK_ALERT_RAISED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T08:03:22.130Z",
+  "producer": "limits-risk-service",
+  "aggregateType": "RiskAlert",
+  "aggregateId": "0192f2aa-0000-7000-8000-00000000a001",
+  "correlationId": "c-0f3e9a",
+  "data": {
+    "alertId": "0192f3c2-0000-7000-8000-0000000000ab",
+    "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+    "txnRef": null,
+    "walletId": "0192f2aa-0000-7000-8000-00000000a001",
+    "decision": "HOLD",
+    "ruleIds": ["FR-NEWDEV-001", "FR-BEN-001"],
+    "riskScore": 75,
+    "details": {
+      "txnType": "P2P",
+      "channel": "APP",
+      "amountPoisha": 2500000,
+      "deviceId": "d-999",
+      "counterpartyWalletId": "0192f2bb-0000-7000-8000-00000000b002",
+      "matchedRules": [
+        {"ruleId": "FR-NEWDEV-001", "ruleVersion": 2, "weight": 45, "action": null, "category": "DEVICE"},
+        {"ruleId": "FR-BEN-001", "ruleVersion": 1, "weight": 30, "action": null, "category": "BENEFICIARY"}
+      ],
+      "blacklistHits": [],
+      "reasonCodes": ["FR-NEWDEV-001", "FR-BEN-001"],
+      "violatedLimit": null,
+      "configVersion": 412,
+      "evaluatedAt": "2026-10-09T08:03:22.000Z"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "eventId": "0192fa72-0000-7000-8000-000000000072",
+  "eventType": "BATCH_APPROVED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T09:30:00.012Z",
+  "producer": "disbursement-service",
+  "aggregateType": "DisbursementBatch",
+  "aggregateId": "0192fa10-0000-7000-8000-000000000001",
+  "correlationId": "c-batch-0192fa10",
+  "data": {
+    "batchId": "0192fa10-0000-7000-8000-000000000001",
+    "batchRef": "BD261009K7Q2M4ZD",
+    "approvalId": "0192fa22-0000-7000-8000-000000000002",
+    "checkerIds": [
+      "hr-checker-02"
+    ],
+    "validAmountPoisha": 6240000000,
+    "approvedAt": "2026-10-09T09:30:00.000Z"
+  }
+}

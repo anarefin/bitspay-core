@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/support-service/support.events/TICKET_STATUS_CHANGED.v1.schema.json",
+  "title": "support.events TICKET_STATUS_CHANGED v1 — envelope.data",
+  "description": "Any status change, escalation-level change or SLA breach (status may equal previousStatus). Producer support-service; aggregateType Ticket; key = aggregateId = ticketId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "ticketId",
+    "ticketNumber",
+    "previousStatus",
+    "status",
+    "customerVisibleStatus",
+    "customerId",
+    "walletId",
+    "msisdn",
+    "language",
+    "escalationLevel",
+    "slaBreached",
+    "resolutionCode",
+    "changedAt",
+    "category",
+    "bbCategory",
+    "source",
+    "channel",
+    "priority",
+    "createdAt",
+    "resolutionDueAt",
+    "firstContactResolution"
+  ],
+  "properties": {
+    "ticketId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ticketNumber": {
+      "type": "string",
+      "pattern": "^T\\d{6}\\d{6,}$",
+      "maxLength": 14
+    },
+    "previousStatus": {
+      "type": "string",
+      "enum": [
+        "NEW",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "PENDING_CUSTOMER",
+        "PENDING_INTERNAL",
+        "RESOLVED",
+        "CLOSED"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "NEW",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "PENDING_CUSTOMER",
+        "PENDING_INTERNAL",
+        "RESOLVED",
+        "CLOSED"
+      ]
+    },
+    "customerVisibleStatus": {
+      "type": "string",
+      "enum": [
+        "RECEIVED",
+        "IN_PROGRESS",
+        "AWAITING_YOUR_RESPONSE",
+        "RESOLVED",
+        "CLOSED"
+      ]
+    },
+    "customerId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "walletId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "msisdn": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^8801[3-9][0-9]{8}$",
+      "description": "full 13 digits"
+    },
+    "language": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "bn",
+        "en",
+        null
+      ]
+    },
+    "escalationLevel": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "slaBreached": {
+      "type": "boolean"
+    },
+    "resolutionCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "ANSWERED",
+        "FIXED",
+        "REVERSED",
+        "REFUNDED_BY_MERCHANT",
+        "REJECTED_NO_FAULT",
+        "DUPLICATE",
+        "NO_RESPONSE",
+        "REFERRED",
+        null
+      ],
+      "description": "non-null iff status in {RESOLVED, CLOSED}"
+    },
+    "changedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "category": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,39}$"
+    },
+    "bbCategory": {
+      "type": "string",
+      "enum": [
+        "BB_FRAUD",
+        "BB_TRANSACTION",
+        "BB_AGENT",
+        "BB_MERCHANT",
+        "BB_ACCOUNT",
+        "BB_CHARGES",
+        "BB_OTHER"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "APP",
+        "USSD",
+        "IVR",
+        "CHATBOT",
+        "CALL_CENTRE",
+        "AGENT",
+        "PORTAL",
+        "EMAIL",
+        "BACKOFFICE",
+        "SYSTEM"
+      ]
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "APP",
+        "USSD",
+        "PARTNER_APP",
+        "PORTAL",
+        "BACKOFFICE",
+        "API",
+        "SYSTEM"
+      ],
+      "description": "channel of ticket creation"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "description": "current"
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$",
+      "description": "ticket creation"
+    },
+    "resolutionDueAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$",
+      "description": "current"
+    },
+    "firstContactResolution": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/pricing-service/fee.rules/PRICING_PLAN_UPSERTED.v1.schema.json",
+  "title": "PlanJson",
+  "description": "data of PRICING_PLAN_UPSERTED on compacted topic fee.rules (key = planId). A retired plan is a tombstone: key planId, null value, no envelope.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "planId",
+    "version",
+    "status",
+    "txnType",
+    "match",
+    "priority",
+    "effectiveFrom",
+    "effectiveTo",
+    "fee",
+    "feeBearer",
+    "vatBps",
+    "freeMonthlyCount",
+    "commission"
+  ],
+  "properties": {
+    "planId": {
+      "type": "string",
+      "pattern": "^PLN-[A-Z0-9-]{2,60}$",
+      "description": "never reused; = Kafka key"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "EXPIRED"
+      ],
+      "description": "consumers keep only ACTIVE; EXPIRED = expired with no successor"
+    },
+    "txnType": {
+      "type": "string",
+      "enum": [
+        "P2P",
+        "CASH_IN",
+        "CASH_OUT",
+        "MERCHANT_PAYMENT",
+        "MERCHANT_REFUND",
+        "FLOAT_TRANSFER",
+        "REVERSAL"
+      ]
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "channel",
+        "payerWalletType",
+        "payeeWalletType",
+        "payerKycTier",
+        "categoryCode"
+      ],
+      "properties": {
+        "channel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "APP",
+            "USSD",
+            "PARTNER_APP",
+            "PORTAL",
+            "BACKOFFICE",
+            "API",
+            "SYSTEM",
+            null
+          ],
+          "description": "null = any channel"
+        },
+        "payerWalletType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "C",
+            "A",
+            "D",
+            "M",
+            "I",
+            null
+          ],
+          "description": "null = any"
+        },
+        "payeeWalletType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "C",
+            "A",
+            "D",
+            "M",
+            "I",
+            null
+          ],
+          "description": "null = any"
+        },
+        "payerKycTier": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9
+        },
+        "categoryCode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 99999,
+          "description": "compared with the resolved category (pricing-algorithm v1 step 0)"
+        }
+      },
+      "description": "all five keys always present"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000,
+      "description": "higher wins"
+    },
+    "effectiveFrom": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$",
+      "description": "inclusive"
+    },
+    "effectiveTo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$",
+      "description": "exclusive; null = open-ended"
+    },
+    "fee": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "type",
+        "fixedPoisha",
+        "percentBps",
+        "slabs",
+        "minPoisha",
+        "maxPoisha"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "FIXED",
+            "PERCENT",
+            "SLAB",
+            "NONE"
+          ]
+        },
+        "fixedPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "percentBps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "slabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "fromPoisha",
+              "toPoisha",
+              "fixedPoisha",
+              "percentBps"
+            ],
+            "properties": {
+              "fromPoisha": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "inclusive lower bound"
+              },
+              "toPoisha": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 9007199254740991,
+                "description": "inclusive upper bound; null = no upper bound (last slab only)"
+              },
+              "fixedPoisha": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "percentBps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          },
+          "description": "SLAB: contiguous from 1, last toPoisha null; other types: []"
+        },
+        "minPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "not applied for NONE or an allowance-zeroed fee"
+        },
+        "maxPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "0 = no cap, else >= minPoisha"
+        }
+      }
+    },
+    "feeBearer": {
+      "type": "string",
+      "enum": [
+        "PAYER",
+        "PAYEE",
+        "OPERATOR",
+        "SHARED"
+      ],
+      "description": "SHARED is reserved and never emitted (OPEN D-03); consumers must accept it in their enums"
+    },
+    "vatBps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "freeMonthlyCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "commission": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "type",
+        "valueBps",
+        "fixedPoisha",
+        "source",
+        "beneficiary",
+        "aitBps"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "FIXED",
+            "PERCENT_OF_AMOUNT",
+            "PERCENT_OF_FEE"
+          ]
+        },
+        "valueBps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "fixedPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "FEE_INCOME",
+            "COMMISSION_PAYABLE",
+            null
+          ],
+          "description": "null iff type NONE"
+        },
+        "beneficiary": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "PAYER",
+            "PAYEE",
+            null
+          ],
+          "description": "null iff type NONE"
+        },
+        "aitBps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "minPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "optional, absent = 0 (OPEN D-27)"
+        },
+        "maxPoisha": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "optional, 0 = no cap, absent = 0 (OPEN D-27)"
+        }
+      }
+    }
+  }
+}

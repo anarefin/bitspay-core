@@ -1,0 +1,3176 @@
+[
+  {
+    "groupId": "transaction-service.feerules-${HOSTNAME}",
+    "service": "transaction-service",
+    "topic": "fee.rules",
+    "eventType": "PRICING_PLAN_UPSERTED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "planId",
+      "version",
+      "status",
+      "txnType",
+      "match",
+      "priority",
+      "effectiveFrom",
+      "effectiveTo",
+      "fee",
+      "feeBearer",
+      "vatBps",
+      "freeMonthlyCount",
+      "commission"
+    ]
+  },
+  {
+    "groupId": "transaction-service.partner",
+    "service": "transaction-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "partnerType",
+      "subType",
+      "categoryCode",
+      "walletId",
+      "parentPartnerId",
+      "ancestorWalletIds",
+      "status",
+      "version",
+      "effectiveFrom"
+    ]
+  },
+  {
+    "groupId": "transaction-service.refdata",
+    "service": "transaction-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "nameEn",
+      "nameBn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_COMPLETED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "screeningId",
+      "subjectType",
+      "subjectId",
+      "trigger",
+      "result",
+      "eddRequired",
+      "sourceEventId",
+      "matches[].listKind"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_DECIDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "screeningId",
+      "subjectType",
+      "subjectId",
+      "trigger",
+      "result",
+      "eddRequired",
+      "sourceEventId",
+      "matches[].listKind",
+      "decision",
+      "decidedAt"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "case.events",
+    "eventType": "RISK_REGRADE_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "subjectType",
+      "subjectId",
+      "currentGrade",
+      "recommendedGrade",
+      "caseId",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "wallet-service.partner-case-events",
+    "service": "wallet-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_COMPLETED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "screeningId",
+      "subjectType",
+      "subjectId",
+      "trigger",
+      "result",
+      "eddRequired",
+      "sourceEventId",
+      "sourceVersion",
+      "matches[].listKind",
+      "matches[].matchedSubjectType",
+      "matches[].matchedSubjectId"
+    ]
+  },
+  {
+    "groupId": "wallet-service.partner-case-events",
+    "service": "wallet-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_DECIDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "screeningId",
+      "subjectType",
+      "subjectId",
+      "trigger",
+      "result",
+      "eddRequired",
+      "sourceEventId",
+      "sourceVersion",
+      "matches[].listKind",
+      "matches[].matchedSubjectType",
+      "matches[].matchedSubjectId",
+      "decision",
+      "decidedAt"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_OPENED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "disputeId",
+      "ticketId",
+      "walletIds",
+      "openedAt"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_RESOLVED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "disputeId"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_REQUESTED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "reversalRequestId",
+      "ticketId",
+      "walletIds",
+      "requestedAt"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_COMPLETED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "reversalRequestId"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "blacklist.events",
+    "eventType": "BLACKLIST_ENTRY_UPSERTED",
+    "producer": "limits-risk-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "entryId",
+      "type",
+      "valueHash",
+      "active",
+      "expiresAt",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "wallet-service.partner-blacklist-events",
+    "service": "wallet-service",
+    "topic": "blacklist.events",
+    "eventType": "BLACKLIST_ENTRY_UPSERTED",
+    "producer": "limits-risk-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "entryId",
+      "type",
+      "valueHash",
+      "active",
+      "expiresAt",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnRef",
+      "txnType",
+      "fromWalletId",
+      "toWalletId",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "wallet-service",
+    "service": "wallet-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "parentCode",
+      "nameEn",
+      "nameBn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "wallet-service.partner-refdata-events",
+    "service": "wallet-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "parentCode",
+      "nameEn",
+      "nameBn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "wallet-service.status-cache-loader",
+    "service": "wallet-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "status",
+      "kycTier",
+      "walletType",
+      "categoryCode",
+      "flags"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.reservations",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "fromWalletId",
+      "toWalletId",
+      "amountPoisha",
+      "createdAt",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.reservations",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "fromWalletId",
+      "toWalletId"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.reservations",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "fromWalletId",
+      "toWalletId",
+      "createdAt",
+      "reversedAmountPoisha"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.reservations",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "fromWalletId",
+      "toWalletId",
+      "createdAt",
+      "refundedTotalPoisha"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.history",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "status",
+      "channel",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "deviceId",
+      "riskDecision",
+      "riskScore"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.history",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "status",
+      "channel",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "deviceId",
+      "riskDecision",
+      "riskScore"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.history",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "status",
+      "channel",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "deviceId",
+      "riskDecision",
+      "riskScore"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.history",
+    "service": "limits-risk-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnType",
+      "status",
+      "channel",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "deviceId",
+      "riskDecision",
+      "riskScore"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.wallet-events",
+    "service": "limits-risk-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "ownerType",
+      "walletType",
+      "msisdn",
+      "status",
+      "previousStatus",
+      "statusReasonCode",
+      "kycTier",
+      "categoryCode",
+      "createdAt",
+      "updatedAt"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.customer-events",
+    "service": "limits-risk-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_REGISTERED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "riskGrade",
+      "nidHash"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.customer-events",
+    "service": "limits-risk-service",
+    "topic": "customer.events",
+    "eventType": "KYC_APPROVED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "riskGrade",
+      "nidHash"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.customer-events",
+    "service": "limits-risk-service",
+    "topic": "customer.events",
+    "eventType": "RISK_GRADE_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "riskGrade",
+      "nidHash"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.customer-events",
+    "service": "limits-risk-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_PROFILE_UPDATED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "riskGrade",
+      "nidHash"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.partner-events",
+    "service": "limits-risk-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "walletId",
+      "riskGrade",
+      "version"
+    ]
+  },
+  {
+    "groupId": "limits-risk-service.disbursement-events",
+    "service": "limits-risk-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_FAILED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "batchId",
+      "walletId",
+      "commandId"
+    ]
+  },
+  {
+    "groupId": "pricing-service.txn",
+    "service": "pricing-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "amountPoisha",
+      "feePoisha",
+      "commissionPoisha",
+      "aitPoisha",
+      "commissionBeneficiaryWalletId",
+      "fromWalletId",
+      "toWalletId",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "pricing-service.txn",
+    "service": "pricing-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "amountPoisha",
+      "completedAt",
+      "reverseCommission",
+      "reversedAmountPoisha",
+      "toWalletId",
+      "fromWalletId",
+      "commissionBeneficiaryWalletId"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-txn",
+    "service": "pricing-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "status",
+      "channel",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "feePoisha",
+      "vatPoisha",
+      "feeBearer",
+      "riskDecision",
+      "deviceId",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-txn",
+    "service": "pricing-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "amountPoisha",
+      "reversedAmountPoisha"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-txn",
+    "service": "pricing-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "status",
+      "amountPoisha",
+      "refundedTotalPoisha"
+    ]
+  },
+  {
+    "groupId": "pricing-service.partner",
+    "service": "pricing-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "partnerType",
+      "subType",
+      "categoryCode",
+      "walletId",
+      "status",
+      "displayName",
+      "ancestorPartnerIds",
+      "ancestorWalletIds",
+      "version",
+      "effectiveFrom",
+      "tinPresent"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-partner",
+    "service": "pricing-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "walletId",
+      "partnerType",
+      "subType",
+      "categoryCode",
+      "mcc",
+      "territory.district",
+      "status",
+      "ancestorPartnerIds",
+      "version"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-wallet",
+    "service": "pricing-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "ownerType",
+      "ownerId",
+      "walletType",
+      "msisdn",
+      "status",
+      "kycTier",
+      "categoryCode",
+      "flags",
+      "language",
+      "createdAt"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-customer",
+    "service": "pricing-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_REGISTERED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nidHash",
+      "dob",
+      "gender",
+      "district",
+      "upazila",
+      "kycTier",
+      "riskGrade",
+      "language",
+      "registeredAt",
+      "referralCode"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-customer",
+    "service": "pricing-service",
+    "topic": "customer.events",
+    "eventType": "KYC_APPROVED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nidHash",
+      "dob",
+      "gender",
+      "district",
+      "upazila",
+      "kycTier",
+      "riskGrade",
+      "language"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-customer",
+    "service": "pricing-service",
+    "topic": "customer.events",
+    "eventType": "KYC_TIER_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "kycTier"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-customer",
+    "service": "pricing-service",
+    "topic": "customer.events",
+    "eventType": "RISK_GRADE_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "riskGrade"
+    ]
+  },
+  {
+    "groupId": "pricing-service.campaign-customer",
+    "service": "pricing-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_PROFILE_UPDATED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nidHash",
+      "dob",
+      "gender",
+      "district",
+      "upazila",
+      "language"
+    ]
+  },
+  {
+    "groupId": "pricing-service.refdata",
+    "service": "pricing-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "treasury-service.ledger-changes",
+    "service": "treasury-service",
+    "topic": "ledger.changes",
+    "eventType": "LEDGER_TRANSFER_POSTED",
+    "producer": "ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "debitAccountId",
+      "creditAccountId",
+      "amountPoisha",
+      "timestamp",
+      "debitAccountBalanceAfter.debitsPosted",
+      "debitAccountBalanceAfter.creditsPosted",
+      "debitAccountBalanceAfter.debitsPending",
+      "creditAccountBalanceAfter.debitsPosted",
+      "creditAccountBalanceAfter.creditsPosted",
+      "creditAccountBalanceAfter.debitsPending"
+    ]
+  },
+  {
+    "groupId": "treasury-service.partner-projection",
+    "service": "treasury-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "partnerType",
+      "subType",
+      "categoryCode",
+      "walletId",
+      "parentPartnerId",
+      "ancestorPartnerIds",
+      "ancestorWalletIds",
+      "territory.division",
+      "territory.district",
+      "territory.upazila",
+      "territory.union",
+      "status",
+      "displayName",
+      "msisdn",
+      "version",
+      "effectiveFrom"
+    ]
+  },
+  {
+    "groupId": "treasury-service.refdata",
+    "service": "treasury-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "nameEn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "disbursement-service.refdata",
+    "service": "disbursement-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "version",
+      "active",
+      "attributes.valueType",
+      "attributes.enabled",
+      "attributes.channels",
+      "attributes.value"
+    ]
+  },
+  {
+    "groupId": "support-service",
+    "service": "support-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnRef",
+      "txnId",
+      "status",
+      "reversalTxnRef",
+      "reversedAmountPoisha",
+      "reverseFee",
+      "reverseCommission"
+    ]
+  },
+  {
+    "groupId": "support-service",
+    "service": "support-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "ownerType",
+      "ownerId",
+      "walletType",
+      "msisdn",
+      "displayName",
+      "language",
+      "status",
+      "statusReasonCode"
+    ]
+  },
+  {
+    "groupId": "support-service",
+    "service": "support-service",
+    "topic": "case.events",
+    "eventType": "REVERSAL_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "caseId",
+      "caseNo",
+      "domain",
+      "txnRef",
+      "walletIds",
+      "amountPoisha",
+      "reasonCode",
+      "recommendedAt"
+    ]
+  },
+  {
+    "groupId": "support-service",
+    "service": "support-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "support-service.approvals",
+    "service": "support-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_DECIDED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "approvalId",
+      "service",
+      "entityType",
+      "status",
+      "level",
+      "requiredLevels"
+    ]
+  },
+  {
+    "groupId": "support-service.approvals",
+    "service": "support-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_EXPIRED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "approvalId",
+      "service",
+      "entityType",
+      "status"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "KYC_SUBMITTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "msisdn",
+      "nameEn",
+      "nameBn",
+      "nidHash",
+      "dob",
+      "kycTier",
+      "riskGrade",
+      "occupation",
+      "incomeBand",
+      "district",
+      "upazila",
+      "gender",
+      "submissionId",
+      "targetTier"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_REGISTERED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "msisdn",
+      "nameEn",
+      "nameBn",
+      "nidHash",
+      "dob",
+      "kycTier",
+      "riskGrade",
+      "occupation",
+      "incomeBand",
+      "district",
+      "upazila",
+      "gender"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_PROFILE_UPDATED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "msisdn",
+      "nameEn",
+      "nameBn",
+      "nidHash",
+      "dob",
+      "kycTier",
+      "riskGrade",
+      "occupation",
+      "incomeBand",
+      "district",
+      "upazila",
+      "gender"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "KYC_APPROVED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "kycTier",
+      "riskGrade",
+      "kycExpiryDate",
+      "submissionId"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "KYC_REJECTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "kycTier",
+      "riskGrade",
+      "kycExpiryDate",
+      "submissionId"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "KYC_TIER_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "kycTier",
+      "riskGrade",
+      "kycExpiryDate",
+      "submissionId"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "customer.events",
+    "eventType": "RISK_GRADE_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "riskGrade",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "partnerType",
+      "status",
+      "displayName",
+      "legalName",
+      "msisdn",
+      "walletId",
+      "territory.district",
+      "riskGrade",
+      "keyPersons[].personId",
+      "keyPersons[].role",
+      "keyPersons[].nameEn",
+      "keyPersons[].nameBn",
+      "keyPersons[].nidHash",
+      "keyPersons[].dob",
+      "version"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "ownerType",
+      "ownerId",
+      "walletType",
+      "msisdn",
+      "status",
+      "previousStatus",
+      "statusReasonCode",
+      "kycTier",
+      "categoryCode",
+      "flags",
+      "displayName",
+      "createdAt"
+    ]
+  },
+  {
+    "groupId": "compliance-service.txn-ingest",
+    "service": "compliance-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "channel",
+      "completedAt",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "feePoisha",
+      "deviceId",
+      "riskDecision",
+      "originalTxnRef"
+    ]
+  },
+  {
+    "groupId": "compliance-service.txn-ingest",
+    "service": "compliance-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "completedAt",
+      "reversalTxnRef",
+      "reversedAmountPoisha"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "risk.alerts",
+    "eventType": "RISK_ALERT_RAISED",
+    "producer": "limits-risk-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "alertId",
+      "txnId",
+      "walletId",
+      "decision",
+      "ruleIds",
+      "riskScore",
+      "details.txnType",
+      "details.channel",
+      "details.amountPoisha",
+      "details.deviceId",
+      "details.counterpartyWalletId",
+      "details.blacklistHits[].type",
+      "details.blacklistHits[].party",
+      "details.blacklistHits[].entryId",
+      "details.evaluatedAt"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "blacklist.events",
+    "eventType": "BLACKLIST_ENTRY_UPSERTED",
+    "producer": "limits-risk-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "entryId",
+      "type",
+      "valueHash",
+      "active",
+      "expiresAt",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "compliance-service",
+    "service": "compliance-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "parentCode",
+      "nameEn",
+      "nameBn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-ledger",
+    "service": "finance-ops-service",
+    "topic": "ledger.changes",
+    "eventType": "LEDGER_TRANSFER_POSTED",
+    "producer": "ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "transferId",
+      "commandId",
+      "commandType",
+      "legIndex",
+      "code",
+      "debitAccountId",
+      "creditAccountId",
+      "amountPoisha",
+      "pendingId",
+      "flags",
+      "timestamp",
+      "debitAccountBalanceAfter",
+      "creditAccountBalanceAfter"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-txn",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "status",
+      "fromWalletId",
+      "fromWalletType",
+      "toWalletId",
+      "toWalletType",
+      "amountPoisha",
+      "feePoisha",
+      "vatPoisha",
+      "feeBearer",
+      "commissionPoisha",
+      "aitPoisha",
+      "commissionBeneficiaryWalletId",
+      "originalTxnRef",
+      "ledgerTransferIds",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-txn",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "txnType",
+      "status",
+      "failureCode",
+      "ledgerTransferIds",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-txn",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "status",
+      "reversalTxnRef",
+      "reversedAmountPoisha",
+      "reverseFee",
+      "reverseCommission"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-txn",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnId",
+      "txnRef",
+      "status",
+      "refundedTotalPoisha"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-disbursement",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_PAID",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "commandId",
+      "amountPoisha",
+      "payerWalletId",
+      "walletId",
+      "rowRef"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-disbursement",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_FAILED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "commandId"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_ISSUED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "txnRef",
+      "amountPoisha",
+      "ledgerTrustAccountId",
+      "destinationAccountId",
+      "bankReference",
+      "businessDate"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEEMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "txnRef",
+      "amountPoisha",
+      "sourceAccountId",
+      "ledgerTrustAccountId",
+      "bankReference",
+      "businessDate"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEMPTION_PAID_OUT",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "payoutReference",
+      "bankReference",
+      "paidOutAt",
+      "businessDate"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "MANUAL_JOURNAL_POSTED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "txnRef",
+      "debitAccountId",
+      "creditAccountId",
+      "amountPoisha",
+      "businessDate"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_REBALANCED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "txnRef",
+      "ledgerFromTrustAccountId",
+      "ledgerToTrustAccountId",
+      "amountPoisha",
+      "bankReference",
+      "businessDate"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-treasury",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_BALANCE_CONFIRMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "trustAccountId",
+      "ledgerTrustAccountId",
+      "confirmationId",
+      "businessDate",
+      "confirmedBalancePoisha",
+      "bankCode",
+      "source",
+      "balanceKind",
+      "balanceAsOf"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-campaign",
+    "service": "finance-ops-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_GRANTED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "commandId",
+      "rewardPoisha",
+      "walletId",
+      "txnRef"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-campaign",
+    "service": "finance-ops-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_CLAWED_BACK",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "commandId",
+      "clawbackCommandId",
+      "clawbackMode",
+      "clawbackTxnRef",
+      "rewardPoisha",
+      "walletId"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-commission",
+    "service": "finance-ops-service",
+    "topic": "commission.events",
+    "eventType": "COMMISSION_SETTLED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "beneficiaryWalletId",
+      "netPoisha",
+      "aitPoisha",
+      "txnRef"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-refdata",
+    "service": "finance-ops-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reconciliation-gl",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_DAY_CLOSED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "businessDate",
+      "revision",
+      "status",
+      "restated"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-ledger-sink",
+    "service": "finance-ops-service",
+    "topic": "ledger.changes",
+    "eventType": "LEDGER_TRANSFER_POSTED",
+    "producer": "ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-txn-sink",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-txn-sink",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-txn-sink",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-txn-sink",
+    "service": "finance-ops-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-wallet-sink",
+    "service": "finance-ops-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_REGISTERED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "KYC_SUBMITTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "KYC_APPROVED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "KYC_REJECTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "KYC_TIER_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "RISK_GRADE_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-customer-sink",
+    "service": "finance-ops-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_PROFILE_UPDATED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-partner-sink",
+    "service": "finance-ops-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-pricing-sink",
+    "service": "finance-ops-service",
+    "topic": "fee.rules",
+    "eventType": "PRICING_PLAN_UPSERTED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-commission-sink",
+    "service": "finance-ops-service",
+    "topic": "commission.events",
+    "eventType": "COMMISSION_ACCRUED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-commission-sink",
+    "service": "finance-ops-service",
+    "topic": "commission.events",
+    "eventType": "COMMISSION_SETTLED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_ISSUED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEEMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEMPTION_PAID_OUT",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_BALANCE_CONFIRMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "FLOAT_REQUEST_UPDATED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "LIQUIDITY_THRESHOLD_BREACHED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "MANUAL_JOURNAL_POSTED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_REBALANCED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_INTEREST_RECORDED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_SUBMITTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_APPROVED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_PAID",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_FAILED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_COMPLETED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "SCHEDULED_TRANSFER_EXECUTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_CREATED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_ACCEPTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_DECLINED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_GRANTED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_CLAWED_BACK",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "TICKET_CREATED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "TICKET_STATUS_CHANGED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_OPENED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_RESOLVED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_REQUESTED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_COMPLETED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_COMPLETED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_DECIDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "CASE_OPENED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "CASE_CLOSED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "FREEZE_APPLIED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "FREEZE_LIFTED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "RISK_REGRADE_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-domain-sink",
+    "service": "finance-ops-service",
+    "topic": "case.events",
+    "eventType": "REVERSAL_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-audit-sink",
+    "service": "finance-ops-service",
+    "topic": "risk.alerts",
+    "eventType": "RISK_ALERT_RAISED",
+    "producer": "limits-risk-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-audit-sink",
+    "service": "finance-ops-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_REQUESTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-audit-sink",
+    "service": "finance-ops-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_DECIDED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-audit-sink",
+    "service": "finance-ops-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_EXPIRED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-audit-sink",
+    "service": "finance-ops-service",
+    "topic": "audit.events",
+    "eventType": "AUDIT_RECORDED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-refdata",
+    "service": "finance-ops-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_DAY_CLOSED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_DAY_CERTIFIED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_PERIOD_STATUS_CHANGED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_JOURNAL_POSTED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_ACCOUNT_UPSERTED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "finance-ops-service.reporting-gl-sink",
+    "service": "finance-ops-service",
+    "topic": "gl.events",
+    "eventType": "GL_EXCEPTION_RAISED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-audit",
+    "service": "admin-service",
+    "topic": "audit.events",
+    "eventType": "AUDIT_RECORDED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-approvals",
+    "service": "admin-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_REQUESTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "approvalId",
+      "service",
+      "module",
+      "entityType",
+      "entityId",
+      "action",
+      "makerId",
+      "checkerId",
+      "level",
+      "requiredLevels",
+      "checkerRoles",
+      "amountPoisha",
+      "status",
+      "summary",
+      "deepLink",
+      "requestedAt",
+      "decidedAt",
+      "expiresAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-approvals",
+    "service": "admin-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_DECIDED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "approvalId",
+      "service",
+      "module",
+      "entityType",
+      "entityId",
+      "action",
+      "makerId",
+      "checkerId",
+      "level",
+      "requiredLevels",
+      "checkerRoles",
+      "amountPoisha",
+      "status",
+      "summary",
+      "deepLink",
+      "requestedAt",
+      "decidedAt",
+      "expiresAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.governance-approvals",
+    "service": "admin-service",
+    "topic": "approval.events",
+    "eventType": "APPROVAL_EXPIRED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "approvalId",
+      "service",
+      "module",
+      "entityType",
+      "entityId",
+      "action",
+      "makerId",
+      "checkerId",
+      "level",
+      "requiredLevels",
+      "checkerRoles",
+      "amountPoisha",
+      "status",
+      "summary",
+      "deepLink",
+      "requestedAt",
+      "decidedAt",
+      "expiresAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_COMPLETED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnType",
+      "txnRef",
+      "fromWalletId",
+      "toWalletId",
+      "amountPoisha",
+      "feePoisha",
+      "vatPoisha",
+      "feeBearer",
+      "commissionPoisha",
+      "aitPoisha",
+      "commissionBeneficiaryWalletId",
+      "merchantReference",
+      "reasonCode",
+      "originalTxnRef",
+      "completedAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_FAILED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "txnType",
+      "txnRef",
+      "channel",
+      "fromWalletId",
+      "amountPoisha",
+      "failureCode",
+      "createdAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REVERSED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-txn",
+    "service": "admin-service",
+    "topic": "txn.events",
+    "eventType": "TRANSACTION_REFUNDED",
+    "producer": "transaction-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-wallet",
+    "service": "admin-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "version",
+      "ownerType",
+      "ownerId",
+      "walletType",
+      "msisdn",
+      "status",
+      "previousStatus",
+      "statusReasonCode",
+      "displayName",
+      "language",
+      "updatedAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "KYC_SUBMITTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn",
+      "targetTier"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "KYC_APPROVED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn",
+      "kycTier"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "KYC_REJECTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "KYC_TIER_CHANGED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn",
+      "kycTier"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_REGISTERED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-customer",
+    "service": "admin-service",
+    "topic": "customer.events",
+    "eventType": "CUSTOMER_PROFILE_UPDATED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "customerId",
+      "walletIds",
+      "nameEn",
+      "nameBn"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-partner",
+    "service": "admin-service",
+    "topic": "partner.events",
+    "eventType": "PARTNER_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "partnerId",
+      "partnerType",
+      "walletId",
+      "status",
+      "version"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-commission",
+    "service": "admin-service",
+    "topic": "commission.events",
+    "eventType": "COMMISSION_SETTLED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "beneficiaryWalletId",
+      "period",
+      "grossPoisha",
+      "aitPoisha",
+      "netPoisha",
+      "txnRef"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_PAID",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "amountPoisha",
+      "payerWalletId",
+      "rowRef",
+      "postedAt"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_SUBMITTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_APPROVED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_ROW_FAILED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "BATCH_COMPLETED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "SCHEDULED_TRANSFER_EXECUTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_CREATED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_ACCEPTED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-disbursement",
+    "service": "admin-service",
+    "topic": "disbursement.events",
+    "eventType": "PAYMENT_REQUEST_DECLINED",
+    "producer": "disbursement-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-campaign",
+    "service": "admin-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_GRANTED",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "rewardPoisha",
+      "rewardType",
+      "txnRef",
+      "triggerTxnRef"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-campaign",
+    "service": "admin-service",
+    "topic": "campaign.events",
+    "eventType": "REWARD_CLAWED_BACK",
+    "producer": "pricing-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "rewardPoisha",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_ISSUED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEEMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEMPTION_PAID_OUT",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_BALANCE_CONFIRMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "FLOAT_REQUEST_UPDATED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "LIQUIDITY_THRESHOLD_BREACHED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "MANUAL_JOURNAL_POSTED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_REBALANCED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-treasury",
+    "service": "admin-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_INTEREST_RECORDED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "TICKET_CREATED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "TICKET_STATUS_CHANGED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_OPENED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "DISPUTE_RESOLVED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_REQUESTED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-support",
+    "service": "admin-service",
+    "topic": "support.events",
+    "eventType": "REVERSAL_COMPLETED",
+    "producer": "support-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_COMPLETED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "SCREENING_DECIDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "CASE_OPENED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "CASE_CLOSED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "FREEZE_APPLIED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "FREEZE_LIFTED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "RISK_REGRADE_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-case",
+    "service": "admin-service",
+    "topic": "case.events",
+    "eventType": "REVERSAL_RECOMMENDED",
+    "producer": "compliance-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-recon",
+    "service": "admin-service",
+    "topic": "recon.events",
+    "eventType": "RECON_RUN_COMPLETED",
+    "producer": "finance-ops-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-recon",
+    "service": "admin-service",
+    "topic": "recon.events",
+    "eventType": "EMONEY_VARIANCE_DETECTED",
+    "producer": "finance-ops-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-recon",
+    "service": "admin-service",
+    "topic": "recon.events",
+    "eventType": "RECON_EXCEPTION_RAISED",
+    "producer": "finance-ops-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_DAY_CLOSED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_DAY_CERTIFIED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_PERIOD_STATUS_CHANGED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_JOURNAL_POSTED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_ACCOUNT_UPSERTED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-gl",
+    "service": "admin-service",
+    "topic": "gl.events",
+    "eventType": "GL_EXCEPTION_RAISED",
+    "producer": "general-ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": []
+  },
+  {
+    "groupId": "admin-service.notification-requests",
+    "service": "admin-service",
+    "topic": "notification.requests",
+    "eventType": "NOTIFICATION_REQUESTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-requests",
+    "service": "admin-service",
+    "topic": "notification.requests",
+    "eventType": "NOTIFICATION_REMINDER_CANCELLED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "*"
+    ]
+  },
+  {
+    "groupId": "admin-service.notification-refdata",
+    "service": "admin-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "nameEn",
+      "nameBn",
+      "attributes",
+      "version",
+      "active"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.ledger",
+    "service": "general-ledger-service",
+    "topic": "ledger.changes",
+    "eventType": "LEDGER_TRANSFER_POSTED",
+    "producer": "ledger-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "transferId",
+      "commandId",
+      "commandType",
+      "legIndex",
+      "code",
+      "debitAccountId",
+      "creditAccountId",
+      "amountPoisha",
+      "pendingId",
+      "flags",
+      "timestamp",
+      "debitAccountBalanceAfter.debitsPosted",
+      "debitAccountBalanceAfter.creditsPosted",
+      "creditAccountBalanceAfter.debitsPosted",
+      "creditAccountBalanceAfter.creditsPosted",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.wallet",
+    "service": "general-ledger-service",
+    "topic": "wallet.events",
+    "eventType": "WALLET_UPSERTED",
+    "producer": "wallet-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "walletId",
+      "walletType",
+      "version"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.treasury",
+    "service": "general-ledger-service",
+    "topic": "treasury.events",
+    "eventType": "TRUST_INTEREST_RECORDED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "interestId",
+      "trustAccountId",
+      "ledgerTrustAccountId",
+      "month",
+      "interestPoisha",
+      "recordedAt"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.treasury",
+    "service": "general-ledger-service",
+    "topic": "treasury.events",
+    "eventType": "MANUAL_JOURNAL_POSTED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.treasury",
+    "service": "general-ledger-service",
+    "topic": "treasury.events",
+    "eventType": "EMONEY_REDEEMED",
+    "producer": "treasury-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "ledgerCommandId",
+      "reasonCode"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.recon",
+    "service": "general-ledger-service",
+    "topic": "recon.events",
+    "eventType": "RECON_RUN_COMPLETED",
+    "producer": "finance-ops-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "runId",
+      "type",
+      "businessDate",
+      "status",
+      "exceptions",
+      "summary.glTieOut",
+      "summary.glRevision"
+    ]
+  },
+  {
+    "groupId": "general-ledger-service.refdata",
+    "service": "general-ledger-service",
+    "topic": "refdata.events",
+    "eventType": "REFDATA_UPSERTED",
+    "producer": "admin-service",
+    "pinned": "1.0.0",
+    "fieldsUsed": [
+      "type",
+      "code",
+      "attributes.valueType",
+      "attributes.value",
+      "attributes.date",
+      "attributes.bankHoliday",
+      "version",
+      "active"
+    ]
+  }
+]

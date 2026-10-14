@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/general-ledger-service/gl.events/GL_DAY_CERTIFIED.v1.schema.json",
+  "title": "gl.events GL_DAY_CERTIFIED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "description": "= key"
+    },
+    "revision": {
+      "type": "integer",
+      "format": "int32",
+      "description": "≥ 1; GL revision that was tied out"
+    },
+    "certification": {
+      "type": "string",
+      "enum": [
+        "CERTIFIED",
+        "FAILED"
+      ]
+    },
+    "reconRunId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "the reconciliation GL_TIEOUT run (recon.events `runId`)"
+    },
+    "breakCount": {
+      "type": "integer",
+      "format": "int64",
+      "description": "≥ 0; buckets that did not tie out"
+    },
+    "certifiedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+    }
+  },
+  "required": [
+    "businessDate",
+    "revision",
+    "certification",
+    "reconRunId",
+    "breakCount",
+    "certifiedAt"
+  ],
+  "additionalProperties": true
+}

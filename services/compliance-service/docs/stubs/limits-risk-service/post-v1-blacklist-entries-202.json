@@ -1,0 +1,25 @@
+{
+  "name": "POST /v1/blacklist/entries → 202",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/blacklist/entries(\\?.*)?$"
+  },
+  "response": {
+    "status": 202,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "entryId": "0192f5aa-0000-7000-8000-0000000000e2",
+      "status": "PENDING_APPROVAL",
+      "approvalId": "0192f5ab-0000-7000-8000-000000000001",
+      "valueMasked": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

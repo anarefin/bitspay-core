@@ -1,0 +1,32 @@
+{
+  "eventId": "0192f4a0-1b2c-7d00-8e11-000000000002",
+  "eventType": "APPROVAL_DECIDED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T05:10:11.123Z",
+  "producer": "admin-service",
+  "aggregateType": "Approval",
+  "aggregateId": "0192f4a0-1b2c-7d00-8e11-2a3b4c5d6e7f",
+  "correlationId": "c-77d1",
+  "data": {
+    "approvalId": "0192f4a0-1b2c-7d00-8e11-2a3b4c5d6e7f",
+    "service": "admin-service",
+    "module": "governance",
+    "entityType": "StaffUser",
+    "entityId": "0192f49f-5c3d-7a10-b2c4-9d8e7f6a5b4c",
+    "action": "ASSIGN_ROLES",
+    "makerId": "0192f001-0000-7000-8000-000000000001",
+    "checkerId": "0192f002-0000-7000-8000-000000000002",
+    "level": 1,
+    "requiredLevels": 1,
+    "checkerRoles": [
+      "ADMIN"
+    ],
+    "amountPoisha": null,
+    "status": "APPROVED",
+    "summary": "Assign OPS_CHECKER to tanvir.h",
+    "deepLink": "/v1/approvals/0192f4a0-1b2c-7d00-8e11-2a3b4c5d6e7f",
+    "requestedAt": "2026-10-09T04:00:00.000Z",
+    "decidedAt": "2026-10-09T05:10:11.000Z",
+    "expiresAt": "2026-10-12T04:00:00.000Z"
+  }
+}

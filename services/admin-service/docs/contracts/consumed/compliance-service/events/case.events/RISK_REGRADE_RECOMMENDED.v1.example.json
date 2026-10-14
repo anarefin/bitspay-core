@@ -1,0 +1,18 @@
+{
+  "eventId": "0193a2d0-0000-7000-8000-0000000004e2",
+  "eventType": "RISK_REGRADE_RECOMMENDED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-11T07:00:00.000Z",
+  "producer": "compliance-service",
+  "aggregateType": "RiskRegrade",
+  "aggregateId": "0192f2c0-0000-7000-8000-00000000c002",
+  "correlationId": "c-7d21aa",
+  "data": {
+    "subjectType": "CUSTOMER",
+    "subjectId": "0192f2c0-0000-7000-8000-00000000c002",
+    "currentGrade": "MEDIUM",
+    "recommendedGrade": "HIGH",
+    "caseId": "0193a2d0-0000-7000-8000-000000000401",
+    "reasonCode": "AML_CASE_SUSPICIOUS"
+  }
+}

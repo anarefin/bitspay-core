@@ -1,0 +1,54 @@
+{
+  "name": "GET /v1/transactions/{txnRef} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/transactions/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "txnRef": "PP26100900K3M9QX2A",
+      "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "txnType": "P2P",
+      "status": "REVERSED",
+      "failureCode": null,
+      "amountPoisha": 50000,
+      "feePoisha": 500,
+      "vatPoisha": 75,
+      "totalDebitPoisha": 50575,
+      "feeBearer": "PAYER",
+      "currency": "BDT",
+      "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001",
+      "toWalletId": "0192f2bb-0002-7000-8000-00000000b002",
+      "createdAt": "2026-10-09T08:03:22.101Z",
+      "completedAt": "2026-10-09T08:03:22.161Z",
+      "channel": "APP",
+      "initiatorActorType": "CUSTOMER",
+      "clientReference": "req-7f3a9c",
+      "purposeCode": "FAMILY_SUPPORT",
+      "note": "for Eid shopping",
+      "merchantReference": null,
+      "qrPayloadId": null,
+      "requestId": null,
+      "commissionPoisha": 0,
+      "aitPoisha": 0,
+      "commissionBeneficiaryWalletId": null,
+      "pricingPlanId": "PLN-P2P-STD",
+      "pricingPlanVersion": 3,
+      "reasonCode": null,
+      "originalTxnRef": null,
+      "reversalTxnRef": "RV26100900Q2D5M8XT",
+      "reversedAmountPoisha": 50000,
+      "refundedTotalPoisha": 0
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "transaction-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

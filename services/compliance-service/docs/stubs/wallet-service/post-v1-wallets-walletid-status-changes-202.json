@@ -1,0 +1,27 @@
+{
+  "name": "POST /v1/wallets/{walletId}/status-changes → 202",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/wallets/[^/]+/status\\-changes(\\?.*)?$"
+  },
+  "response": {
+    "status": 202,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "changeRequestId": "0192f400-1111-7000-8000-00000000a001",
+      "walletId": "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+      "outcome": "PENDING_APPROVAL",
+      "approvalId": "0192f400-1111-7000-8000-00000000b001",
+      "walletStatus": "A",
+      "walletVersion": 8813
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

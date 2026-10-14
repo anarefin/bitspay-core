@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/disbursement-service/disbursement.events/BATCH_ROW_FAILED.v1.schema.json",
+  "title": "disbursement.events BATCH_ROW_FAILED v1 — envelope.data",
+  "description": "Row failed during execution (INVALID and SKIPPED rows never produce this event). aggregateType DisbursementBatch; Kafka key = envelope aggregateId = data.batchId. Producer disbursement-service.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "batchId",
+    "rowNo",
+    "walletId",
+    "amountPoisha",
+    "commandId",
+    "failureCode",
+    "payerWalletId",
+    "batchRef",
+    "rowRef",
+    "attempt"
+  ],
+  "properties": {
+    "batchId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "rowNo": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "walletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "int64 poisha"
+    },
+    "commandId": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      ],
+      "description": "current attempt's commandId if that attempt was sent to evaluate:batch (reserving) or to the ledger, else null (OPEN D-14)"
+    },
+    "failureCode": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "open enum; known values: WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_HELD_FOR_REVIEW, RISK_STEP_UP_REQUIRED, SERVICE_DISABLED, MAX_BALANCE_EXCEEDED, LEDGER_INVALID_AMOUNT, LEDGER_OTHER. Consumers tolerate new values. DEPENDENCY_UNAVAILABLE is never final for a row."
+    },
+    "payerWalletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "batchRef": {
+      "type": "string",
+      "pattern": "^BD\\d{6}[0-9A-HJKMNP-TV-Z]{8}$"
+    },
+    "rowRef": {
+      "type": "string",
+      "pattern": "^BD\\d{6}[0-9A-HJKMNP-TV-Z]{8}-[1-9][0-9]{0,6}$",
+      "maxLength": 24,
+      "description": "{batchRef}-{rowNo}; not a txnRef (OPEN D-13)"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

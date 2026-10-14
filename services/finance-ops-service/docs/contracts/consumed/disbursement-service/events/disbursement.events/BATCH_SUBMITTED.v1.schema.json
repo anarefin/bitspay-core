@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/disbursement-service/disbursement.events/BATCH_SUBMITTED.v1.schema.json",
+  "title": "disbursement.events BATCH_SUBMITTED v1 — envelope.data",
+  "description": "Batch submitted for approval (VALIDATED -> PENDING_APPROVAL). aggregateType DisbursementBatch; Kafka key = envelope aggregateId = data.batchId. Producer disbursement-service.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "batchId",
+    "batchRef",
+    "institutionId",
+    "payerWalletId",
+    "validRows",
+    "invalidRows",
+    "validAmountPoisha",
+    "makerId"
+  ],
+  "properties": {
+    "batchId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "batchRef": {
+      "type": "string",
+      "pattern": "^BD\\d{6}[0-9A-HJKMNP-TV-Z]{8}$"
+    },
+    "institutionId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "partnerId = ownerId of the payer wallet (type I)"
+    },
+    "payerWalletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "validRows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "invalidRows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "validAmountPoisha": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "int64 poisha"
+    },
+    "makerId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "maker X-Actor-Id: institution partnerId or STAFF user id"
+    },
+    "makerUserId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "maker X-Actor-User-Id (institution user); optional key"
+    }
+  }
+}

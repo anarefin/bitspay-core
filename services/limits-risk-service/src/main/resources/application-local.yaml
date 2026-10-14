@@ -1,0 +1,13 @@
+# Profile `local`: this service alone; every other service is a WireMock stub on :8099 (kernel K9).
+# Infra: start only what you need, e.g. `make infra` (or docker compose up -d postgres kafka-init).
+bitspay:
+  clients:
+    ledger:          { base-url: http://localhost:8099 }
+    transaction:     { base-url: http://localhost:8099 }
+    wallet:          { base-url: http://localhost:8099 }
+    limitsrisk:      { base-url: http://localhost:8099 }
+    pricing:         { base-url: http://localhost:8099 }
+    treasury:        { base-url: http://localhost:8099 }
+    financeops:      { base-url: http://localhost:8099 }
+    admin:           { base-url: http://localhost:8099 }
+    generalledger:   { base-url: http://localhost:8099 }

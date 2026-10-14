@@ -1,0 +1,18 @@
+service: disbursement-service
+generatedAt: '2026-10-13T15:47:27Z'
+pins:
+- producer: admin-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: ledger-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: limits-risk-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: transaction-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: wallet-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0

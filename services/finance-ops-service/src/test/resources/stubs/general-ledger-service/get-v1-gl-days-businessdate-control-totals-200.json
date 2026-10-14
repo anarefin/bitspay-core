@@ -1,0 +1,122 @@
+{
+  "name": "GET /v1/gl/days/{businessDate}/control-totals → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/gl/days/[^/]+/control\\-totals(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "businessDate": "2026-10-09",
+      "revision": 1,
+      "dayStatus": "CLOSED",
+      "ruleSetVersion": 1,
+      "cutoffAt": "2026-10-09T18:00:00.000Z",
+      "items": [
+        {
+          "bucket": "SYS:AIT_PAYABLE",
+          "trustIndex": null,
+          "ledgerAccountId": "00000000-0000-0000-0000-000000000230",
+          "debitsPostedPoisha": 0,
+          "creditsPostedPoisha": 64,
+          "dayDebitPoisha": 0,
+          "dayCreditPoisha": 64,
+          "legCount": 2
+        },
+        {
+          "bucket": "SYS:COMMISSION_PAYABLE",
+          "trustIndex": null,
+          "ledgerAccountId": "00000000-0000-0000-0000-000000000220",
+          "debitsPostedPoisha": 400,
+          "creditsPostedPoisha": 0,
+          "dayDebitPoisha": 400,
+          "dayCreditPoisha": 0,
+          "legCount": 2
+        },
+        {
+          "bucket": "SYS:FEE_INCOME",
+          "trustIndex": null,
+          "ledgerAccountId": "00000000-0000-0000-0000-000000000200",
+          "debitsPostedPoisha": 240,
+          "creditsPostedPoisha": 1625,
+          "dayDebitPoisha": 240,
+          "dayCreditPoisha": 1625,
+          "legCount": 5
+        },
+        {
+          "bucket": "SYS:VAT_PAYABLE",
+          "trustIndex": null,
+          "ledgerAccountId": "00000000-0000-0000-0000-000000000210",
+          "debitsPostedPoisha": 0,
+          "creditsPostedPoisha": 244,
+          "dayDebitPoisha": 0,
+          "dayCreditPoisha": 244,
+          "legCount": 3
+        },
+        {
+          "bucket": "TRUST",
+          "trustIndex": 1,
+          "ledgerAccountId": "00000000-0000-0000-0000-000000030001",
+          "debitsPostedPoisha": 100000000,
+          "creditsPostedPoisha": 0,
+          "dayDebitPoisha": 100000000,
+          "dayCreditPoisha": 0,
+          "legCount": 1
+        },
+        {
+          "bucket": "WALLET:A",
+          "trustIndex": null,
+          "ledgerAccountId": null,
+          "debitsPostedPoisha": 100000,
+          "creditsPostedPoisha": 10040576,
+          "dayDebitPoisha": 100000,
+          "dayCreditPoisha": 10040576,
+          "legCount": 5
+        },
+        {
+          "bucket": "WALLET:C",
+          "trustIndex": null,
+          "ledgerAccountId": null,
+          "debitsPostedPoisha": 126265,
+          "creditsPostedPoisha": 160000,
+          "dayDebitPoisha": 126265,
+          "dayCreditPoisha": 160000,
+          "legCount": 10
+        },
+        {
+          "bucket": "WALLET:D",
+          "trustIndex": null,
+          "ledgerAccountId": null,
+          "debitsPostedPoisha": 10000000,
+          "creditsPostedPoisha": 100000000,
+          "dayDebitPoisha": 10000000,
+          "dayCreditPoisha": 100000000,
+          "legCount": 2
+        },
+        {
+          "bucket": "WALLET:M",
+          "trustIndex": null,
+          "ledgerAccountId": null,
+          "debitsPostedPoisha": 10604,
+          "creditsPostedPoisha": 35000,
+          "dayDebitPoisha": 10604,
+          "dayCreditPoisha": 35000,
+          "legCount": 4
+        }
+      ],
+      "totals": {
+        "debitsPostedPoisha": 110237509,
+        "creditsPostedPoisha": 110237509
+      }
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "general-ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

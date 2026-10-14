@@ -1,0 +1,331 @@
+# support-service — owned codes (CONTRACT-MODEL §4). contractVersion 1.0.0.
+# Mirror: SPEC.md §5.3. This file wins over the prose.
+
+codeSets:
+  ticketStatus:
+    description: "Internal ticket status (support.events status / previousStatus; staff ticket views)"
+    values:
+      - {code: NEW, description: "Created, not yet picked up"}
+      - {code: ASSIGNED, description: "Assigned to an agent or team"}
+      - {code: IN_PROGRESS, description: "Being worked"}
+      - {code: PENDING_CUSTOMER, description: "Waiting for the customer (resolution SLA paused)"}
+      - {code: PENDING_INTERNAL, description: "Waiting for an internal step (dispute, reversal, wallet approval)"}
+      - {code: RESOLVED, description: "Resolved with a resolutionCode"}
+      - {code: CLOSED, description: "Closed (auto-close after autoCloseDays)"}
+  customerVisibleStatus:
+    description: "Status shown to the complainant (mapping BR-S-04)"
+    values:
+      - {code: RECEIVED, description: "NEW / ASSIGNED"}
+      - {code: IN_PROGRESS, description: "IN_PROGRESS / PENDING_INTERNAL"}
+      - {code: AWAITING_YOUR_RESPONSE, description: "PENDING_CUSTOMER"}
+      - {code: RESOLVED, description: "RESOLVED"}
+      - {code: CLOSED, description: "CLOSED"}
+  ticketPriority:
+    description: "Ticket priority"
+    values:
+      - {code: P1, description: "Critical (UNAUTHORISED_TXN always P1)"}
+      - {code: P2, description: "High"}
+      - {code: P3, description: "Normal"}
+      - {code: P4, description: "Low"}
+  ticketSource:
+    description: "Origin of the complaint (request body source; IVR / CHATBOT adaptors call as SYSTEM with X-Channel SYSTEM)"
+    values:
+      - {code: APP}
+      - {code: USSD}
+      - {code: IVR}
+      - {code: CHATBOT}
+      - {code: CALL_CENTRE}
+      - {code: AGENT}
+      - {code: PORTAL}
+      - {code: EMAIL}
+      - {code: BACKOFFICE}
+      - {code: SYSTEM}
+  bbCategory:
+    description: "Bangladesh Bank complaint category (RR-05 / SUP-011 dataset); derived from CATEGORIES"
+    values:
+      - {code: BB_FRAUD}
+      - {code: BB_TRANSACTION}
+      - {code: BB_AGENT}
+      - {code: BB_MERCHANT}
+      - {code: BB_ACCOUNT}
+      - {code: BB_CHARGES}
+      - {code: BB_OTHER}
+  ticketCategory:
+    description: "Seed keys of the CATEGORIES config document. Open set (config-driven, governed by the ConfigDocument approval); consumers treat category as a string and handle unknown values"
+    values:
+      - {code: UNAUTHORISED_TXN}
+      - {code: WRONG_TRANSFER}
+      - {code: TXN_FAILED_DEBITED}
+      - {code: CASH_OUT_ISSUE}
+      - {code: CASH_IN_ISSUE}
+      - {code: MERCHANT_PAYMENT_ISSUE}
+      - {code: ACCOUNT_ACCESS}
+      - {code: ACCOUNT_STATUS}
+      - {code: KYC_ONBOARDING}
+      - {code: AGENT_SERVICE}
+      - {code: FEE_CHARGE_QUERY}
+      - {code: CLOSURE_REQUEST}
+      - {code: GENERAL_ENQUIRY}
+      - {code: OTHER}
+      - {code: REVERSAL_RECOMMENDATION, description: "Internal only (opened from compliance REVERSAL_RECOMMENDED); never shown to customers, never notified (tipping-off)"}
+  resolutionCode:
+    description: "Resolution code of a RESOLVED / CLOSED ticket"
+    values:
+      - {code: ANSWERED}
+      - {code: FIXED}
+      - {code: REVERSED}
+      - {code: REFUNDED_BY_MERCHANT}
+      - {code: REJECTED_NO_FAULT}
+      - {code: DUPLICATE}
+      - {code: NO_RESPONSE}
+      - {code: REFERRED}
+  disputeType:
+    description: "Dispute type"
+    values:
+      - {code: WRONG_TRANSFER}
+      - {code: UNAUTHORISED_TXN}
+      - {code: MERCHANT_DISPUTE}
+      - {code: DUPLICATE_TXN}
+      - {code: CASH_OUT_NOT_RECEIVED}
+      - {code: OTHER}
+  disputeState:
+    description: "Dispute state (the 'Disputed' indicator of a transaction is held here, OPEN D-34)"
+    values:
+      - {code: OPEN}
+      - {code: INVESTIGATING}
+      - {code: AWAITING_CONSENT}
+      - {code: REVERSAL_PENDING}
+      - {code: RESOLVED_UPHELD}
+      - {code: RESOLVED_REJECTED}
+      - {code: WITHDRAWN}
+  disputeOutcome:
+    description: "Outcome of a resolved dispute (DISPUTE_RESOLVED.outcome; :resolve request)"
+    values:
+      - {code: UPHELD}
+      - {code: REJECTED}
+      - {code: WITHDRAWN}
+  holdState:
+    description: "Support ledger hold state"
+    values:
+      - {code: REQUESTED}
+      - {code: ACTIVE}
+      - {code: REJECTED}
+      - {code: RELEASE_REQUESTED}
+      - {code: RELEASED}
+      - {code: CONSUMED_BY_REVERSAL}
+  consentType:
+    values:
+      - {code: RECIPIENT_CONSENT}
+      - {code: REGULATORY_INSTRUCTION}
+  consentMethod:
+    values:
+      - {code: CALL_RECORDED}
+      - {code: IN_PERSON}
+      - {code: WRITTEN}
+      - {code: APP_CONFIRMATION}
+      - {code: BB_LETTER}
+      - {code: COURT_ORDER}
+  reversalRequestState:
+    description: "Reversal request state"
+    values:
+      - {code: PENDING_APPROVAL}
+      - {code: APPROVED}
+      - {code: EXECUTING}
+      - {code: COMPLETED}
+      - {code: PENDING_FUNDS}
+      - {code: FAILED_RETRYABLE}
+      - {code: FAILED}
+      - {code: REJECTED}
+      - {code: EXPIRED}
+      - {code: CANCELLED}
+  reversalOutcome:
+    description: "REVERSAL_COMPLETED.outcome (all terminal for consumers)"
+    values:
+      - {code: COMPLETED}
+      - {code: FAILED}
+      - {code: REJECTED}
+      - {code: EXPIRED}
+      - {code: CANCELLED}
+  reversalFailureCode:
+    description: "Support-generated REVERSAL_COMPLETED.failureCode values; for outcome FAILED the value is the transaction problem code or transaction.failureCode (open)"
+    values:
+      - {code: APPROVAL_REJECTED}
+      - {code: APPROVAL_EXPIRED}
+      - {code: CANCELLED_BY_MAKER}
+  serviceActionType:
+    values:
+      - {code: BLOCK_WALLET}
+      - {code: UNBLOCK_WALLET}
+      - {code: RESEND_RECEIPT}
+      - {code: PIN_RESET, description: "recorded only (RECORDED_PENDING_AUTH), OPEN D-34"}
+      - {code: UNBIND_DEVICE, description: "recorded only (RECORDED_PENDING_AUTH), OPEN D-34"}
+      - {code: UPDATE_CONTACT}
+  serviceActionState:
+    values:
+      - {code: SUBMITTED}
+      - {code: PENDING_APPROVAL}
+      - {code: APPLIED}
+      - {code: SENT}
+      - {code: RECORDED_PENDING_AUTH}
+      - {code: FAILED}
+  verificationMethod:
+    values:
+      - {code: KBA}
+      - {code: NID_CHECK}
+      - {code: OTP_UPSTREAM}
+  sectionStatus:
+    description: "Customer-360 section status"
+    values:
+      - {code: OK}
+      - {code: TIMEOUT}
+      - {code: UNAVAILABLE}
+      - {code: NOT_CONFIGURED}
+      - {code: FORBIDDEN}
+  configKey:
+    values:
+      - {code: CATEGORIES}
+      - {code: SLA_POLICY}
+      - {code: ESCALATION}
+      - {code: HOLD_POLICY}
+      - {code: REVERSAL_POLICY}
+      - {code: MASKING_POLICY}
+      - {code: SUPPORT_PARAMS}
+  configStatus:
+    values:
+      - {code: DRAFT}
+      - {code: PENDING_APPROVAL}
+      - {code: ACTIVE}
+      - {code: RETIRED}
+      - {code: REJECTED}
+  attachmentPurpose:
+    values:
+      - {code: TICKET}
+      - {code: EVIDENCE}
+      - {code: CONSENT}
+      - {code: REGULATORY_INSTRUCTION}
+
+problemReasons:
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["GET /v1/support/tickets", "GET /v1/support/my/tickets", "GET /v1/support/disputes", "GET /v1/support/reversal-requests", "GET /v1/support/transactions", "GET /v1/approvals"]}
+  - {code: VALIDATION_FAILED, reason: UNKNOWN_CATEGORY, operations: ["POST /v1/support/tickets"]}
+  - {code: VALIDATION_FAILED, reason: PRIORITY_LOWERED, operations: ["POST /v1/support/tickets"]}
+  - {code: VALIDATION_FAILED, reason: CONSENT_ATTACHMENT_REQUIRED, operations: ["POST /v1/support/disputes/{disputeId}/consents"]}
+  - {code: VALIDATION_FAILED, reason: PARTIAL_WITH_FEE_FLAGS, operations: ["POST /v1/support/reversal-requests", "POST /v1/support/disputes/{disputeId}:resolve"]}
+  - {code: VALIDATION_FAILED, reason: UNSUPPORTED_CONTENT_TYPE, operations: ["POST /v1/support/tickets/{ticketId}/attachments", "POST /v1/support/disputes/{disputeId}/evidence"]}
+  - {code: VALIDATION_FAILED, reason: ATTACHMENT_LIMIT_REACHED, operations: ["POST /v1/support/tickets/{ticketId}/attachments", "POST /v1/support/disputes/{disputeId}/evidence"]}
+  - {code: VALIDATION_FAILED, reason: CONFIG_INVALID, operations: ["POST /v1/support/config/{key}/versions"]}
+  - {code: STATE_CONFLICT, reason: TICKET_CLOSED, operations: ["POST /v1/support/tickets/{ticketId}/comments", "POST /v1/support/tickets/{ticketId}/attachments", "POST /v1/support/tickets/{ticketId}:assign", "POST /v1/support/tickets/{ticketId}:escalate"]}
+  - {code: STATE_CONFLICT, reason: ILLEGAL_TRANSITION, operations: ["POST /v1/support/tickets/{ticketId}:transition"]}
+  - {code: STATE_CONFLICT, reason: OPEN_DISPUTE_OR_REVERSAL, operations: ["POST /v1/support/tickets/{ticketId}:transition"]}
+  - {code: STATE_CONFLICT, reason: MAX_ESCALATION_LEVEL, operations: ["POST /v1/support/tickets/{ticketId}:escalate"]}
+  - {code: STATE_CONFLICT, reason: REOPEN_NOT_ALLOWED, operations: ["POST /v1/support/tickets/{ticketId}:reopen"]}
+  - {code: STATE_CONFLICT, reason: ACTIVE_DISPUTE_EXISTS, operations: ["POST /v1/support/disputes"], extensions: [disputeId]}
+  - {code: STATE_CONFLICT, reason: TXN_NOT_COMPLETED, operations: ["POST /v1/support/disputes", "POST /v1/support/reversal-requests"]}
+  - {code: STATE_CONFLICT, reason: TXN_TYPE_NOT_ALLOWED, operations: ["POST /v1/support/disputes", "POST /v1/support/reversal-requests"]}
+  - {code: STATE_CONFLICT, reason: OUTSIDE_DISPUTE_WINDOW, operations: ["POST /v1/support/disputes"]}
+  - {code: STATE_CONFLICT, reason: NOT_A_PARTY, operations: ["POST /v1/support/disputes"]}
+  - {code: STATE_CONFLICT, reason: DISPUTE_NOT_OPEN, operations: ["POST /v1/support/disputes/{disputeId}/holds", "POST /v1/support/disputes/{disputeId}/consents", "POST /v1/support/disputes/{disputeId}:resolve", "POST /v1/support/disputes/{disputeId}/evidence"]}
+  - {code: STATE_CONFLICT, reason: HOLD_NOT_ALLOWED, operations: ["POST /v1/support/disputes/{disputeId}/holds"]}
+  - {code: STATE_CONFLICT, reason: NO_FUNDS_TO_HOLD, operations: ["POST /v1/support/disputes/{disputeId}/holds"]}
+  - {code: STATE_CONFLICT, reason: HOLD_NOT_ACTIVE, operations: ["POST /v1/support/disputes/{disputeId}/holds/{holdId}:release", "POST /v1/support/disputes/{disputeId}/holds/{holdId}:extend"]}
+  - {code: STATE_CONFLICT, reason: HOLD_LOCKED_BY_REVERSAL, operations: ["POST /v1/support/disputes/{disputeId}/holds/{holdId}:release"]}
+  - {code: STATE_CONFLICT, reason: MAX_EXTENSIONS_REACHED, operations: ["POST /v1/support/disputes/{disputeId}/holds/{holdId}:extend"]}
+  - {code: STATE_CONFLICT, reason: CONSENT_REQUIRED, operations: ["POST /v1/support/disputes/{disputeId}:resolve", "POST /v1/support/reversal-requests"]}
+  - {code: STATE_CONFLICT, reason: ACTIVE_REVERSAL_EXISTS, operations: ["POST /v1/support/disputes/{disputeId}:resolve", "POST /v1/support/reversal-requests"], extensions: [reversalRequestId]}
+  - {code: STATE_CONFLICT, reason: OUTSIDE_REVERSAL_WINDOW, operations: ["POST /v1/support/disputes/{disputeId}:resolve", "POST /v1/support/reversal-requests"]}
+  - {code: STATE_CONFLICT, reason: REVERSAL_PREREQUISITE_MISSING, operations: ["POST /v1/support/reversal-requests"]}
+  - {code: STATE_CONFLICT, reason: NOT_RETRYABLE, operations: ["POST /v1/support/reversal-requests/{reversalRequestId}:retry"]}
+  - {code: STATE_CONFLICT, reason: NOT_CANCELLABLE, operations: ["POST /v1/support/reversal-requests/{reversalRequestId}:cancel"]}
+  - {code: STATE_CONFLICT, reason: RECEIPT_RESEND_LIMIT, operations: ["POST /v1/support/service-actions"]}
+  - {code: STATE_CONFLICT, reason: TXN_NOT_ON_TICKET_WALLET, operations: ["POST /v1/support/service-actions"]}
+  - {code: STATE_CONFLICT, reason: VERSION_NOT_DRAFT, operations: ["POST /v1/support/config/{key}/versions"]}
+  - {code: STATE_CONFLICT, reason: NOT_PENDING, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: STATE_CONFLICT, reason: APPROVAL_EXPIRED, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: STATE_CONFLICT, reason: REVALIDATION_FAILED, operations: ["POST /v1/approvals/{id}:approve"]}
+  - {code: SERVICE_DISABLED, reason: HISTORY_NOT_CONFIGURED, operations: ["GET /v1/support/transactions"]}
+  - {code: DEPENDENCY_UNAVAILABLE, reason: TRANSACTION_SERVICE_UNAVAILABLE, operations: ["POST /v1/support/disputes", "POST /v1/support/reversal-requests", "POST /v1/support/disputes/{disputeId}:resolve", "GET /v1/support/transactions/{txnRef}", "GET /v1/support/transactions"]}
+  - {code: DEPENDENCY_UNAVAILABLE, reason: LEDGER_UNAVAILABLE, operations: ["POST /v1/support/disputes/{disputeId}/holds"]}
+  - {code: DEPENDENCY_UNAVAILABLE, reason: SUBJECT_UNRESOLVABLE, operations: ["GET /v1/support/customer-360"]}
+
+problemExtensions:
+  - {name: disputeId, type: uuid, when: "reason = ACTIVE_DISPUTE_EXISTS (the existing active dispute)"}
+  - {name: reversalRequestId, type: uuid, when: "reason = ACTIVE_REVERSAL_EXISTS (the existing active reversal request)"}
+
+entityTypes:
+  - module: null
+    values:
+      - {code: ReversalRequest, action: EXECUTE_REVERSAL, amountPoisha: "requested principal", checkerRoles: "L1 SUP_CHECKER,OPS_CHECKER (FRAUD_CONFIRMED: RISK_CHECKER,CAMLCO); L2 FIN_CHECKER when principal > singleLevelMaxPoisha"}
+      - {code: HoldExtension, action: EXTEND_HOLD, amountPoisha: null, checkerRoles: "SUP_CHECKER"}
+      - {code: ConfigDocument, action: ACTIVATE, amountPoisha: null, checkerRoles: "SUP_CHECKER,ADMIN"}
+
+notificationTemplates:
+  - code: TXN_RECEIPT
+    category: TRANSACTIONAL
+    trigger: "service action RESEND_RECEIPT (≤ receiptResendPerTxnPerDay = 3 per txn per day)"
+    recipient: "ticket's walletId"
+    dedupeKey: "rcpt:{actionId}"
+    variables:
+      - {name: txnRef, type: TEXT, req: true, notes: ""}
+      - {name: txnType, type: TEXT, req: true, notes: ""}
+      - {name: amountPoisha, type: MONEY, req: true, notes: ""}
+      - {name: feePoisha, type: MONEY, req: false, notes: "fee + VAT"}
+      - {name: counterpartyMsisdn, type: MSISDN, req: false, notes: "full 13-digit; masked by template"}
+      - {name: time, type: DATETIME, req: true, notes: "completion time"}
+  - code: FUNDS_HELD_NOTICE
+    category: SERVICE
+    trigger: "hold ACTIVE and HOLD_POLICY notifyCounterparty"
+    recipient: "counterparty walletId"
+    dedupeKey: "hold:{holdCommandId}"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true, notes: ""}
+      - {name: txnRef, type: TEXT, req: true, notes: ""}
+      - {name: ticketNumber, type: TEXT, req: true, notes: ""}
+      - {name: heldUntil, type: DATETIME, req: true, notes: ""}
+  - code: FUNDS_RELEASED_NOTICE
+    category: SERVICE
+    trigger: "hold released (expiry / manual / dispute rejected)"
+    recipient: "counterparty walletId"
+    dedupeKey: "release:{holdCommandId}"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true, notes: ""}
+      - {name: txnRef, type: TEXT, req: true, notes: ""}
+      - {name: ticketNumber, type: TEXT, req: true, notes: ""}
+  - code: TICKET_UPDATE
+    category: SERVICE
+    trigger: "ticket created; every customer-visible status change; dispute resolved (SRS SUP-002/004). Never for internal tickets (category REVERSAL_RECOMMENDATION, tipping-off). OPEN D-12"
+    recipient: "ticket walletId, else msisdn (SMS only)"
+    dedupeKey: "tk:{ticketId}:{event}:{status}"
+    variables:
+      - {name: ticketNumber, type: TEXT, req: true, notes: ""}
+      - {name: event, type: TEXT, req: true, notes: "enum{CREATED,STATUS_CHANGED,DISPUTE_RESOLVED}"}
+      - {name: status, type: TEXT, req: true, notes: "customerVisibleStatus"}
+      - {name: outcome, type: TEXT, req: false, notes: "enum{UPHELD,REJECTED,WITHDRAWN} on DISPUTE_RESOLVED"}
+      - {name: dueAt, type: DATETIME, req: false, notes: "resolution due"}
+  - code: SUPPORT_ESCALATION
+    category: INTERNAL
+    trigger: "SLA 75 % warning, breach, escalation, hold expiring, reversal EXECUTING > 30 min"
+    recipient: "assignee staffUserId or recipient.role SUP_MAKER / SUP_CHECKER"
+    dedupeKey: "esc:{ticketId}:{kind}:{escalationLevel}"
+    variables:
+      - {name: ticketNumber, type: TEXT, req: true, notes: ""}
+      - {name: priority, type: TEXT, req: true, notes: ""}
+      - {name: kind, type: TEXT, req: true, notes: "enum{SLA_WARNING,SLA_BREACHED,ESCALATED,HOLD_EXPIRING,REVERSAL_STUCK}"}
+      - {name: escalationLevel, type: INT, req: true, notes: ""}
+      - {name: dueAt, type: DATETIME, req: true, notes: ""}
+
+reasonCodes: []   # support introduces no governance REASON_CODE item; it uses the Reversal, Hold and Wallet-status groups owned by their services
+
+txnRefPrefixes:
+  - {prefix: T, meaning: "support ticket number — a human-readable non-ledger business reference; never a txnRef, never sent to the ledger", format: "T{yyMMdd}{6+ digit daily seq} (Asia/Dhaka calendar date), 13..14 chars, e.g. T261009000123"}
+
+productCodes: []   # support-service owns no product switch
+
+metrics:
+  - {name: bitspay_support_tickets_created_total, type: counter, labels: [category, source]}
+  - {name: bitspay_support_tickets_open, type: gauge, labels: [priority, status]}
+  - {name: bitspay_support_sla_breaches_total, type: counter, labels: [priority, kind]}
+  - {name: bitspay_support_holds_active, type: gauge, labels: []}
+  - {name: bitspay_support_hold_amount_poisha_active, type: gauge, labels: []}
+  - {name: bitspay_support_reversals_total, type: counter, labels: [reason, state]}
+  - {name: bitspay_support_reversal_executing_age_seconds, type: gauge, labels: []}
+  - {name: bitspay_support_360_section_status_total, type: counter, labels: [section, status]}
+  - {name: bitspay_support_notifications_requested_total, type: counter, labels: [template]}

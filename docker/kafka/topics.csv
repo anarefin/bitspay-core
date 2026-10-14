@@ -1,0 +1,21 @@
+# GENERATED from docs/global/generated/topics.json — topic,partitions_dev,partitions_prod,compacted,tombstones,owner
+ledger.changes,3,48,no,no,ledger-service
+txn.events,3,96,no,no,transaction-service
+wallet.events,3,48,yes,no,wallet-service
+customer.events,3,24,no,no,wallet-service
+partner.events,3,12,yes,no,wallet-service
+risk.alerts,3,12,no,no,limits-risk-service
+blacklist.events,1,3,yes,no,limits-risk-service
+fee.rules,1,1,yes,yes,pricing-service
+commission.events,3,12,no,no,pricing-service
+campaign.events,3,12,no,no,pricing-service
+treasury.events,3,6,no,no,treasury-service
+disbursement.events,3,12,no,no,disbursement-service
+support.events,3,6,no,no,support-service
+case.events,3,6,no,no,compliance-service
+recon.events,1,3,no,no,finance-ops-service
+refdata.events,1,3,yes,no,admin-service
+notification.requests,3,24,no,no,admin-service
+approval.events,3,6,no,no,admin-service
+audit.events,6,48,no,no,admin-service
+gl.events,1,3,no,no,general-ledger-service

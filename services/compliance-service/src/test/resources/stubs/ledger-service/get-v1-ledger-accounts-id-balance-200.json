@@ -1,0 +1,28 @@
+{
+  "name": "GET /v1/ledger/accounts/{id}/balance → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/ledger/accounts/[^/]+/balance(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "accountId": "0192f2aa-0000-7000-8000-00000000a001",
+      "ledgerBalancePoisha": 149425,
+      "availableBalancePoisha": 149425,
+      "heldPoisha": 0,
+      "asOf": "2026-10-09T08:03:22.130Z",
+      "accountType": "CUSTOMER_WALLET",
+      "closed": false
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

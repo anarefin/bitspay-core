@@ -1,0 +1,31 @@
+{
+  "name": "POST /v1/limits/reservations/{txnId}:release → 403",
+  "priority": 9,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/limits/reservations/[^/]+:release(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "403"
+      }
+    }
+  },
+  "response": {
+    "status": 403,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "Actor not allowed",
+      "status": 403,
+      "code": "ACTOR_NOT_ALLOWED",
+      "correlationId": "c-0f3e9a"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

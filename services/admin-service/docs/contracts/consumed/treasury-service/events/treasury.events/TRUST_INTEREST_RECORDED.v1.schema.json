@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/TRUST_INTEREST_RECORDED.v1.schema.json",
+  "title": "treasury.events TRUST_INTEREST_RECORDED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType TrustInterest; Kafka key = aggregateId = data.trustAccountId. Trigger: TrustInterest maker-checker reaches RECORDED; no ledger posting.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "interestId",
+    "trustAccountId",
+    "ledgerTrustAccountId",
+    "bankCode",
+    "month",
+    "interestPoisha",
+    "makerId",
+    "checkerIds",
+    "recordedAt"
+  ],
+  "properties": {
+    "interestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "trustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ledgerTrustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "bankCode": {
+      "type": "string"
+    },
+    "month": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "first day of the month, e.g. 2026-09-01"
+    },
+    "interestPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0,
+      "description": "≥ 0"
+    },
+    "makerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "checkerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "1 item"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

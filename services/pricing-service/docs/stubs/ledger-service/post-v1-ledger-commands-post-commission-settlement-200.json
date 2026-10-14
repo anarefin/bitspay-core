@@ -1,0 +1,30 @@
+{
+  "name": "POST /v1/ledger/commands/post-commission-settlement → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-commission\\-settlement(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f560-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "79251445-410c-e6e9-5f97-056e1a0920cd",
+        "706587b8-3b99-72db-8de4-d204f2c6539c"
+      ],
+      "postedAt": "2026-10-31T18:05:00.120Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

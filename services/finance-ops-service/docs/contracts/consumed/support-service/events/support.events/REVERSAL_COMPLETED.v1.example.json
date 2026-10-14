@@ -1,0 +1,23 @@
+{
+  "eventId": "0192f806-0000-7000-8000-000000000010",
+  "eventType": "REVERSAL_COMPLETED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T09:30:00.100Z",
+  "producer": "support-service",
+  "aggregateType": "Ticket",
+  "aggregateId": "0192f800-0000-7000-8000-000000000123",
+  "correlationId": "c-77a1",
+  "data": {
+    "reversalRequestId": "0192f803-0000-7000-8000-000000000007",
+    "ticketId": "0192f800-0000-7000-8000-000000000123",
+    "originalTxnRef": "PP26100900W7RT2X9B",
+    "outcome": "COMPLETED",
+    "reversalTxnRef": "RV26100900H2D5N8QA",
+    "failureCode": null,
+    "walletIds": [
+      "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+      "0192f2ee-5c6d-7e8f-9a0b-1c2d3e4f5a6b"
+    ],
+    "completedAt": "2026-10-09T09:30:00.040Z"
+  }
+}

@@ -1,0 +1,403 @@
+[
+  {
+    "values": [
+      "MerchantRefund"
+    ],
+    "service": "transaction-service"
+  },
+  {
+    "module": "wallet",
+    "values": [
+      "WalletStatusChange",
+      "KycSubmission",
+      "CustomerProfile",
+      "CustomerRiskGrade",
+      "WalletClosure",
+      "ConfigDocument",
+      "ExceptionItem"
+    ],
+    "actions": {
+      "WalletStatusChange": [
+        "APPLY"
+      ],
+      "KycSubmission": [
+        "APPROVE_KYC",
+        "REJECT_KYC"
+      ],
+      "CustomerProfile": [
+        "UPDATE"
+      ],
+      "CustomerRiskGrade": [
+        "CHANGE_GRADE"
+      ],
+      "WalletClosure": [
+        "CLOSE"
+      ],
+      "ConfigDocument": [
+        "ACTIVATE"
+      ],
+      "ExceptionItem": [
+        "OVERRIDE"
+      ]
+    },
+    "service": "wallet-service"
+  },
+  {
+    "module": "partner",
+    "values": [
+      "Partner",
+      "PartnerApplication",
+      "HierarchyAssignment",
+      "Config",
+      "BankAccount"
+    ],
+    "actions": {
+      "Partner": [
+        "SUSPEND",
+        "REACTIVATE",
+        "TERMINATE",
+        "CANCEL_TERMINATION",
+        "CHANGE_CATEGORY",
+        "CHANGE_TERRITORY",
+        "UPDATE_PROFILE"
+      ],
+      "PartnerApplication": [
+        "APPROVE_STAGE_SALES",
+        "APPROVE_STAGE_COMPLIANCE",
+        "APPROVE_STAGE_EDD",
+        "APPROVE_STAGE_FINANCE",
+        "APPROVE_STAGE_OPERATIONS"
+      ],
+      "HierarchyAssignment": [
+        "CHANGE_HIERARCHY"
+      ],
+      "Config": [
+        "CONFIG_APPROVAL_CHAINS",
+        "CONFIG_HIERARCHY_RULES",
+        "CONFIG_HIERARCHY_LEVELS",
+        "CONFIG_CATEGORY_CODES",
+        "CONFIG_DOCUMENT_CHECKLISTS",
+        "CONFIG_RISK_SCORE_RULES",
+        "CONFIG_PARAMS"
+      ],
+      "BankAccount": [
+        "ADD_BANK_ACCOUNT",
+        "REMOVE_BANK_ACCOUNT"
+      ]
+    },
+    "service": "wallet-service"
+  },
+  {
+    "module": null,
+    "values": [
+      "LimitChangeSet",
+      "EmergencyControl",
+      "FraudRuleVersion",
+      "RiskSettings",
+      "ListEntry",
+      "SelfLimit"
+    ],
+    "service": "limits-risk-service"
+  },
+  {
+    "module": "pricing",
+    "values": [
+      "PricingPlanVersion",
+      "PricingPlanRetire",
+      "CommissionShareRule",
+      "IncentiveRule",
+      "CommissionAdjustment",
+      "CommissionSettlement",
+      "SettlementProfile"
+    ],
+    "service": "pricing-service"
+  },
+  {
+    "module": "campaign",
+    "values": [
+      "Campaign",
+      "CampaignCancel",
+      "CampaignBudgetIncrease",
+      "RewardClawback",
+      "RewardWriteOff",
+      "LuckyDraw"
+    ],
+    "service": "pricing-service"
+  },
+  {
+    "module": null,
+    "values": [
+      "TrustAccount",
+      "TrustBalanceConfirmation",
+      "EmoneyIssuance",
+      "EmoneyRedemption",
+      "TrustRebalance",
+      "ManualJournal",
+      "LiquidityThreshold",
+      "TrustInterest"
+    ],
+    "actions": {
+      "TrustAccount": [
+        "CREATE",
+        "DEACTIVATE"
+      ],
+      "TrustBalanceConfirmation": [
+        "CONFIRM"
+      ],
+      "EmoneyIssuance": [
+        "ISSUE"
+      ],
+      "EmoneyRedemption": [
+        "REDEEM"
+      ],
+      "TrustRebalance": [
+        "REBALANCE"
+      ],
+      "ManualJournal": [
+        "POST"
+      ],
+      "LiquidityThreshold": [
+        "UPSERT",
+        "RETIRE"
+      ],
+      "TrustInterest": [
+        "RECORD"
+      ]
+    },
+    "checkerRoles": {
+      "TrustAccount": "FIN_CHECKER",
+      "TrustBalanceConfirmation": "FIN_CHECKER",
+      "EmoneyIssuance": "FIN_CHECKER",
+      "EmoneyRedemption": "FIN_CHECKER",
+      "TrustRebalance": "FIN_CHECKER",
+      "ManualJournal": "FIN_CHECKER (level 2 may be configured to ADMIN)",
+      "LiquidityThreshold": "OPS_CHECKER",
+      "TrustInterest": "FIN_CHECKER"
+    },
+    "service": "treasury-service"
+  },
+  {
+    "module": null,
+    "values": [
+      "DisbursementBatch"
+    ],
+    "actions": {
+      "DisbursementBatch": [
+        "EXECUTE"
+      ]
+    },
+    "checkerRoles": {
+      "level1": [
+        "OPS_CHECKER"
+      ],
+      "level2": [
+        "FIN_CHECKER"
+      ]
+    },
+    "service": "disbursement-service"
+  },
+  {
+    "module": null,
+    "values": [
+      {
+        "code": "ReversalRequest",
+        "action": "EXECUTE_REVERSAL",
+        "amountPoisha": "requested principal",
+        "checkerRoles": "L1 SUP_CHECKER,OPS_CHECKER (FRAUD_CONFIRMED: RISK_CHECKER,CAMLCO); L2 FIN_CHECKER when principal > singleLevelMaxPoisha"
+      },
+      {
+        "code": "HoldExtension",
+        "action": "EXTEND_HOLD",
+        "amountPoisha": null,
+        "checkerRoles": "SUP_CHECKER"
+      },
+      {
+        "code": "ConfigDocument",
+        "action": "ACTIVATE",
+        "amountPoisha": null,
+        "checkerRoles": "SUP_CHECKER,ADMIN"
+      }
+    ],
+    "service": "support-service"
+  },
+  {
+    "module": null,
+    "values": [
+      "ListVersion",
+      "ScreeningSettings",
+      "TransliterationChangeSet",
+      "ScreeningDecision",
+      "EddDecision",
+      "CaseDecision",
+      "CaseAction",
+      "FreezeLift",
+      "AutoFreezeReview",
+      "RegulatoryInstruction",
+      "StrReport",
+      "CtrReport",
+      "AmlScenario"
+    ],
+    "service": "compliance-service"
+  },
+  {
+    "module": "reconciliation",
+    "values": [
+      "ReconAdjustment",
+      "EodForceClose",
+      "EodRestatement",
+      "ReconCounterparty",
+      "ReconFileProfile",
+      "ReconMatchRule",
+      "ReconManualMatch",
+      "ReconUnmatch",
+      "StatementLineIgnore",
+      "AutoResolutionRule",
+      "ReconSourceRule",
+      "ReconSourceMapping"
+    ],
+    "checkerRoles": {
+      "ReconAdjustment": "L1 FIN_CHECKER; amount ≥ 10,000,000 poisha or a wallet side → L2 CAMLCO | FIN_CHECKER (distinct users)",
+      "ReconSourceRule": "FIN_CHECKER | ADMIN",
+      "ReconSourceMapping": "FIN_CHECKER | ADMIN",
+      "*": "FIN_CHECKER"
+    },
+    "service": "finance-ops-service"
+  },
+  {
+    "module": "reporting",
+    "values": [
+      "ReportDefinition",
+      "ReportSchedule",
+      "MaskingRule",
+      "RegulatoryRun",
+      "IngestionReplay"
+    ],
+    "checkerRoles": {
+      "ReportDefinition": "ADMIN",
+      "ReportSchedule": "OPS_CHECKER | FIN_CHECKER",
+      "MaskingRule": "ADMIN",
+      "RegulatoryRun": "dataset checker roles",
+      "IngestionReplay": "ADMIN"
+    },
+    "service": "finance-ops-service"
+  },
+  {
+    "module": "governance",
+    "values": [
+      "StaffUser",
+      "Role",
+      "SodRule",
+      "RefDataItem",
+      "RefDataImport",
+      "SystemParam",
+      "ProductSwitch",
+      "RetentionPolicy",
+      "LegalHold",
+      "MonitoringRule",
+      "ApprovalRoute"
+    ],
+    "service": "admin-service"
+  },
+  {
+    "module": "notification",
+    "values": [
+      "TemplateVersion",
+      "NotificationRule",
+      "Provider",
+      "ProviderRoute",
+      "QuietHoursPolicy",
+      "FrequencyCapPolicy",
+      "ChannelPolicy",
+      "ReminderPolicy"
+    ],
+    "service": "admin-service"
+  },
+  {
+    "module": null,
+    "checkerRoles": [
+      "FIN_CHECKER"
+    ],
+    "values": [
+      {
+        "entityType": "GlAccount",
+        "actions": [
+          "CREATE",
+          "UPDATE",
+          "DEACTIVATE"
+        ],
+        "levels": 1
+      },
+      {
+        "entityType": "PostingRuleSet",
+        "actions": [
+          "CREATE"
+        ],
+        "levels": 2
+      },
+      {
+        "entityType": "GlManualJournal",
+        "actions": [
+          "POST"
+        ],
+        "levels": "1; 2 when total ≥ bitspay.gl.approval.l2-threshold-poisha (100000000)"
+      },
+      {
+        "entityType": "GlJournalReversal",
+        "actions": [
+          "POST"
+        ],
+        "levels": "as the original journal"
+      },
+      {
+        "entityType": "GlOpeningBalance",
+        "actions": [
+          "POST"
+        ],
+        "levels": 2
+      },
+      {
+        "entityType": "GlDayForceClose",
+        "actions": [
+          "CLOSE"
+        ],
+        "levels": 1
+      },
+      {
+        "entityType": "GlDayRestatement",
+        "actions": [
+          "RESTATE"
+        ],
+        "levels": 1
+      },
+      {
+        "entityType": "GlPeriodClose",
+        "actions": [
+          "CLOSE"
+        ],
+        "levels": 2
+      },
+      {
+        "entityType": "GlPeriodReopen",
+        "actions": [
+          "REOPEN"
+        ],
+        "levels": 2
+      },
+      {
+        "entityType": "GlYearClose",
+        "actions": [
+          "CLOSE"
+        ],
+        "levels": 2
+      },
+      {
+        "entityType": "GlExport",
+        "actions": [
+          "REGENERATE"
+        ],
+        "levels": 1
+      }
+    ],
+    "service": "general-ledger-service"
+  }
+]

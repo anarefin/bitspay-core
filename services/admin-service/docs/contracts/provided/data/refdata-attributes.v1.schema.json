@@ -1,0 +1,390 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/admin-service/data/refdata-attributes.v1.schema.json",
+  "title": "refdata attributes per type (admin-service owned code set / data contract)",
+  "description": "Schema of REFDATA_UPSERTED.data.attributes and of GET /v1/refdata/{type} items[].attributes, selected by type. codeRegex lists the per-type code pattern.",
+  "type": "object",
+  "x-codeRegex": {
+    "GEO": "^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$",
+    "MCC": "^[0-9]{4}$",
+    "PURPOSE_CODE": "^[A-Z_]{3,32}$",
+    "REASON_CODE": "^[A-Z_]{3,40}$",
+    "BANK": "^[A-Z0-9-]{3,12}$",
+    "HOLIDAY": "^\\d{4}-\\d{2}-\\d{2}$",
+    "SYSTEM_PARAM": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"
+  },
+  "x-parentCode": {
+    "GEO": "parent GEO code, null for divisions",
+    "*": "null"
+  },
+  "$defs": {
+    "GEO": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "level",
+        "bbsCode"
+      ],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "DIVISION",
+            "DISTRICT",
+            "UPAZILA",
+            "UNION"
+          ]
+        },
+        "bbsCode": {
+          "type": "string"
+        },
+        "cityCorporation": {
+          "type": "boolean"
+        },
+        "riskFlag": {
+          "type": "boolean",
+          "default": false
+        },
+        "qrCity": {
+          "type": "string",
+          "maxLength": 15,
+          "pattern": "^[A-Z ]+$"
+        }
+      }
+    },
+    "MCC": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "group",
+        "riskLevel"
+      ],
+      "properties": {
+        "group": {
+          "type": "string",
+          "enum": [
+            "01",
+            "02",
+            "03",
+            "04",
+            "05",
+            "06",
+            "07",
+            "99"
+          ]
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ]
+        }
+      }
+    },
+    "PURPOSE_CODE": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "appliesTo",
+        "requiresNote"
+      ],
+      "properties": {
+        "appliesTo": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          }
+        },
+        "requiresNote": {
+          "type": "boolean"
+        }
+      }
+    },
+    "REASON_CODE": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "domain",
+        "customerVisible"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "enum": [
+            "WALLET",
+            "REVERSAL",
+            "HOLD",
+            "REFUND",
+            "KYC",
+            "PARTNER",
+            "APPROVAL",
+            "OTHER"
+          ]
+        },
+        "customerVisible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "BANK": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "trustEligible"
+      ],
+      "properties": {
+        "routingPrefix": {
+          "type": "string"
+        },
+        "swift": {
+          "type": "string"
+        },
+        "trustEligible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "HOLIDAY": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "date",
+        "kind",
+        "bankHoliday",
+        "provisional"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "PUBLIC",
+            "BANK",
+            "OPTIONAL"
+          ]
+        },
+        "bankHoliday": {
+          "type": "boolean"
+        },
+        "provisional": {
+          "type": "boolean"
+        }
+      }
+    },
+    "SYSTEM_PARAM": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "valueType"
+      ],
+      "properties": {
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "STRING",
+            "INT",
+            "BOOL",
+            "TIME",
+            "DURATION",
+            "CRON",
+            "JSON",
+            "FEATURE",
+            "RETENTION"
+          ]
+        },
+        "value": {}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "const": "FEATURE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "enabled",
+              "channels",
+              "licenceRef"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "channels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "APP",
+                    "USSD",
+                    "PARTNER_APP",
+                    "PORTAL",
+                    "BACKOFFICE",
+                    "API",
+                    "SYSTEM"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "licenceRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "const": "RETENTION"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "onlineMonths",
+              "totalYears",
+              "basis",
+              "endAction",
+              "legalHold"
+            ],
+            "properties": {
+              "onlineMonths": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "totalYears": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "basis": {
+                "type": "string",
+                "enum": [
+                  "EVENT_DATE",
+                  "RELATIONSHIP_END",
+                  "CASE_CLOSURE"
+                ]
+              },
+              "endAction": {
+                "type": "string",
+                "enum": [
+                  "PURGE",
+                  "ANONYMISE"
+                ]
+              },
+              "legalHold": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "enum": [
+                  "STRING",
+                  "INT",
+                  "BOOL",
+                  "TIME",
+                  "DURATION",
+                  "CRON",
+                  "JSON"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "const": "INT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "const": "BOOL"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "const": "TIME"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": {
+                "enum": [
+                  "STRING",
+                  "DURATION",
+                  "CRON"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

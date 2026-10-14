@@ -1,0 +1,33 @@
+{
+  "name": "GET /v1/ledger/holds → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/ledger/holds(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "holdCommandId": "0192f5aa-0000-7000-8000-000000000001",
+          "accountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "amountPoisha": 50000,
+          "reasonCode": "WRONG_TRANSFER_HOLD",
+          "transferId": "4af8bc15-345c-e4d7-f5fd-ed8171026a0a",
+          "createdBy": "support-service",
+          "createdAt": "2026-10-09T09:10:00.000Z"
+        }
+      ],
+      "totalHeldPoisha": 50000
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

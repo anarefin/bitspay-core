@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/release-hold → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/release\\-hold(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "7a1e0c4b-3d2f-5a6b-8c9d-0e1f2a3b4c5d",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "b111a5e0-6227-f840-535a-4773a9d0a0ca"
+      ],
+      "postedAt": "2026-10-12T09:30:00.012Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

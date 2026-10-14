@@ -1,0 +1,54 @@
+{
+  "name": "POST /v1/partners/{partnerId}/status-changes → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/partners/[^/]+/status\\-changes(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "partnerId": "0192f4a0-0e01-7c00-8a00-00000000e001",
+      "partnerCode": "M000123455",
+      "partnerType": "MERCHANT",
+      "subType": "MICRO",
+      "mcc": "5411",
+      "categoryCode": 3101,
+      "legalName": "Nirob Store",
+      "displayName": "NIROB STORE",
+      "displayNameBn": "নীরব স্টোর",
+      "msisdn": "8801812000111",
+      "walletId": "0192f4a1-0e01-7c00-8a00-00000000e001",
+      "status": "SUSPENDED",
+      "statusReasonCode": "DISTRIBUTOR_SUSPENSION",
+      "riskGrade": "LOW",
+      "parentPartnerId": "0192f4a0-0d03-7c00-8a00-00000000d003",
+      "ancestorPartnerIds": [
+        "0192f4a0-0d03-7c00-8a00-00000000d003",
+        "0192f4a0-0d02-7c00-8a00-00000000d002",
+        "0192f4a0-0d01-7c00-8a00-00000000d001"
+      ],
+      "depth": 4,
+      "hierarchyEffectiveFrom": "2026-10-09T10:00:00.000Z",
+      "territory": {
+        "division": "30",
+        "district": "3026",
+        "upazila": "302648",
+        "union": null
+      },
+      "settlementMode": "WALLET",
+      "flags": [],
+      "suspendedUntil": "2026-10-12T18:00:00.000Z",
+      "activatedAt": "2026-10-09T10:00:00.000Z",
+      "version": 5
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

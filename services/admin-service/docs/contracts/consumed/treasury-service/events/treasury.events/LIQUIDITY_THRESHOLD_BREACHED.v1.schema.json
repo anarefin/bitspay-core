@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/LIQUIDITY_THRESHOLD_BREACHED.v1.schema.json",
+  "title": "treasury.events LIQUIDITY_THRESHOLD_BREACHED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType FloatPosition; Kafka key = aggregateId = data.walletId. Trigger: position enters LOW or HIGH, a STOCK_OUT incident opens, and each re-alert (realert = true, every liquidity.realert-minutes while open).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "walletId",
+    "partnerId",
+    "partnerType",
+    "subType",
+    "thresholdType",
+    "thresholdPoisha",
+    "availableBalancePoisha",
+    "parentWalletId",
+    "district",
+    "incidentId",
+    "realert",
+    "detectedAt"
+  ],
+  "properties": {
+    "walletId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "partnerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "partnerType": {
+      "type": "string",
+      "enum": [
+        "AGENT",
+        "MERCHANT",
+        "DISTRIBUTOR",
+        "INSTITUTION"
+      ]
+    },
+    "subType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "partner subType"
+    },
+    "thresholdType": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "HIGH",
+        "STOCK_OUT"
+      ],
+      "description": "STOCK_OUT: thresholdPoisha = configured stock-out level"
+    },
+    "thresholdPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0,
+      "description": "≥ 0"
+    },
+    "availableBalancePoisha": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ledger − held"
+    },
+    "parentWalletId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "ancestorWalletIds[0]"
+    },
+    "district": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}$",
+      "description": "refdata GEO code (BBS district, 4 digits); null if no territory"
+    },
+    "incidentId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "stable across re-alerts of one incident"
+    },
+    "realert": {
+      "type": "boolean"
+    },
+    "detectedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

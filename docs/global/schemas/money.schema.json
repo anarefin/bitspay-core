@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/kernel/money.schema.json",
+  "title": "Standard money object (kernel K3.5)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["amountPoisha", "feePoisha", "vatPoisha", "totalDebitPoisha", "feeBearer", "currency"],
+  "properties": {
+    "amountPoisha": {"type": "integer", "exclusiveMinimum": 0, "maximum": 10000000000000},
+    "feePoisha": {"type": "integer", "minimum": 0},
+    "vatPoisha": {"type": "integer", "minimum": 0},
+    "totalDebitPoisha": {"type": "integer", "minimum": 0},
+    "feeBearer": {"type": "string", "enum": ["PAYER", "PAYEE", "OPERATOR"]},
+    "currency": {"type": "string", "const": "BDT"}
+  }
+}

@@ -1,0 +1,81 @@
+# general-ledger-service — posting rule set v1 (PROVISIONAL; SVC-16 §8.3)
+#
+# A rule maps ONE SIDE of one TigerBeetle business transfer (published on ledger.changes) to ONE GL account.
+# Every transfer therefore becomes exactly one debit line and one credit line of equal amount (GL-1 holds by construction).
+#
+# Match keys (all optional except tbAccountType):
+#   tbAccountType            catalogue §2.1 code of the account on THIS side (100..140 wallets, 200..420 system, 300 trust)
+#   side                     DEBIT | CREDIT  (which side of the TB transfer this account is on)
+#   transferCode             catalogue §2.2 code (1001..1016, 2001..2004)
+#   commandType              catalogue §2.4 type (1..17)
+#   legIndex                 0..5
+#   reasonCode               only commands 10/11 (ledger.changes.reasonCode, CCR-GL-03; else treasury.events). Rule set v1 uses
+#                            NO reason keys, so no leg ever waits for enrichment; pool-to-pool adjustments are keyed by counterparty.
+#   counterpartyAccountType  §2.1 code of the account on the OTHER side
+# Resolution: among rules whose specified keys all match, the one with the MOST specified keys wins; ties → lowest
+# priority number; still tied → rule set is invalid (validator rejects it). No match → 1999 + CRITICAL exception.
+# glAccount may contain {nn} = the trust index of the TRUST_SETTLEMENT account on this side (1101-{nn} → 1101-01).
+ruleSetVersion: 1
+effectiveFrom: "2026-10-01"
+provisional: true
+coaVersion: v0
+description: Initial provisional rule set for SRS R1 internal products (B-08 open).
+rules:
+  # ---------------- wallets: e-money liabilities by wallet type ----------------
+  - {id: W-100, priority: 100, tbAccountType: 100, glAccount: "2101", note: customer wallets}
+  - {id: W-110, priority: 100, tbAccountType: 110, glAccount: "2102", note: agent wallets}
+  - {id: W-120, priority: 100, tbAccountType: 120, glAccount: "2103", note: distributor wallets}
+  - {id: W-130, priority: 100, tbAccountType: 130, glAccount: "2104", note: merchant wallets}
+  - {id: W-140, priority: 100, tbAccountType: 140, glAccount: "2105", note: institution wallets}
+  # ---------------- trust mirror ----------------
+  - {id: T-300, priority: 100, tbAccountType: 300, glAccount: "1101-{nn}", note: one GL account per trust bank account}
+  # ---------------- FEE_INCOME (200) — operator e-money pool; P&L recognised by leg ----------------
+  - {id: F-DEF,      priority: 900, tbAccountType: 200, glAccount: "4199", note: any other FEE_INCOME movement}
+  - {id: F-FEE-P2P,  priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 1, glAccount: "4101"}
+  - {id: F-FEE-CI,   priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 2, glAccount: "4102"}
+  - {id: F-FEE-CO,   priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 3, glAccount: "4103"}
+  - {id: F-FEE-MP,   priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 4, glAccount: "4104", note: MDR (payee-borne)}
+  - {id: F-FEE-MR,   priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 5, glAccount: "4105"}
+  - {id: F-FEE-FT,   priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 6, glAccount: "4106"}
+  - {id: F-FEE-DIS,  priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 2001, commandType: 8, glAccount: "4107"}
+  - {id: F-COMM,     priority: 100, tbAccountType: 200, side: DEBIT,  transferCode: 2003, glAccount: "5101", note: in-line commission paid from fees (net leg)}
+  - {id: F-AIT,      priority: 100, tbAccountType: 200, side: DEBIT,  transferCode: 2004, glAccount: "5101", note: AIT withheld is part of gross commission expense}
+  - {id: F-REV-FEE,  priority: 100, tbAccountType: 200, side: DEBIT,  transferCode: 1013, commandType: 7, glAccount: "4190", note: fee refunded by a reversal}
+  - {id: F-REV-COMM, priority: 100, tbAccountType: 200, side: CREDIT, transferCode: 1013, commandType: 7, glAccount: "5190", note: commission/AIT clawed back by a reversal}
+  - {id: F-SWEEP,    priority: 100, tbAccountType: 200, side: DEBIT,  commandType: 10, glAccount: "1201", note: REVENUE_SWEEP to the operating bank}
+  - {id: F-ADJ,      priority: 500, tbAccountType: 200, commandType: 11, glAccount: "1999", note: unanticipated fee-pool correction — review (CRITICAL)}
+  - {id: F-ADJ-220,  priority: 100, tbAccountType: 200, commandType: 11, counterpartyAccountType: 220, glAccount: "1950", note: pool ↔ COMMISSION_PAYABLE (e.g. COMMISSION_FUNDING)}
+  - {id: F-ADJ-240,  priority: 100, tbAccountType: 200, commandType: 11, counterpartyAccountType: 240, glAccount: "1950", note: pool ↔ CAMPAIGN_FUNDING}
+  - {id: F-ADJ-210,  priority: 100, tbAccountType: 200, commandType: 11, counterpartyAccountType: 210, glAccount: "4190", note: VAT reclass / fee correction}
+  - {id: F-ADJ-230,  priority: 100, tbAccountType: 200, commandType: 11, counterpartyAccountType: 230, glAccount: "5101", note: AIT under-withheld, absorbed as commission cost}
+  - {id: F-ADJ-S-D,  priority: 100, tbAccountType: 200, side: DEBIT,  commandType: 11, counterpartyAccountType: 400, glAccount: "5301", note: suspense item (bank charge) absorbed by the operator}
+  - {id: F-ADJ-C-D,  priority: 100, tbAccountType: 200, side: DEBIT,  commandType: 11, counterpartyAccountType: 410, glAccount: "5399", note: adjustment-clearing loss absorbed}
+  - {id: F-ADJ-S-C,  priority: 100, tbAccountType: 200, side: CREDIT, commandType: 11, counterpartyAccountType: 400, glAccount: "4399", note: unexplained suspense credit taken to income}
+  - {id: F-ADJ-C-C,  priority: 100, tbAccountType: 200, side: CREDIT, commandType: 11, counterpartyAccountType: 410, glAccount: "4399"}
+  # ---------------- VAT_PAYABLE (210) / AIT_PAYABLE (230): pure liability mirrors ----------------
+  - {id: V-210, priority: 100, tbAccountType: 210, glAccount: "2201"}
+  - {id: A-230, priority: 100, tbAccountType: 230, glAccount: "2202"}
+  # ---------------- COMMISSION_PAYABLE (220): operator-funded commission pool (debit allowed) ----------------
+  - {id: C-DEF,    priority: 900, tbAccountType: 220, glAccount: "2301"}
+  - {id: C-COMM,   priority: 100, tbAccountType: 220, side: DEBIT,  transferCode: 2003, glAccount: "5101", note: in-line cash-in commission (net leg)}
+  - {id: C-AIT,    priority: 100, tbAccountType: 220, side: DEBIT,  transferCode: 2004, glAccount: "5101"}
+  - {id: C-REV,    priority: 100, tbAccountType: 220, side: CREDIT, transferCode: 1013, commandType: 7, glAccount: "5190"}
+  - {id: C-CMS,    priority: 100, tbAccountType: 220, side: DEBIT,  transferCode: 1012, commandType: 13, glAccount: "5102", note: settled commission expensed at settlement until accruals are consumed (rule set v2 → 2301)}
+  - {id: C-CMS-AIT, priority: 100, tbAccountType: 220, side: DEBIT, transferCode: 2004, commandType: 13, glAccount: "5102"}
+  - {id: C-ADJ,    priority: 500, tbAccountType: 220, commandType: 11, glAccount: "1999", note: unanticipated commission-pool correction — review}
+  - {id: C-ADJ-200, priority: 100, tbAccountType: 220, commandType: 11, counterpartyAccountType: 200, glAccount: "1950"}
+  - {id: C-ADJ-240, priority: 100, tbAccountType: 220, commandType: 11, counterpartyAccountType: 240, glAccount: "1950"}
+  - {id: C-ADJ-230, priority: 100, tbAccountType: 220, commandType: 11, counterpartyAccountType: 230, glAccount: "5101"}
+  # ---------------- CAMPAIGN_FUNDING (240) — R2; anything unanticipated goes to 1999 for review ----------------
+  - {id: P-DEF,    priority: 900, tbAccountType: 240, glAccount: "1999"}
+  - {id: P-FUND,   priority: 100, tbAccountType: 240, side: CREDIT, commandType: 9,  glAccount: "1201", note: operator cash paid into trust to fund campaigns}
+  - {id: P-RETURN, priority: 100, tbAccountType: 240, side: DEBIT,  commandType: 10, glAccount: "1201"}
+  - {id: P-REWARD, priority: 100, tbAccountType: 240, side: DEBIT,  transferCode: 1011, commandType: 12, glAccount: "5201"}
+  - {id: P-CLAW,   priority: 100, tbAccountType: 240, side: CREDIT, transferCode: 1013, commandType: 7,  glAccount: "5290"}
+  - {id: P-ADJ,    priority: 500, tbAccountType: 240, commandType: 11, glAccount: "5201", note: campaign pool corrections}
+  - {id: P-ADJ-200, priority: 100, tbAccountType: 240, commandType: 11, counterpartyAccountType: 200, glAccount: "1950"}
+  - {id: P-ADJ-220, priority: 100, tbAccountType: 240, commandType: 11, counterpartyAccountType: 220, glAccount: "1950"}
+  # ---------------- SUSPENSE / ADJUSTMENT_CLEARING / HOLD_CONTROL: mirrors ----------------
+  - {id: S-400, priority: 100, tbAccountType: 400, glAccount: "1901"}
+  - {id: S-410, priority: 100, tbAccountType: 410, glAccount: "1902"}
+  - {id: S-420, priority: 100, tbAccountType: 420, glAccount: "2901"}

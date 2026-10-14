@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/transaction-service/txn.events/TRANSACTION_REVERSED.v1.schema.json",
+  "title": "txn.events TRANSACTION_REVERSED v1 — envelope.data",
+  "description": "Same DB transaction as the REVERSAL's COMPLETED. data = the ORIGINAL transaction + reversal fields. Key = the original's fromWalletId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "txnId",
+    "txnRef",
+    "txnType",
+    "status",
+    "channel",
+    "initiatorActorType",
+    "initiatorActorId",
+    "clientReference",
+    "fromWalletId",
+    "fromWalletType",
+    "toWalletId",
+    "toWalletType",
+    "amountPoisha",
+    "feePoisha",
+    "vatPoisha",
+    "feeBearer",
+    "commissionPoisha",
+    "aitPoisha",
+    "commissionBeneficiaryWalletId",
+    "pricingPlanId",
+    "pricingPlanVersion",
+    "riskDecision",
+    "riskScore",
+    "deviceId",
+    "purposeCode",
+    "note",
+    "merchantReference",
+    "qrPayloadId",
+    "requestId",
+    "reasonCode",
+    "approvalId",
+    "originalTxnRef",
+    "failureCode",
+    "ledgerTransferIds",
+    "createdAt",
+    "completedAt",
+    "reversalTxnRef",
+    "reverseFee",
+    "reverseCommission",
+    "reversedAmountPoisha",
+    "refundedTotalPoisha"
+  ],
+  "properties": {
+    "txnId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string",
+      "description": "UUIDv7 = ledger commandId. REVERSED/REFUNDED: the original's."
+    },
+    "txnRef": {
+      "pattern": "^[A-Z]{2}\\d{6}00[0-9A-HJKMNP-TV-Z]{8}$",
+      "description": "18 chars {prefix}{yyMMdd}00{8 Crockford}. REVERSED/REFUNDED: the original's. Consumers treat it as opaque 1..32 [A-Z0-9-].",
+      "type": "string"
+    },
+    "txnType": {
+      "type": "string",
+      "enum": [
+        "P2P",
+        "CASH_IN",
+        "CASH_OUT",
+        "MERCHANT_PAYMENT",
+        "MERCHANT_REFUND",
+        "FLOAT_TRANSFER",
+        "REVERSAL"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "REVERSED"
+      ],
+      "description": "Fixed per eventType."
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "APP",
+        "USSD",
+        "PARTNER_APP",
+        "PORTAL",
+        "BACKOFFICE",
+        "API",
+        "SYSTEM"
+      ],
+      "description": "X-Channel of the creating request."
+    },
+    "initiatorActorType": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER",
+        "AGENT",
+        "MERCHANT",
+        "DISTRIBUTOR",
+        "INSTITUTION",
+        "STAFF",
+        "SYSTEM",
+        "SERVICE"
+      ],
+      "description": "Refund via approval: the maker's."
+    },
+    "initiatorActorId": {
+      "minLength": 1,
+      "maxLength": 64,
+      "type": "string"
+    },
+    "clientReference": {
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "= Idempotency-Key of the creating request (OPEN D-13).",
+      "type": "string"
+    },
+    "fromWalletId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "fromWalletType": {
+      "type": "string",
+      "enum": [
+        "C",
+        "A",
+        "D",
+        "M",
+        "I"
+      ]
+    },
+    "toWalletId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "toWalletType": {
+      "type": "string",
+      "enum": [
+        "C",
+        "A",
+        "D",
+        "M",
+        "I"
+      ]
+    },
+    "amountPoisha": {
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "type": "integer",
+      "description": "REVERSAL row: principal reversed."
+    },
+    "feePoisha": {
+      "minimum": 0,
+      "maximum": 10000000000000,
+      "type": "integer",
+      "description": "REVERSAL row: fee reversed (0 when not reversed)."
+    },
+    "vatPoisha": {
+      "minimum": 0,
+      "maximum": 10000000000000,
+      "type": "integer",
+      "description": "REVERSAL row: VAT reversed (0 when not reversed)."
+    },
+    "feeBearer": {
+      "type": "string",
+      "enum": [
+        "PAYER",
+        "PAYEE",
+        "OPERATOR"
+      ],
+      "description": "Never null; PAYER when no plan matched; REVERSAL row: the original's. SHARED reserved, never produced (OPEN D-03)."
+    },
+    "commissionPoisha": {
+      "minimum": 0,
+      "maximum": 10000000000000,
+      "type": "integer",
+      "description": "Gross commission. REVERSAL row: reversed."
+    },
+    "aitPoisha": {
+      "minimum": 0,
+      "maximum": 10000000000000,
+      "type": "integer",
+      "description": "<= commissionPoisha. REVERSAL row: reversed."
+    },
+    "commissionBeneficiaryWalletId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Null when commission 0; REVERSAL row: original beneficiary."
+    },
+    "pricingPlanId": {
+      "pattern": "^PLN-[A-Z0-9-]{2,60}$",
+      "description": "Null when no plan matched or REVERSAL.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pricingPlanVersion": {
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "riskDecision": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "ALLOW",
+        "ALLOW_AND_ALERT",
+        "STEP_UP",
+        "HOLD",
+        "BLOCK",
+        "LIMIT_EXCEEDED",
+        "SERVICE_DISABLED",
+        null
+      ],
+      "description": "Null when no risk call was made (REVERSAL, failure before risk evaluation)."
+    },
+    "riskScore": {
+      "minimum": 0,
+      "maximum": 100,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "deviceId": {
+      "maxLength": 128,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "purposeCode": {
+      "maxLength": 32,
+      "description": "P2P only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "note": {
+      "maxLength": 140,
+      "description": "P2P only. Never logged.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "merchantReference": {
+      "maxLength": 64,
+      "description": "MERCHANT_PAYMENT only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "qrPayloadId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "MERCHANT_PAYMENT only."
+    },
+    "requestId": {
+      "maxLength": 64,
+      "description": "FLOAT_TRANSFER only (treasury float-request id).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reasonCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "WRONG_TRANSFER",
+        "DISPUTE_UPHELD",
+        "SYSTEM_ERROR",
+        "FRAUD_CONFIRMED",
+        "CUSTOMER_RETURN",
+        "DUPLICATE_PAYMENT",
+        "ORDER_CANCELLED",
+        "PRICE_ADJUSTMENT",
+        "OTHER",
+        null
+      ],
+      "description": "REVERSAL: Reversal group; MERCHANT_REFUND: Merchant refund group (OPEN D-32); else null."
+    },
+    "approvalId": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Approval that authorised a REVERSAL or an approved MERCHANT_REFUND, else null (OPEN D-32)."
+    },
+    "originalTxnRef": {
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "Set on REVERSAL and MERCHANT_REFUND rows. On REVERSED/REFUNDED: the original's own value (null unless the original is itself a refund).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "failureCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "WALLET_NOT_TRANSACTABLE",
+        "LIMIT_EXCEEDED",
+        "RISK_BLOCKED",
+        "RISK_HELD_FOR_REVIEW",
+        "RISK_STEP_UP_REQUIRED",
+        "SERVICE_DISABLED",
+        "INSUFFICIENT_FUNDS",
+        "MAX_BALANCE_EXCEEDED",
+        "LEDGER_ORIGINAL_NOT_FOUND",
+        "LEDGER_ALREADY_REVERSED",
+        "LEDGER_HOLD_NOT_FOUND",
+        "LEDGER_INVALID_AMOUNT",
+        "LEDGER_OTHER",
+        "LEDGER_NOT_POSTED",
+        null
+      ],
+      "description": "Non-null only on FAILED."
+    },
+    "ledgerTransferIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "description": "Canonical UUID text in leg order; [] for pre-ledger failures."
+    },
+    "createdAt": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+      "description": "= UUIDv7 time of txnId = risk-evaluate `at`.",
+      "type": "string"
+    },
+    "completedAt": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+      "description": "Time of the final state (COMPLETED or FAILED). REVERSED/REFUNDED: the original's.",
+      "type": "string"
+    },
+    "reversalTxnRef": {
+      "pattern": "^[A-Z]{2}\\d{6}00[0-9A-HJKMNP-TV-Z]{8}$",
+      "description": "Non-null only on TRANSACTION_REVERSED.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reverseFee": {
+      "description": "Non-null only on TRANSACTION_REVERSED; false for a partial reversal.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reverseCommission": {
+      "description": "Non-null only on TRANSACTION_REVERSED; false for a partial reversal.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reversedAmountPoisha": {
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Non-null only on TRANSACTION_REVERSED; < amountPoisha => partial."
+    },
+    "refundedTotalPoisha": {
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Non-null only on TRANSACTION_REFUNDED; cumulative refunded total incl. this refund."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "POST /v1/ledger/commands/post-disbursement-batch → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-disbursement\\-batch(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "batchId": "0192f400-1111-7000-8000-000000000001",
+      "results": [
+        {
+          "commandId": "5b1f3c2e-9a7d-5e41-8c0b-2f6d1a9e4b70",
+          "result": "OK",
+          "rejectionCode": null,
+          "detail": null,
+          "transferIds": [
+            "cd88d35c-9eac-ed16-d7b3-da141b9bc743"
+          ],
+          "postedAt": "2026-10-09T09:00:01.002Z"
+        },
+        {
+          "commandId": "6c2a4d3f-0b8e-5f52-9d1c-3a7e2b0f5c81",
+          "result": "REJECTED",
+          "rejectionCode": "ACCOUNT_CLOSED",
+          "detail": "leg 0: credit_account_already_closed",
+          "transferIds": [],
+          "postedAt": null
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

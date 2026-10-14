@@ -1,0 +1,286 @@
+# general-ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0.
+# Adding a value is additive (MINOR); removing/renaming one impacts consumers that list it (or "*").
+
+codeSets:
+  accountClass:
+    description: "GL account class (GlAccount.accountClass, GL_ACCOUNT_UPSERTED.accountClass). Leading code digit = class by convention; the field is authoritative."
+    values:
+      - {code: ASSET, description: "1xxx; normal side DEBIT (CREDIT when contra)"}
+      - {code: LIABILITY, description: "2xxx; normal side CREDIT"}
+      - {code: EQUITY, description: "3xxx; normal side CREDIT"}
+      - {code: INCOME, description: "4xxx; normal side CREDIT"}
+      - {code: EXPENSE, description: "5xxx; normal side DEBIT"}
+  normalSide:
+    description: "Normal balance side, derived from class and contra"
+    values:
+      - {code: DEBIT}
+      - {code: CREDIT}
+  glAccountStatus:
+    description: "GL account status as published (PENDING_APPROVAL is internal and never published on gl.events)"
+    values:
+      - {code: ACTIVE}
+      - {code: INACTIVE}
+  journalSource:
+    description: "GL journal source (Journal.source, GL_JOURNAL_POSTED.source; LEDGER_DAY journals are announced by GL_DAY_CLOSED only)"
+    values:
+      - {code: LEDGER_DAY, description: "derived from ledger.changes; one per (businessDate, revision); ref GLJ-{yyyyMMdd}-L-R{revision}"}
+      - {code: MANUAL, description: "maker-checker manual journal on GL-only accounts; ref letter M"}
+      - {code: ACCRUAL, description: "manual accrual with autoReverseOn; ref letter A"}
+      - {code: ACCRUAL_REVERSAL, description: "automatic reversal of an ACCRUAL on autoReverseOn; ref letter X"}
+      - {code: REVERSAL, description: "maker-checker reversal of a POSTED non-ledger journal; ref letter R"}
+      - {code: AUTO_INTEREST, description: "trust-interest auto-journal from treasury.events (flagged); ref letter I"}
+      - {code: YEAR_END_CLOSE, description: "fiscal-year close to retained earnings; ref letter Y"}
+      - {code: OPENING_BALANCE, description: "opening balances on the GL start date; ref letter O"}
+  journalStatus:
+    description: "GL journal status"
+    values:
+      - {code: PENDING_APPROVAL}
+      - {code: POSTED}
+      - {code: SUPERSEDED, description: "LEDGER_DAY journal replaced by a newer revision"}
+      - {code: REJECTED}
+      - {code: CANCELLED, description: "cancelled by the maker or expired approval"}
+  periodStatus:
+    description: "Month and fiscal-year status (GlPeriod.status, FiscalYear.status; GL_PERIOD_STATUS_CHANGED publishes OPEN/CLOSED only)"
+    values:
+      - {code: OPEN}
+      - {code: CLOSING, description: "internal, while the approved close executes; never published"}
+      - {code: CLOSED}
+  periodKind:
+    description: "GL_PERIOD_STATUS_CHANGED.periodKind"
+    values:
+      - {code: MONTH, description: "periodId ^[0-9]{4}-[0-9]{2}$ (calendar month)"}
+      - {code: FISCAL_YEAR, description: "periodId ^FY[0-9]{4}-[0-9]{2}$"}
+  dayStatus:
+    description: "GL day status (GlDay.status)"
+    values:
+      - {code: OPEN}
+      - {code: AWAITING_WATERMARK}
+      - {code: CLOSING}
+      - {code: CLOSED}
+      - {code: CLOSED_WITH_EXCEPTIONS}
+      - {code: FAILED}
+      - {code: RESTATING}
+  dayCloseStatus:
+    description: "GL_DAY_CLOSED.status and ControlTotals.dayStatus"
+    values:
+      - {code: CLOSED}
+      - {code: CLOSED_WITH_EXCEPTIONS, description: "a GL-3/GL-5/GL-6 check failed or HIGH+ exceptions dated the day are open"}
+  dayCertification:
+    description: "GlDay.certification"
+    values:
+      - {code: PENDING}
+      - {code: CERTIFIED}
+      - {code: FAILED}
+      - {code: NOT_REQUIRED, description: "bitspay.gl.certification.required=false"}
+  certificationOutcome:
+    description: "GL_DAY_CERTIFIED.certification"
+    values:
+      - {code: CERTIFIED}
+      - {code: FAILED}
+  checkResult:
+    description: "Value of every GlDayChecks member (journalBalanced, trialBalanceZero, ledgerControlTrust, ledgerControlSystem, summaryComplete, mustBeZero, ledgerControlledIntegrity, normalBalance)"
+    values:
+      - {code: PASS}
+      - {code: FAIL}
+      - {code: NOT_VERIFIED}
+  exceptionCategory:
+    description: "GL exception category. GL_EXCEPTION_RAISED publishes only HIGH/CRITICAL categories (closed enum on the event); INFO categories stay in the API."
+    values:
+      - {code: UNMAPPED_POSTING, severity: CRITICAL}
+      - {code: UNKNOWN_LEDGER_ACCOUNT, severity: CRITICAL}
+      - {code: INVALID_LEDGER_EVENT, severity: CRITICAL}
+      - {code: CLOSE_CHECK_FAILED, severity: CRITICAL}
+      - {code: ENRICHMENT_TIMEOUT, severity: CRITICAL}
+      - {code: CONTROL_BREAK, severity: CRITICAL}
+      - {code: MUST_BE_ZERO_BREAK, severity: CRITICAL}
+      - {code: CERTIFICATION_FAILED, severity: CRITICAL}
+      - {code: PRIOR_PERIOD_LATE_EVENT, severity: HIGH}
+      - {code: DAY_CLOSE_BLOCKED, severity: HIGH}
+      - {code: LATE_LEDGER_EVENT, severity: INFO, description: "API only, never on gl.events"}
+      - {code: NORMAL_BALANCE_VIOLATION, severity: INFO, description: "API only, never on gl.events"}
+  exceptionSeverity:
+    description: "GL exception severity (gl.events carries CRITICAL and HIGH only)"
+    values:
+      - {code: CRITICAL}
+      - {code: HIGH}
+      - {code: INFO}
+  controlTotalBucket:
+    description: "ControlTotalItem.bucket — ledger buckets, named exactly as reconciliation names them"
+    values:
+      - {code: "WALLET:C"}
+      - {code: "WALLET:A"}
+      - {code: "WALLET:D"}
+      - {code: "WALLET:M"}
+      - {code: "WALLET:I"}
+      - {code: "SYS:FEE_INCOME"}
+      - {code: "SYS:VAT_PAYABLE"}
+      - {code: "SYS:COMMISSION_PAYABLE"}
+      - {code: "SYS:AIT_PAYABLE"}
+      - {code: "SYS:CAMPAIGN_FUNDING"}
+      - {code: "SYS:SUSPENSE"}
+      - {code: "SYS:ADJUSTMENT_CLEARING"}
+      - {code: "SYS:HOLD_CONTROL"}
+      - {code: "TRUST", description: "one row per trust account; trustIndex 1..99"}
+  ruleSetStatus:
+    description: "Posting rule set status"
+    values:
+      - {code: DRAFT}
+      - {code: PENDING_APPROVAL}
+      - {code: APPROVED}
+      - {code: SUPERSEDED, description: "replaced by a newer APPROVED set with the same effectiveFrom"}
+      - {code: REJECTED}
+      - {code: CANCELLED}
+  ruleValidationCode:
+    description: "ValidationIssue.code of :validate"
+    values:
+      - {code: UNKNOWN_ACCOUNT, severity: ERROR}
+      - {code: NOT_POSTABLE, severity: ERROR}
+      - {code: INACTIVE_ACCOUNT, severity: ERROR}
+      - {code: DUPLICATE_RULE_ID, severity: ERROR}
+      - {code: AMBIGUOUS, severity: ERROR}
+      - {code: NOT_COVERED, severity: ERROR}
+      - {code: LEDGER_CONTROL_MISMATCH, severity: ERROR}
+      - {code: MAPS_TO_SUSPENSE, severity: WARNING}
+  exportStatus:
+    description: "GlExport.status"
+    values:
+      - {code: GENERATING}
+      - {code: GENERATED}
+      - {code: FAILED}
+      - {code: SUPERSEDED}
+  exportFormat:
+    description: "ERP export format (format SPI)"
+    values:
+      - {code: GENERIC_CSV_V1, description: "data contract provided/data/gl-export-generic-csv.v1.md"}
+
+problemReasons:
+  # 400 VALIDATION_FAILED
+  - {code: VALIDATION_FAILED, reason: UNBALANCED, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: LEDGER_CONTROLLED_ACCOUNT, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: ACCOUNT_NOT_POSTABLE, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: ACCOUNT_INACTIVE, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: MANUAL_POSTING_NOT_ALLOWED, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances", "POST /v1/gl/accounts", "PATCH /v1/gl/accounts/{code}"]}
+  - {code: VALIDATION_FAILED, reason: NARRATION_TOO_SHORT, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: TOO_MANY_LINES, operations: ["POST /v1/gl/journals", "POST /v1/gl/opening-balances"]}
+  - {code: VALIDATION_FAILED, reason: RULE_SET_INVALID, operations: ["POST /v1/gl/rule-sets"], note: "with errors[] (one per ERROR issue)"}
+  - {code: VALIDATION_FAILED, reason: RANGE_TOO_LARGE, operations: ["GET /v1/gl/reports/trial-balance", "GET /v1/gl/reports/profit-and-loss", "GET /v1/gl/reports/account-ledger/{code}", "GET /v1/gl/journals", "GET /v1/gl/days", "GET /v1/gl/exports"]}
+  - {code: VALIDATION_FAILED, reason: PARENT_CLASS_MISMATCH, operations: ["POST /v1/gl/accounts", "PATCH /v1/gl/accounts/{code}"]}
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["*list operations"], note: "kernel-reserved (K3.4)"}
+  # 409 STATE_CONFLICT
+  - {code: STATE_CONFLICT, reason: PERIOD_CLOSED, operations: ["POST /v1/gl/journals", "POST /v1/gl/journals/{journalId}:reverse", "POST /v1/gl/rule-sets", "POST /v1/gl/accounts", "POST /v1/gl/days/{businessDate}:force-close", "POST /v1/gl/days/{businessDate}:restate", "POST /v1/internal/jobs/gl-day-close:run", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: FUTURE_DATE, operations: ["POST /v1/gl/journals", "POST /v1/gl/journals/{journalId}:reverse"]}
+  - {code: STATE_CONFLICT, reason: BEFORE_GL_START, operations: ["POST /v1/gl/journals"]}
+  - {code: STATE_CONFLICT, reason: GL_ALREADY_STARTED, operations: ["POST /v1/gl/opening-balances", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: DAY_NOT_CLOSED, operations: ["GET /v1/gl/days/{businessDate}/control-totals", "POST /v1/gl/days/{businessDate}:restate", "POST /v1/gl/exports/{businessDate}:regenerate", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: DAY_NOT_READY, operations: ["POST /v1/internal/jobs/gl-day-close:run"], note: "watermark or previous-day condition not met (ignoreCutoff never skips them)"}
+  - {code: STATE_CONFLICT, reason: ACCOUNT_IN_USE, operations: ["POST /v1/gl/accounts/{code}:deactivate", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: DAYS_NOT_CLOSED, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: DAYS_NOT_CERTIFIED, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: PENDING_JOURNALS, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: OPEN_EXCEPTIONS, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: PREVIOUS_PERIOD_OPEN, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/gl/fiscal-years/{fiscalYear}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: PREVIOUS_FISCAL_YEAR_OPEN, operations: ["POST /v1/gl/periods/{periodId}:close", "POST /v1/approvals/{id}:approve"], extensions: [blockingItems]}
+  - {code: STATE_CONFLICT, reason: NOT_LATEST_CLOSED_PERIOD, operations: ["POST /v1/gl/periods/{periodId}:reopen", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: FISCAL_YEAR_CLOSED, operations: ["POST /v1/gl/periods/{periodId}:reopen", "POST /v1/gl/fiscal-years/{fiscalYear}:close", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: ALREADY_REVERSED, operations: ["POST /v1/gl/journals/{journalId}:reverse", "POST /v1/approvals/{id}:approve"]}
+
+problemExtensions:
+  - {name: blockingItems, type: "array<string>", when: "STATE_CONFLICT with reason DAYS_NOT_CLOSED, DAYS_NOT_CERTIFIED, PENDING_JOURNALS, OPEN_EXCEPTIONS, PREVIOUS_PERIOD_OPEN or PREVIOUS_FISCAL_YEAR_OPEN", notes: "the business dates, journal ids, exception ids or period ids that block the close; max 200 items"}
+
+entityTypes:
+  - module: null          # single-module service: approval.events/audit.events carry no data.module
+    checkerRoles: [FIN_CHECKER]
+    values:
+      - {entityType: GlAccount, actions: [CREATE, UPDATE, DEACTIVATE], levels: 1}
+      - {entityType: PostingRuleSet, actions: [CREATE], levels: 2}
+      - {entityType: GlManualJournal, actions: [POST], levels: "1; 2 when total ≥ bitspay.gl.approval.l2-threshold-poisha (100000000)"}
+      - {entityType: GlJournalReversal, actions: [POST], levels: "as the original journal"}
+      - {entityType: GlOpeningBalance, actions: [POST], levels: 2}
+      - {entityType: GlDayForceClose, actions: [CLOSE], levels: 1}
+      - {entityType: GlDayRestatement, actions: [RESTATE], levels: 1}
+      - {entityType: GlPeriodClose, actions: [CLOSE], levels: 2}
+      - {entityType: GlPeriodReopen, actions: [REOPEN], levels: 2}
+      - {entityType: GlYearClose, actions: [CLOSE], levels: 2}
+      - {entityType: GlExport, actions: [REGENERATE], levels: 1}
+
+notificationTemplates:
+  # Sender: general-ledger-service. Category INTERNAL. One request per role; recipient.role only.
+  - code: GL_DAY_CLOSE_BLOCKED
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER and FIN_CHECKER (one request each)"
+    trigger: "a GL day is not closed 90 min after cut-off; repeated every 60 min while blocked"
+    variables:
+      - {name: businessDate, type: DATE, req: true, notes: "date"}
+      - {name: minutesLate, type: INT, req: true, notes: "int32; minutes since cut-off"}
+      - {name: partitionsReady, type: INT, req: true, notes: "int32"}
+      - {name: partitionsTotal, type: INT, req: true, notes: "int32"}
+      - {name: deferredTransfers, type: INT, req: true, notes: "int32; unresolved deferred legs with valueDate ≤ businessDate"}
+  - code: GL_DAY_CLOSED_WITH_EXCEPTIONS
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER and FIN_CHECKER"
+    trigger: "a day closes CLOSED_WITH_EXCEPTIONS or a close attempt fails (FAILED)"
+    variables:
+      - {name: businessDate, type: DATE, req: true, notes: "date"}
+      - {name: revision, type: INT, req: true, notes: "int32"}
+      - {name: failedChecks, type: TEXT, req: true, notes: "string; comma list of GlDayChecks member names that are FAIL"}
+      - {name: exceptionCount, type: INT, req: true, notes: "int64; open HIGH+ exceptions for the day"}
+  - code: GL_DAY_CERTIFICATION_FAILED
+    category: INTERNAL
+    recipient: "recipient.role FIN_CHECKER"
+    trigger: "reconciliation GL tie-out for the current revision did not match"
+    variables:
+      - {name: businessDate, type: DATE, req: true, notes: "date"}
+      - {name: revision, type: INT, req: true, notes: "int32"}
+      - {name: breakCount, type: INT, req: true, notes: "int64"}
+      - {name: reconRunId, type: TEXT, req: true, notes: "uuid"}
+  - code: GL_UNMAPPED_POSTING
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER"
+    trigger: "a close books a leg combination to 1999 (one per combination and day)"
+    variables:
+      - {name: businessDate, type: DATE, req: true, notes: "date"}
+      - {name: amountPoisha, type: MONEY, req: true, notes: "int64 poisha"}
+      - {name: combination, type: TEXT, req: true, notes: "string ≤ 200, e.g. tbAccountType=220 side=DEBIT transferCode=1010 commandType=11 counterparty=400"}
+  - code: GL_PERIOD_CLOSED
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER and FIN_CHECKER"
+    trigger: "a month or fiscal year is closed"
+    variables:
+      - {name: periodId, type: TEXT, req: true, notes: "string"}
+      - {name: periodKind, type: TEXT, req: true, notes: "enum{MONTH, FISCAL_YEAR}"}
+      - {name: netResultPoisha, type: MONEY, req: true, notes: "int64 poisha, signed"}
+  - code: GL_EXPORT_READY
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER"
+    trigger: "an ERP export version is generated"
+    variables:
+      - {name: businessDate, type: DATE, req: true}
+      - {name: exportVersion, type: INT, req: true}
+      - {name: fileName, type: TEXT, req: true}
+      - {name: lineCount, type: INT, req: true}
+      - {name: totalDebitPoisha, type: MONEY, req: true}
+      - {name: superseded, type: TEXT, req: false, notes: "boolean flag sent as TEXT \"true\"/\"false\" (template variable types have no boolean); \"true\" when it replaces an earlier export of the same date"}
+  - code: GL_EXPORT_FAILED
+    category: INTERNAL
+    recipient: "recipient.role FIN_MAKER"
+    trigger: "an ERP export build fails (unbalanced or technical error)"
+    variables:
+      - {name: businessDate, type: DATE, req: true}
+      - {name: exportVersion, type: INT, req: true}
+      - {name: variant, type: TEXT, req: true, notes: "enum{FAILED, RESTATED}; general-ledger-service sends FAILED (a restatement regenerates and sends GL_EXPORT_READY with superseded=true)"}
+      - {name: errorCode, type: TEXT, req: true, notes: "UNBALANCED or a technical error code"}
+
+txnRefPrefixes:
+  - {prefix: GLJ, meaning: "GL journal reference (never a ledger txnRef; no ledger command uses it)", format: "GLJ-{yyyyMMdd}-L-R{revision} for LEDGER_DAY; GLJ-{yyyyMMdd}-{M|A|X|R|I|Y|O}-{6-digit seq per day} otherwise"}
+
+metrics:
+  - {name: bitspay_gl_ingest_lag_seconds, type: gauge, labels: [partition]}
+  - {name: bitspay_gl_ingested_legs_total, type: counter, labels: [result], values: {result: [summarised, ignored, deferred, duplicate]}}
+  - {name: bitspay_gl_ingest_batch_seconds, type: histogram, labels: []}
+  - {name: bitspay_gl_deferred_transfers, type: gauge, labels: []}
+  - {name: bitspay_gl_unmapped_legs_total, type: counter, labels: []}
+  - {name: bitspay_gl_day_close_seconds, type: histogram, labels: [status]}
+  - {name: bitspay_gl_day_status, type: gauge, labels: [status]}
+  - {name: bitspay_gl_control_breaks_total, type: counter, labels: [check]}
+  - {name: bitspay_gl_open_exceptions, type: gauge, labels: [severity]}
+  - {name: bitspay_gl_export_last_success_timestamp_seconds, type: gauge, labels: []}

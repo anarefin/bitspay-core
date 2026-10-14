@@ -1,0 +1,22 @@
+{
+  "eventId": "0193a3e1-0000-7000-8000-0000000007e1",
+  "eventType": "FREEZE_LIFTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-20T06:00:00.160Z",
+  "producer": "compliance-service",
+  "aggregateType": "Freeze",
+  "aggregateId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+  "correlationId": "c-7d21aa",
+  "data": {
+    "freezeId": "0193a3e1-0000-7000-8000-000000000702",
+    "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+    "freezeType": "FULL_BLOCK",
+    "reasonCode": "AML_FREEZE",
+    "reference": "CASE-2026-000123",
+    "caseId": "0193a2d0-0000-7000-8000-000000000401",
+    "instructionId": null,
+    "heldAmountPoisha": null,
+    "holdCommandId": null,
+    "liftedAt": "2026-10-20T06:00:00.150Z"
+  }
+}

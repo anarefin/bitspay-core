@@ -1,0 +1,290 @@
+# limits-risk-service — owned code lists (CONTRACT-MODEL §4)
+# contractVersion 1.0.0 · kernel 1.0
+# Every list here is owned by limits-risk-service. Consumers that switch on a set declare it in their own
+# contract.yaml (codesUsed) and must handle unknown values safely (kernel K1 open enums).
+
+codeSets:
+
+  riskDecision:
+    description: >-
+      Decision of POST /v1/risk/evaluate and of each POST /v1/risk/evaluate:batch item (field `decision`).
+      Always HTTP 200; the caller maps the decision. Precedence (highest first):
+      SERVICE_DISABLED > BLOCK > LIMIT_EXCEEDED > HOLD > STEP_UP > ALLOW_AND_ALERT > ALLOW.
+      ALLOW and ALLOW_AND_ALERT are never returned without a reservation. evaluate:batch returns only
+      ALLOW, BLOCK, LIMIT_EXCEEDED, SERVICE_DISABLED. HOLD and STEP_UP are terminal declines in R1 (OPEN D-04).
+    values:
+      - {code: ALLOW, precedence: 7, description: "Money may move; reservation held (reservationId = txnId)"}
+      - {code: ALLOW_AND_ALERT, precedence: 6, description: "Money may move; reservation held; RISK_ALERT_RAISED emitted"}
+      - {code: STEP_UP, precedence: 5, description: "Fraud engine requires step-up authentication (R1: decline + alert, OPEN D-04)"}
+      - {code: HOLD, precedence: 4, description: "Fraud engine holds for review (R1: decline + alert, OPEN D-04)"}
+      - {code: LIMIT_EXCEEDED, precedence: 3, description: "A limit of FROM or TO would be exceeded; violatedLimit is non-null"}
+      - {code: BLOCK, precedence: 2, description: "Blacklist hit or BLOCK rule / score"}
+      - {code: SERVICE_DISABLED, precedence: 1, description: "Matching ACTIVE emergency FREEZE control"}
+
+  alertDecision:
+    description: "risk.alerts RISK_ALERT_RAISED data.decision (subset of riskDecision)"
+    values:
+      - {code: ALLOW_AND_ALERT}
+      - {code: STEP_UP}
+      - {code: HOLD}
+      - {code: BLOCK}
+      - {code: LIMIT_EXCEEDED, description: "only when risk setting alertOnLimitExceeded = true"}
+
+  evaluateTxnType:
+    description: >-
+      txnType accepted by POST /v1/risk/evaluate (first seven) and additionally by evaluate:batch items
+      (DISBURSEMENT, CAMPAIGN_REWARD). REVERSAL is a no-counter type, reserved and never sent in R1.
+    values:
+      - {code: P2P}
+      - {code: CASH_IN}
+      - {code: CASH_OUT}
+      - {code: MERCHANT_PAYMENT}
+      - {code: MERCHANT_REFUND}
+      - {code: FLOAT_TRANSFER}
+      - {code: REVERSAL, description: "no-counter type; reserved, never sent in R1"}
+      - {code: DISBURSEMENT, description: "evaluate:batch only"}
+      - {code: CAMPAIGN_REWARD, description: "evaluate:batch only; from party = system funding account, walletType S"}
+
+  partyWalletType:
+    description: >-
+      Party.walletType on evaluate requests. Names are accepted too (CUSTOMER, AGENT, DISTRIBUTOR, MERCHANT,
+      INSTITUTION). S (system funding account 00000000-0000-0000-0000-000000000240) is valid only as the
+      `from` party of an evaluate:batch item with txnType CAMPAIGN_REWARD; anywhere else -> 400.
+    values:
+      - {code: C, name: CUSTOMER}
+      - {code: A, name: AGENT}
+      - {code: D, name: DISTRIBUTOR}
+      - {code: M, name: MERCHANT}
+      - {code: I, name: INSTITUTION}
+      - {code: S, name: SYSTEM_FUNDING, description: "evaluate:batch CAMPAIGN_REWARD from party only"}
+
+  limitCode:
+    description: >-
+      Limit code grammar `<SCOPE>_<SEND|RECEIVE|ANY>_<DIMENSION>`. SCOPE = a txnType (evaluateTxnType),
+      a scope-group code (e.g. CICO) or ALL. Middle part = limitDirection. DIMENSION = limitDimension.
+      Examples: P2P_RECEIVE_DAILY_AMOUNT, P2P_SEND_TXN_ALLOWED, CICO_ANY_DAILY_AMOUNT, ALL_RECEIVE_MONTHLY_AMOUNT,
+      CASH_OUT_SEND_PER_TXN_MAX. Carried in ViolatedLimit.limitCode and in reasonCodes as `LIMIT:<limitCode>`.
+      Consumers treat a limitCode as an opaque string unless they parse it with this grammar.
+    pattern: "^[A-Z][A-Z0-9_]*_(SEND|RECEIVE|ANY)_(TXN_ALLOWED|PER_TXN_MIN|PER_TXN_MAX|DAILY_COUNT|DAILY_AMOUNT|WEEKLY_COUNT|WEEKLY_AMOUNT|MONTHLY_COUNT|MONTHLY_AMOUNT|MAX_BALANCE)$"
+    values: []
+
+  limitDimension:
+    description: "ViolatedLimit.dimension and limit_rule.dimension. Unit of *Value fields follows the dimension."
+    values:
+      - {code: TXN_ALLOWED, unit: "flag (limit 0 = not permitted)", description: "txn type not permitted for this party; limitValue 0"}
+      - {code: PER_TXN_MIN, unit: poisha}
+      - {code: PER_TXN_MAX, unit: poisha}
+      - {code: DAILY_COUNT, unit: count}
+      - {code: DAILY_AMOUNT, unit: poisha}
+      - {code: WEEKLY_COUNT, unit: count}
+      - {code: WEEKLY_AMOUNT, unit: poisha}
+      - {code: MONTHLY_COUNT, unit: count}
+      - {code: MONTHLY_AMOUNT, unit: poisha}
+      - {code: MAX_BALANCE, unit: poisha, description: "enforced by the ledger; returned as receiverMaxBalancePoisha"}
+
+  limitDirection:
+    description: "ViolatedLimit.direction; FROM party = SEND, TO party = RECEIVE; ANY = rule counting both directions"
+    values:
+      - {code: SEND}
+      - {code: RECEIVE}
+      - {code: ANY}
+
+  limitLayer:
+    description: "ViolatedLimit.layer and limit_rule.layer (precedence REGULATORY_CAP > TIER > PRODUCT_CHANNEL > OVERRIDE <= cap; SELF lowers SEND only)"
+    values:
+      - {code: REGULATORY_CAP}
+      - {code: TIER}
+      - {code: PRODUCT_CHANNEL}
+      - {code: OVERRIDE}
+      - {code: SELF}
+
+  limitParty:
+    description: "ViolatedLimit.party and blacklistHits[].party"
+    values:
+      - {code: FROM}
+      - {code: TO}
+
+  evaluateReasonCode:
+    description: >-
+      Vocabulary of evaluate `reasonCodes[]` (producer-local, not governance REASON_CODE refdata). Ordered by
+      decision precedence, fraud rules by weight desc. `[]` for a plain ALLOW. Also carried in
+      risk.alerts data.details.reasonCodes.
+    values:
+      - {code: "LIMIT:<limitCode>", pattern: "^LIMIT:[A-Z][A-Z0-9_]*$", description: "limit violated (limitCode grammar)"}
+      - {code: "BLACKLIST:<type>:<FROM|TO>", pattern: "^BLACKLIST:(NID|MSISDN|DEVICE|WALLET|BANK_ACCOUNT|IP|PARTNER):(FROM|TO)$", description: "active blacklist entry matched for that party"}
+      - {code: "EMERGENCY:<controlCode>", pattern: "^EMERGENCY:EC-[0-9]{6}$", description: "emergency FREEZE control matched"}
+      - {code: "<ruleId>", pattern: "^FR-[A-Z]{2,6}-[0-9]{3}$", description: "ENFORCE fraud rule matched, e.g. FR-NEWDEV-001"}
+      - {code: STEP_UP_UNSUPPORTED_CHANNEL, description: "STEP_UP replaced by stepUpFallback on a channel that cannot step up"}
+
+  blacklistType:
+    description: "Blacklist entry type (check API, entries API, blacklist.events, blacklistHits[].type). Hash normalisation per kernel K2."
+    values:
+      - {code: NID, description: "check/propose by valueHash only (clear value -> 400)"}
+      - {code: MSISDN}
+      - {code: DEVICE}
+      - {code: WALLET, description: "HMAC over lower-case walletId"}
+      - {code: BANK_ACCOUNT, description: "check/propose by valueHash only (clear value -> 400)"}
+      - {code: IP}
+      - {code: PARTNER, description: "HMAC over lower-case partnerId"}
+
+  whitelistType:
+    description: "Whitelist entry type (never published)"
+    values:
+      - {code: WALLET}
+      - {code: DEVICE}
+      - {code: MSISDN}
+
+  blacklistEntrySource:
+    values:
+      - {code: MANUAL, description: "default"}
+      - {code: COMPLIANCE_CASE, description: "proposed by compliance-service"}
+      - {code: BULK, description: "POST /v1/blacklist/entries:bulk (internal; not accepted in the single-entry body)"}
+
+  listEntryStatus:
+    values:
+      - {code: PENDING_APPROVAL}
+      - {code: ACTIVE}
+      - {code: INACTIVE}
+      - {code: EXPIRED}
+      - {code: REJECTED}
+
+  releaseState:
+    description: "POST /v1/limits/reservations/{txnId}:release response `state`; all four are final. released = state in {RELEASED, EXPIRED}."
+    values:
+      - {code: RELEASED, description: "released now or earlier (released: true)"}
+      - {code: COMMITTED, description: "transaction completed; nothing released (released: false)"}
+      - {code: EXPIRED, description: "released earlier by the sweeper (released: true)"}
+      - {code: NOT_FOUND, description: "no reservation (released: false)"}
+
+  releaseReasonCode:
+    description: "Suggested values of the informational release body `reasonCode` (any ^[A-Z0-9_]{1,64}$ accepted; audit/metric only)"
+    values:
+      - {code: NO_INTENT}
+      - {code: ROW_FAILED}
+      - {code: REWARD_FAILED}
+      - {code: MANUAL}
+
+  riskGrade:
+    values:
+      - {code: LOW}
+      - {code: MEDIUM}
+      - {code: HIGH}
+
+  userCategory:
+    description: "Usage response userCategory; derived from (walletType, categoryCode) via user_category_map"
+    values:
+      - {code: CUSTOMER}
+      - {code: RETAIL_AGENT}
+      - {code: SUPER_AGENT}
+      - {code: MERCHANT_AGENT}
+      - {code: BANK_AGENT}
+      - {code: MICRO_MERCHANT}
+      - {code: SMALL_MERCHANT}
+      - {code: ENTERPRISE_MERCHANT}
+      - {code: ONLINE_MERCHANT}
+      - {code: DISTRIBUTOR}
+      - {code: MASTER_DISTRIBUTOR}
+      - {code: SUB_DISTRIBUTOR}
+      - {code: INSTITUTION}
+
+  fraudRuleCategory:
+    description: "risk.alerts details.matchedRules[].category and fraud_rule.category"
+    values:
+      - {code: VELOCITY}
+      - {code: PROFILE}
+      - {code: DEVICE}
+      - {code: BENEFICIARY}
+      - {code: STRUCTURING}
+      - {code: PASS_THROUGH}
+      - {code: DORMANT}
+      - {code: MERCHANT}
+      - {code: AGENT}
+      - {code: GEO}
+      - {code: AUTH}
+      - {code: SIM}
+      - {code: LIST}
+
+  fraudRuleAction:
+    description: "risk.alerts details.matchedRules[].action (null = score-only rule); ALERT = ALLOW_AND_ALERT"
+    values:
+      - {code: ALERT}
+      - {code: STEP_UP}
+      - {code: HOLD}
+      - {code: BLOCK}
+
+  approvalAction:
+    description: "approval.events action values published by limits-risk-service"
+    values:
+      - {code: APPLY, description: "LimitChangeSet (incl. overrides), RiskSettings"}
+      - {code: ACTIVATE, description: "FraudRuleVersion submit, EmergencyControl MAKER_CHECKER"}
+      - {code: DEACTIVATE, description: "override / list entry deactivation"}
+      - {code: RETIRE, description: "FraudRuleVersion retire"}
+      - {code: ADD, description: "ListEntry add / bulk add"}
+      - {code: REMOVE, description: "reserved"}
+      - {code: POST_FACTO_REVIEW, description: "EmergencyControl EMERGENCY_SINGLE review"}
+
+sharedObjects:
+  - name: ViolatedLimit
+    schema: "provided/openapi.yaml#/components/schemas/ViolatedLimit"
+    description: >-
+      Owned object describing the first violated limit. Returned in evaluate / evaluate:batch responses
+      (non-null iff decision = LIMIT_EXCEEDED) and in risk.alerts data.details.violatedLimit.
+      Fields: limitCode (limitCode grammar), party (limitParty), walletId, scope, direction (limitDirection),
+      dimension (limitDimension), layer (limitLayer), limitValue, currentValue?, attemptedValue,
+      remainingValue?, resetsAt?. *Value fields are int64 in the unit of `dimension` (documented exception to
+      the ...Poisha naming rule).
+    usedIn:
+      - "POST /v1/risk/evaluate res.violatedLimit"
+      - "POST /v1/risk/evaluate:batch res.items[].violatedLimit"
+      - "risk.alerts RISK_ALERT_RAISED details.violatedLimit"
+
+problemReasons:
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["GET /v1/limits/rules", "GET /v1/limits/overrides", "GET /v1/limits/emergency-controls", "GET /v1/risk/rules", "GET /v1/risk/decisions", "GET /v1/blacklist/entries", "GET /v1/whitelist/entries", "GET /v1/approvals"], extensions: [], note: "kernel-reserved"}
+  - {code: VALIDATION_FAILED, reason: CLEAR_VALUE_NOT_ALLOWED, operations: ["GET /v1/blacklist/check", "POST /v1/blacklist/entries"], extensions: [], note: "type NID or BANK_ACCOUNT sent with clear `value`"}
+  - {code: VALIDATION_FAILED, reason: SYSTEM_PARTY_NOT_ALLOWED, operations: ["POST /v1/risk/evaluate", "POST /v1/risk/evaluate:batch"], extensions: [], note: "walletType S outside an evaluate:batch CAMPAIGN_REWARD from party"}
+  - {code: VALIDATION_FAILED, reason: DUPLICATE_TXN_ID, operations: ["POST /v1/risk/evaluate:batch"], extensions: []}
+  - {code: VALIDATION_FAILED, reason: EXCEEDS_REGULATORY_CAP, operations: ["POST /v1/limits/change-sets", "POST /v1/limits/overrides"], extensions: []}
+  - {code: VALIDATION_FAILED, reason: DSL_INVALID, operations: ["POST /v1/risk/rules", "PUT /v1/risk/rules/{ruleId}/versions/{v}", "POST /v1/risk/rules/{ruleId}/versions/{v}:submit", "POST /v1/risk/simulations"], extensions: []}
+  - {code: STATE_CONFLICT, reason: TXN_ID_RELEASED, operations: ["POST /v1/risk/evaluate", "POST /v1/risk/evaluate:batch"], extensions: [txnIds], note: "txnId already released or expired; batch: whole batch refused, txnIds lists the offending items"}
+  - {code: STATE_CONFLICT, reason: DUPLICATE_ENTRY, operations: ["POST /v1/blacklist/entries", "POST /v1/whitelist/entries"], extensions: [entryId], note: "ACTIVE or PENDING_APPROVAL entry exists for (list, type, valueHash); entryId only on blacklist"}
+  - {code: STATE_CONFLICT, reason: INVALID_TRANSITION, operations: ["POST /v1/limits/overrides/{id}:deactivate", "POST /v1/limits/emergency-controls/{id}:deactivate", "POST /v1/risk/rules/{ruleId}/versions/{v}:submit", "POST /v1/risk/rules/{ruleId}:retire", "PUT /v1/risk/rules/{ruleId}/versions/{v}", "POST /v1/blacklist/entries/{id}:deactivate", "POST /v1/whitelist/entries/{id}:deactivate"], extensions: []}
+  - {code: STATE_CONFLICT, reason: STALE_VERSION, operations: ["PUT /v1/risk/rules/{ruleId}/versions/{v}"], extensions: [], note: "If-Match does not equal the current row version"}
+  - {code: STATE_CONFLICT, reason: SIMULATION_RUNNING, operations: ["POST /v1/risk/simulations"], extensions: []}
+  - {code: STATE_CONFLICT, reason: APPROVAL_NOT_PENDING, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"], extensions: []}
+  - {code: STATE_CONFLICT, reason: APPROVAL_EXPIRED, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"], extensions: []}
+  - {code: STATE_CONFLICT, reason: REVALIDATION_FAILED, operations: ["POST /v1/approvals/{id}:approve"], extensions: []}
+
+problemExtensions:
+  - {name: txnIds, type: "array<uuid>", minItems: 1, when: "409 STATE_CONFLICT reason = TXN_ID_RELEASED from POST /v1/risk/evaluate:batch", meaning: "item txnIds already released or expired"}
+  - {name: entryId, type: uuid, when: "409 STATE_CONFLICT reason = DUPLICATE_ENTRY from POST /v1/blacklist/entries", meaning: "existing ACTIVE or PENDING_APPROVAL entry"}
+
+entityTypes:
+  - {module: null, values: [LimitChangeSet, EmergencyControl, FraudRuleVersion, RiskSettings, ListEntry, SelfLimit]}
+
+reasonCodes:
+  - group: "Blacklist entry"
+    field: "POST /v1/blacklist/entries req.reasonCode; blacklist.events BLACKLIST_ENTRY_UPSERTED reasonCode; check entries[].reasonCode"
+    values: [FRAUD_CONFIRMED, MULE_ACCOUNT, IDENTITY_FRAUD, AML_SUSPICION, REGULATORY_INSTRUCTION, SANCTIONS, OTHER]
+    status: "OPEN D-32 (seed pending governance sign-off)"
+
+metrics:
+  - {name: bitspay_risk_decisions_total, type: counter, labels: [decision], mandatory: true, note: "one increment per evaluate decision and per evaluate:batch item"}
+  - {name: bitspay_limitsrisk_evaluate_seconds, type: histogram, labels: [decision, txnType]}
+  - {name: bitspay_limitsrisk_limits_seconds, type: histogram, labels: []}
+  - {name: bitspay_limitsrisk_fraud_seconds, type: histogram, labels: []}
+  - {name: bitspay_limitsrisk_decisions_total, type: counter, labels: [decision, txnType, channel]}
+  - {name: bitspay_limitsrisk_limit_exceeded_total, type: counter, labels: [limitCode]}
+  - {name: bitspay_limitsrisk_rule_hits_total, type: counter, labels: [rule, mode]}
+  - {name: bitspay_limitsrisk_reservations_total, type: counter, labels: [result]}
+  - {name: bitspay_limitsrisk_reservations_released_total, type: counter, labels: [source]}
+  - {name: bitspay_limitsrisk_reservations_expired_total, type: counter, labels: []}
+  - {name: bitspay_limitsrisk_expired_then_completed_total, type: counter, labels: [], note: "alert > 0"}
+  - {name: bitspay_limitsrisk_counter_clamped_total, type: counter, labels: [], note: "must stay 0"}
+  - {name: bitspay_limitsrisk_pending_reservations, type: gauge, labels: []}
+  - {name: bitspay_limitsrisk_txn_watermark_lag_seconds, type: gauge, labels: []}
+  - {name: bitspay_limitsrisk_config_version, type: gauge, labels: []}
+  - {name: bitspay_limitsrisk_clock_skew_total, type: counter, labels: []}
+  - {name: bitspay_limitsrisk_unknown_category_total, type: counter, labels: [walletType]}
+  - {name: bitspay_limitsrisk_profile_missing_total, type: counter, labels: [check]}
+  - {name: bitspay_limitsrisk_decision_write_failures_total, type: counter, labels: []}
+  - {name: bitspay_limitsrisk_batch_release_mismatch_total, type: counter, labels: []}

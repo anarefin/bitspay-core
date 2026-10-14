@@ -1,0 +1,37 @@
+{
+  "name": "POST /v1/wallets/lookup:batch → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/wallets/lookup:batch(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "msisdn": "8801711000000",
+          "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+          "walletType": "C",
+          "status": "A",
+          "displayNameMasked": "Karim A***"
+        },
+        {
+          "msisdn": "01755000017",
+          "walletId": null,
+          "walletType": "C",
+          "status": null,
+          "displayNameMasked": null
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

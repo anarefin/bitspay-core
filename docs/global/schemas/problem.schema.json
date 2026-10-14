@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/kernel/problem.schema.json",
+  "title": "Problem body (kernel K3.6) — extension members are provider-owned",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["type", "title", "status", "code", "correlationId"],
+  "properties": {
+    "type": {"type": "string"},
+    "title": {"type": "string", "maxLength": 200},
+    "status": {"type": "integer"},
+    "code": {"type": "string", "enum": ["VALIDATION_FAILED", "ACTOR_NOT_ALLOWED", "NOT_FOUND", "IDEMPOTENCY_CONFLICT", "STATE_CONFLICT", "SOD_VIOLATION", "INSUFFICIENT_FUNDS", "LIMIT_EXCEEDED", "RISK_BLOCKED", "RISK_STEP_UP_REQUIRED", "RISK_HELD_FOR_REVIEW", "WALLET_NOT_TRANSACTABLE", "MAX_BALANCE_EXCEEDED", "REFUND_EXCEEDS_ORIGINAL", "SERVICE_DISABLED", "MAKER_CHECKER_VIOLATION", "DEPENDENCY_UNAVAILABLE"]},
+    "detail": {"type": ["string", "null"], "maxLength": 1000},
+    "instance": {"type": ["string", "null"]},
+    "correlationId": {"type": "string"},
+    "reason": {"type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "errors": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["field", "message"], "properties": {"field": {"type": "string"}, "message": {"type": "string"}}}},
+    "retryable": {"type": "boolean", "const": true}
+  }
+}

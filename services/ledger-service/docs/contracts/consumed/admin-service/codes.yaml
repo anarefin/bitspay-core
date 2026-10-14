@@ -1,0 +1,1885 @@
+# admin-service owned codes (CONTRACT-MODEL §4). Producer-declared templates, reason codes and product codes of other services
+# are NOT listed here: admin-service seeds them from ../../00-global/generated/*.json (seed import, SPEC §7.9).
+codeSets:
+  refdataType:
+    description: REFDATA_UPSERTED.type and GET /v1/refdata/{type} path values (closed for this major)
+    values:
+    - code: GEO
+      description: 'BBS geocode: division 2, district 4, upazila 6, union 8 digits'
+    - code: MCC
+      description: merchant category code
+    - code: PURPOSE_CODE
+      description: P2P purpose
+    - code: REASON_CODE
+      description: status / reversal / hold / refund / KYC / partner reasons
+    - code: BANK
+      description: banks
+    - code: HOLIDAY
+      description: public / bank holidays
+    - code: SYSTEM_PARAM
+      description: namespaced system parameters
+  systemParamValueType:
+    description: attributes.valueType of SYSTEM_PARAM items
+    values:
+    - code: STRING
+    - code: INT
+    - code: BOOL
+    - code: TIME
+    - code: DURATION
+    - code: CRON
+    - code: JSON
+    - code: FEATURE
+    - code: RETENTION
+  systemParamNamespace:
+    description: Reserved SYSTEM_PARAM namespaces (code prefix before the first dot). Consumers must not invent codes inside them.
+    values:
+    - code: FEATURE
+      description: product enable switches FEATURE.<PRODUCT> (kernel K3.7)
+    - code: CUTOFF
+      description: cut-off times (CUTOFF.EOD, CUTOFF.EOD_GRACE_MINUTES, CUTOFF.SETTLEMENT_BANK)
+    - code: EOD
+      description: EOD schedule
+    - code: CALENDAR
+      description: weekend days, time zone
+    - code: RETENTION
+      description: retention policy per category incl. legalHold
+    - code: WALLET
+      description: wallet behaviour switches
+    - code: SUPPORT
+      description: support contact data
+    - code: GL
+      description: general-ledger parameters (GL.FISCAL_YEAR_START_MONTH)
+  retentionCategory:
+    description: RETENTION.<CATEGORY> and legal-hold categories
+    values:
+    - code: FINANCIAL_TXN
+    - code: CUSTOMER_KYC
+    - code: PARTNER
+    - code: AML_CASE
+    - code: AUDIT
+    - code: NOTIFICATION_LOG
+    - code: API_LOG
+    - code: RECON
+    - code: COMPLAINT
+  legalHoldSubjectType:
+    description: GET /v1/retention/legal-holds subjectType
+    values:
+    - code: CATEGORY
+    - code: CUSTOMER
+    - code: WALLET
+    - code: PARTNER
+    - code: CASE
+    - code: TXN
+  templateCategory:
+    description: Notification template categories; the template category is authoritative (producers send priority null unless SECURITY)
+    values:
+    - code: SECURITY
+      mandatory: true
+      ttl: PT15M
+    - code: TRANSACTIONAL
+      mandatory: true
+      ttl: PT24H
+    - code: SERVICE
+      mandatory: true
+      ttl: PT24H
+    - code: INTERNAL
+      mandatory: true
+      ttl: PT24H
+    - code: REMINDER
+      mandatory: false
+      ttl: PT12H
+    - code: MARKETING
+      mandatory: false
+      ttl: PT48H
+  templateVariableType:
+    description: Template variable types and their JSON value on notification.requests.variables
+    values:
+    - code: MONEY
+      json: int64 poisha; name ends in Poisha; never pre-formatted
+      formatter: money
+    - code: DATETIME
+      json: timestamp ISO-8601 UTC ms Z; never local time
+      formatter: datetime
+    - code: DATE
+      json: date YYYY-MM-DD (Asia/Dhaka)
+      formatter: date
+    - code: MSISDN
+      json: full 13-digit 8801…; never pre-masked
+      formatter: msisdnMask
+    - code: INT
+      json: int64
+      formatter: int / digits
+    - code: TEXT
+      json: string ≤ 500
+      formatter: none / upper
+  notificationChannel:
+    values:
+    - code: IN_APP
+    - code: SMS
+    - code: PUSH
+    - code: EMAIL
+    - code: IVR
+  notificationPriority:
+    values:
+    - code: SECURITY
+    - code: TRANSACTIONAL
+    - code: SERVICE
+    - code: REMINDER
+    - code: MARKETING
+  reminderPolicyCode:
+    values:
+    - code: PAYMENT_REQUEST_DUE
+      enabled: true
+    - code: SCHEDULED_TRANSFER_PRE
+      enabled: true
+    - code: KYC_EXPIRY
+      enabled: false
+    - code: BILL_DUE
+      enabled: false
+  reminderSubjectType:
+    values:
+    - code: PAYMENT_REQUEST
+      policy: PAYMENT_REQUEST_DUE
+      subjectRef: '{requestId} (uuid)'
+    - code: SCHEDULED_TRANSFER
+      policy: SCHEDULED_TRANSFER_PRE
+      subjectRef: '{scheduleId}:{yyyy-MM-dd} (occurrence date Asia/Dhaka)'
+    - code: KYC_EXPIRY
+      policy: KYC_EXPIRY
+      subjectRef: '{customerId} (reserved)'
+    - code: BILL_DUE
+      policy: BILL_DUE
+      subjectRef: reserved
+    - code: SERVICE_EXPIRY
+      policy: null
+      subjectRef: reserved
+    - code: AGREEMENT_EXPIRY
+      policy: null
+      subjectRef: reserved
+  deliveryStatus:
+    description: GET /v1/notifications/logs deliveries[].status
+    values:
+    - code: UNREAD
+    - code: READ
+    - code: ARCHIVED
+    - code: PENDING
+    - code: WAITING_CONTACT
+    - code: DEFERRED
+    - code: SENDING
+    - code: RETRY_WAIT
+    - code: SENT
+    - code: DELIVERED
+    - code: UNDELIVERED
+    - code: SENT_NO_DLR
+    - code: FAILED
+    - code: SUPPRESSED
+    - code: EXPIRED
+  deliveryStatusReason:
+    values:
+    - code: OPTED_OUT
+    - code: NO_ADDRESS
+    - code: NO_CONTACT
+    - code: QUIET_HOURS
+    - code: FREQ_CAP
+    - code: STALE_EVENT
+    - code: PERMANENT_ERROR
+    - code: MAX_ATTEMPTS
+    - code: TTL
+    - code: PROVIDER_DLR_*
+  approvalStatus:
+    description: approval.events status (closed)
+    values:
+    - code: PENDING
+    - code: APPROVED
+    - code: REJECTED
+    - code: EXPIRED
+    - code: CANCELLED
+  approvalModule:
+    description: approval.events / audit.events module (required for merged services)
+    values:
+    - code: wallet
+    - code: partner
+    - code: pricing
+    - code: campaign
+    - code: reconciliation
+    - code: reporting
+    - code: governance
+    - code: notification
+  auditOutcome:
+    values:
+    - code: SUCCESS
+    - code: FAILURE
+    - code: DENIED
+      description: refused for authorisation / role / SoD / maker-checker reasons
+  verificationFindingReason:
+    values:
+    - code: HASH_MISMATCH
+    - code: PREV_LINK_MISMATCH
+    - code: SEQ_GAP
+    - code: SEQ_DUPLICATE
+    - code: HEAD_MISMATCH
+    - code: SEAL_MISMATCH
+    - code: ANCHOR_MISMATCH
+    - code: MISSING_SEAL
+    - code: C14N_INVALID
+    - code: COLUMN_MISMATCH
+    - code: GENESIS_MISMATCH
+  ageingBucket:
+    values:
+    - code: LT_4H
+    - code: H4_24
+    - code: D1_3
+    - code: GT_3D
+problemReasons:
+- code: ACTOR_NOT_ALLOWED
+  reason: NOT_MAKER
+  operations:
+  - POST /v1/approvals/{id}:cancel
+- code: MAKER_CHECKER_VIOLATION
+  reason: ALERT_SUBJECT
+  operations:
+  - POST /v1/monitoring/alerts/{id}:acknowledge
+  - POST /v1/monitoring/alerts/{id}:close
+- code: MAKER_CHECKER_VIOLATION
+  reason: CHECKER_ALREADY_DECIDED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: MAKER_CHECKER_VIOLATION
+  reason: CHECKER_IS_MAKER
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: MAKER_CHECKER_VIOLATION
+  reason: CHECKER_IS_SUBJECT
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: SOD_VIOLATION
+  reason: SOD_BLOCK
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/staff/users
+  - PUT /v1/staff/users/{id}/roles
+  - POST /v1/roles
+  - PUT /v1/roles/{code}/permissions
+  extensions:
+  - sodRuleCodes
+- code: STATE_CONFLICT
+  reason: ACTIVE_MANDATORY_TEMPLATE
+  operations:
+  - POST /v1/templates/{code}/versions/{v}:retire
+- code: STATE_CONFLICT
+  reason: APPROVAL_ALREADY_OPEN
+  operations:
+  - POST /v1/staff/users
+  - PATCH /v1/staff/users/{id}
+  - POST /v1/staff/users/{id}:suspend
+  - POST /v1/staff/users/{id}:reactivate
+  - POST /v1/staff/users/{id}:disable
+  - PUT /v1/staff/users/{id}/roles
+  - PUT /v1/staff/users/{id}/scopes
+  - POST /v1/roles
+  - PUT /v1/roles/{code}/permissions
+  - POST /v1/sod-rules
+  - PUT /v1/sod-rules/{code}
+  - PUT /v1/approval-routes
+  - POST /v1/monitoring/rules
+  - PUT /v1/monitoring/rules/{code}
+  - PUT /v1/refdata/{type}/{code}
+  - POST /v1/refdata/{type}/imports
+  - PUT /v1/params/{code}
+  - PUT /v1/products/{product}
+  - PUT /v1/retention/policies/{category}
+  - POST /v1/retention/legal-holds
+  - POST /v1/retention/legal-holds/{id}:release
+  - POST /v1/templates/{code}/versions/{v}:submit
+  - POST /v1/templates/{code}/versions/{v}:retire
+  - POST /v1/rules
+  - PUT /v1/rules/{id}
+  - POST /v1/rules/{id}:enable
+  - POST /v1/rules/{id}:disable
+  - POST /v1/providers
+  - PUT /v1/providers/{code}
+  - POST /v1/provider-routes
+  - PUT /v1/provider-routes/{id}
+  - PUT /v1/policies/quiet-hours/{id}
+  - PUT /v1/policies/frequency-caps/{category}
+  - PUT /v1/policies/channel-fallback/{id}
+  - PUT /v1/reminder-policies/{code}
+- code: STATE_CONFLICT
+  reason: APPROVAL_EXPIRED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: STATE_CONFLICT
+  reason: EXPORT_EXPIRED
+  operations:
+  - GET /v1/audit/exports/{id}/file
+- code: STATE_CONFLICT
+  reason: EXPORT_NOT_READY
+  operations:
+  - GET /v1/audit/exports/{id}/file
+- code: STATE_CONFLICT
+  reason: HOLD_ALREADY_ACTIVE
+  operations:
+  - POST /v1/retention/legal-holds
+- code: STATE_CONFLICT
+  reason: HOLD_NOT_ACTIVE
+  operations:
+  - POST /v1/retention/legal-holds/{id}:release
+- code: STATE_CONFLICT
+  reason: IMPORT_DUPLICATE_FILE
+  operations:
+  - POST /v1/refdata/{type}/imports
+- code: STATE_CONFLICT
+  reason: INVALID_ALERT_TRANSITION
+  operations:
+  - POST /v1/monitoring/alerts/{id}:acknowledge
+  - POST /v1/monitoring/alerts/{id}:close
+- code: STATE_CONFLICT
+  reason: INVALID_STATUS_TRANSITION
+  operations:
+  - POST /v1/staff/users/{id}:suspend
+  - POST /v1/staff/users/{id}:reactivate
+  - POST /v1/staff/users/{id}:disable
+- code: STATE_CONFLICT
+  reason: NOT_PENDING
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+  - POST /v1/approvals/{id}:cancel
+- code: STATE_CONFLICT
+  reason: PROVIDER_EXISTS
+  operations:
+  - POST /v1/providers
+- code: STATE_CONFLICT
+  reason: REMINDER_NOT_ACTIVE
+  operations:
+  - POST /v1/reminders/{subjectType}/{subjectRef}:reschedule
+- code: STATE_CONFLICT
+  reason: REMINDER_SUBJECT_CONFLICT
+  operations:
+  - POST /v1/reminders
+- code: STATE_CONFLICT
+  reason: REVALIDATION_FAILED
+  operations:
+  - POST /v1/approvals/{id}:approve
+- code: STATE_CONFLICT
+  reason: ROLE_EXISTS
+  operations:
+  - POST /v1/roles
+- code: STATE_CONFLICT
+  reason: ROUTE_EXISTS
+  operations:
+  - POST /v1/provider-routes
+- code: STATE_CONFLICT
+  reason: RULE_EXISTS
+  operations:
+  - POST /v1/monitoring/rules
+  - POST /v1/rules
+- code: STATE_CONFLICT
+  reason: SOD_RULE_EXISTS
+  operations:
+  - POST /v1/sod-rules
+- code: STATE_CONFLICT
+  reason: TEMPLATE_EXISTS
+  operations:
+  - POST /v1/templates
+- code: STATE_CONFLICT
+  reason: TEMPLATE_OWNED_BY_PRODUCER
+  operations:
+  - POST /v1/templates
+- code: STATE_CONFLICT
+  reason: TEMPLATE_VERSION_NOT_DRAFT
+  operations:
+  - PUT /v1/templates/{code}/versions/{v}
+  - POST /v1/templates/{code}/versions/{v}:submit
+- code: STATE_CONFLICT
+  reason: USERNAME_EXISTS
+  operations:
+  - POST /v1/staff/users
+- code: VALIDATION_FAILED
+  reason: ATTRIBUTES_INVALID
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: BANGLA_NAME_REQUIRED
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: CODE_INVALID
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: CSV_HEADER_INVALID
+  operations:
+  - POST /v1/refdata/{type}/imports
+- code: VALIDATION_FAILED
+  reason: DUE_AT_IN_PAST
+  operations:
+  - POST /v1/reminders
+  - POST /v1/reminders/{subjectType}/{subjectRef}:reschedule
+- code: VALIDATION_FAILED
+  reason: FILE_TOO_LARGE
+  operations:
+  - POST /v1/refdata/{type}/imports
+- code: VALIDATION_FAILED
+  reason: FORMATTER_NOT_ALLOWED
+  operations:
+  - POST /v1/templates/{code}/versions/{v}:submit
+- code: VALIDATION_FAILED
+  reason: INVALID_CONDITION
+  operations:
+  - POST /v1/rules
+  - PUT /v1/rules/{id}
+- code: VALIDATION_FAILED
+  reason: INVALID_CURSOR
+  operations:
+  - GET /v1/audit/records
+  - GET /v1/refdata/{type}
+  - GET /v1/notifications/logs
+- code: VALIDATION_FAILED
+  reason: INVALID_REGEX
+  operations:
+  - POST /v1/monitoring/rules
+  - PUT /v1/monitoring/rules/{code}
+- code: VALIDATION_FAILED
+  reason: INVALID_SYNTAX
+  operations:
+  - PUT /v1/templates/{code}/versions/{v}
+  - POST /v1/templates/{code}/versions
+  - POST /v1/templates/{code}/versions/{v}:submit
+- code: VALIDATION_FAILED
+  reason: LEVEL_MISMATCH
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: LICENCE_REF_REQUIRED
+  operations:
+  - PUT /v1/products/{product}
+- code: VALIDATION_FAILED
+  reason: MANDATORY_CATEGORY
+  operations:
+  - PUT /v1/notification-preferences
+- code: VALIDATION_FAILED
+  reason: MISSING_LANGUAGE
+  operations:
+  - POST /v1/templates/{code}/versions/{v}:preview
+  - POST /v1/templates/{code}/versions/{v}:submit
+- code: VALIDATION_FAILED
+  reason: PARENT_INACTIVE
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: PARENT_MISSING
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+- code: VALIDATION_FAILED
+  reason: POLICY_FILTER_MISMATCH
+  operations:
+  - POST /v1/reminders
+- code: VALIDATION_FAILED
+  reason: RANGE_TOO_LARGE
+  operations:
+  - GET /v1/audit/records
+  - POST /v1/audit/exports
+  - POST /v1/audit/verifications
+  - GET /v1/audit/anchors
+  - GET /v1/calendar/business-days
+  - GET /v1/notifications/logs
+  - GET /v1/notifications/reports/delivery-summary
+- code: VALIDATION_FAILED
+  reason: RECIPIENT_REQUIRED
+  operations:
+  - POST /v1/reminders
+- code: VALIDATION_FAILED
+  reason: RESERVED_NAMESPACE
+  operations:
+  - PUT /v1/refdata/{type}/{code}
+  - PUT /v1/params/{code}
+- code: VALIDATION_FAILED
+  reason: SCOPE_ALL_EXCLUSIVE
+  operations:
+  - POST /v1/staff/users
+  - PUT /v1/staff/users/{id}/scopes
+- code: VALIDATION_FAILED
+  reason: SELECTOR_REQUIRED
+  operations:
+  - GET /v1/audit/records
+  - GET /v1/notifications/logs
+- code: VALIDATION_FAILED
+  reason: SMS_TOO_LONG
+  operations:
+  - POST /v1/templates/{code}/versions/{v}:submit
+- code: VALIDATION_FAILED
+  reason: SYSTEM_CHANNEL_REQUIRED
+  operations:
+  - PUT /v1/products/{product}
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_GEO
+  operations:
+  - POST /v1/staff/users
+  - PUT /v1/staff/users/{id}/scopes
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_PERMISSION
+  operations:
+  - POST /v1/roles
+  - PUT /v1/roles/{code}/permissions
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_POLICY
+  operations:
+  - POST /v1/reminders
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_PROVIDER
+  operations:
+  - POST /v1/provider-routes
+  - PUT /v1/provider-routes/{id}
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_REFDATA_TYPE
+  operations:
+  - GET /v1/refdata/{type}
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_ROLE
+  operations:
+  - POST /v1/staff/users
+  - PUT /v1/staff/users/{id}/roles
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_TEMPLATE
+  operations:
+  - POST /v1/rules
+  - PUT /v1/rules/{id}
+  - PUT /v1/reminder-policies/{code}
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_VARIABLE
+  operations:
+  - PUT /v1/templates/{code}/versions/{v}
+  - POST /v1/templates/{code}/versions
+  - POST /v1/templates/{code}/versions/{v}:preview
+  - POST /v1/templates/{code}/versions/{v}:submit
+  - POST /v1/rules
+  - PUT /v1/rules/{id}
+  - POST /v1/reminders
+- code: VALIDATION_FAILED
+  reason: VALUE_TYPE_MISMATCH
+  operations:
+  - PUT /v1/params/{code}
+problemExtensions:
+- name: sodRuleCodes
+  type: array<string>
+  when: code = SOD_VIOLATION (409); the BLOCK rule codes that refused the change
+entityTypes:
+- module: governance
+  values:
+  - StaffUser
+  - Role
+  - SodRule
+  - RefDataItem
+  - RefDataImport
+  - SystemParam
+  - ProductSwitch
+  - RetentionPolicy
+  - LegalHold
+  - MonitoringRule
+  - ApprovalRoute
+- module: notification
+  values:
+  - TemplateVersion
+  - NotificationRule
+  - Provider
+  - ProviderRoute
+  - QuietHoursPolicy
+  - FrequencyCapPolicy
+  - ChannelPolicy
+  - ReminderPolicy
+approvalRoutes:
+  description: 'Seed of the governance approval-inbox routing table. Order: event checkerRoles[] → (service, module, entityType) → (service, module, *) → (service, *, *) → ADMIN. Data, changed by maker-checker
+    (entityType ApprovalRoute); a new producer entityType needs no change here.'
+  rows:
+  - service: wallet-service
+    module: wallet
+    entityType: '*'
+    checkerRoles:
+    - OPS_CHECKER
+    - SUP_CHECKER
+  - service: wallet-service
+    module: partner
+    entityType: '*'
+    checkerRoles:
+    - PARTNER_OPS_CHECKER
+  - service: limits-risk-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - RISK_CHECKER
+  - service: pricing-service
+    module: pricing
+    entityType: '*'
+    checkerRoles:
+    - PRICING_CHECKER
+  - service: pricing-service
+    module: campaign
+    entityType: '*'
+    checkerRoles:
+    - OPS_CHECKER
+  - service: treasury-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - FIN_CHECKER
+  - service: transaction-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - OPS_CHECKER
+  - service: disbursement-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - OPS_CHECKER
+  - service: support-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - SUP_CHECKER
+  - service: compliance-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - CAMLCO
+  - service: finance-ops-service
+    module: reconciliation
+    entityType: '*'
+    checkerRoles:
+    - FIN_CHECKER
+  - service: finance-ops-service
+    module: reporting
+    entityType: '*'
+    checkerRoles:
+    - FIN_CHECKER
+    - CAMLCO
+  - service: general-ledger-service
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - FIN_CHECKER
+  - service: admin-service
+    module: notification
+    entityType: '*'
+    checkerRoles:
+    - OPS_CHECKER
+  - service: admin-service
+    module: governance
+    entityType: '*'
+    checkerRoles:
+    - ADMIN
+  - service: admin-service
+    module: governance
+    entityType: RefDataItem
+    checkerRoles:
+    - OPS_CHECKER
+    - ADMIN
+  - service: admin-service
+    module: governance
+    entityType: RefDataImport
+    checkerRoles:
+    - OPS_CHECKER
+    - ADMIN
+  - service: admin-service
+    module: governance
+    entityType: SystemParam
+    checkerRoles:
+    - OPS_CHECKER
+    - FIN_CHECKER
+    - ADMIN
+  - service: admin-service
+    module: governance
+    entityType: LegalHold
+    checkerRoles:
+    - CAMLCO
+    - ADMIN
+  - service: archiver
+    module: '*'
+    entityType: '*'
+    checkerRoles:
+    - ADMIN
+notificationTemplates:
+- code: P2P_SENT
+  category: TRANSACTIONAL
+  trigger: R-P2P-SENT · txn.events TRANSACTION_COMPLETED, txnType = P2P
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: feePoisha
+    type: MONEY
+    req: false
+    notes: ← sum(feePoisha, vatPoisha) only when feeBearer = PAYER; section hidden when 0
+  - name: counterpartyMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(toWalletId).msisdn
+  - name: counterpartyName
+    type: TEXT
+    req: false
+    notes: ← contact(toWalletId).name
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: P2P_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-P2P-RECEIVED · same event
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: counterpartyMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(fromWalletId).msisdn
+  - name: counterpartyName
+    type: TEXT
+    req: false
+    notes: ← contact(fromWalletId).name
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASH_IN_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-CASHIN-CUST · COMPLETED CASH_IN
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: feePoisha
+    type: MONEY
+    req: false
+    notes: ← sum(feePoisha, vatPoisha) when feeBearer = PAYER
+  - name: agentMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(fromWalletId).msisdn
+  - name: agentName
+    type: TEXT
+    req: false
+    notes: ← contact(fromWalletId).name
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASH_IN_AGENT_CONFIRM
+  category: TRANSACTIONAL
+  trigger: R-CASHIN-AGENT · COMPLETED CASH_IN (SMS cost OPEN D-40)
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: customerMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(toWalletId).msisdn
+  - name: commissionPoisha
+    type: MONEY
+    req: false
+    notes: ← commissionPoisha
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASH_OUT_SUCCESS
+  category: TRANSACTIONAL
+  trigger: R-CASHOUT-CUST · COMPLETED CASH_OUT
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: feePoisha
+    type: MONEY
+    req: false
+    notes: ← sum(feePoisha, vatPoisha) when feeBearer = PAYER
+  - name: agentMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(toWalletId).msisdn
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASH_OUT_AGENT_CONFIRM
+  category: TRANSACTIONAL
+  trigger: R-CASHOUT-AGENT · COMPLETED CASH_OUT (OPEN D-40)
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: customerMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(fromWalletId).msisdn
+  - name: commissionPoisha
+    type: MONEY
+    req: false
+    notes: ← commissionPoisha
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: MERCHANT_PAYMENT_SENT
+  category: TRANSACTIONAL
+  trigger: R-MERCHANT-CUST · COMPLETED MERCHANT_PAYMENT
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: feePoisha
+    type: MONEY
+    req: false
+    notes: ← sum(feePoisha, vatPoisha) when feeBearer = PAYER
+  - name: merchantName
+    type: TEXT
+    req: true
+    notes: ← contact(toWalletId).name
+  - name: merchantReference
+    type: TEXT
+    req: false
+    notes: ← merchantReference (≤ 64)
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: MERCHANT_PAYMENT_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-MERCHANT-MER · COMPLETED MERCHANT_PAYMENT (OPEN D-40)
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: customerMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(fromWalletId).msisdn
+  - name: merchantReference
+    type: TEXT
+    req: false
+    notes: ← merchantReference
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: MERCHANT_REFUND_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-REFUND · COMPLETED MERCHANT_REFUND
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: merchantName
+    type: TEXT
+    req: true
+    notes: ← contact(fromWalletId).name
+  - name: originalTxnRef
+    type: TEXT
+    req: true
+    notes: ← originalTxnRef
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: MERCHANT_REFUND_SENT
+  category: TRANSACTIONAL
+  trigger: R-REFUND-MER · COMPLETED MERCHANT_REFUND (SMS OPEN D-40)
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: originalTxnRef
+    type: TEXT
+    req: true
+    notes: ← originalTxnRef
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: FLOAT_TRANSFER_SENT
+  category: TRANSACTIONAL
+  trigger: R-FLOAT-SENT · COMPLETED FLOAT_TRANSFER
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: counterpartyName
+    type: TEXT
+    req: false
+    notes: ← contact(toWalletId).name
+  - name: counterpartyMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(toWalletId).msisdn
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: FLOAT_TRANSFER_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-FLOAT-RECEIVED · COMPLETED FLOAT_TRANSFER
+  recipient: TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: counterpartyName
+    type: TEXT
+    req: false
+    notes: ← contact(fromWalletId).name
+  - name: counterpartyMsisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(fromWalletId).msisdn
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: TXN_REVERSED
+  category: TRANSACTIONAL
+  trigger: R-REVERSAL-FROM / R-REVERSAL-TO · COMPLETED REVERSAL
+  recipient: FROM_WALLET and TO_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: '← amountPoisha of the REVERSAL transaction (partial: the reversed amount)'
+  - name: originalTxnRef
+    type: TEXT
+    req: true
+    notes: ← originalTxnRef
+  - name: reason
+    type: TEXT
+    req: false
+    notes: ← refdata(REASON_CODE, reasonCode).name
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: txnRef of the REVERSAL
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: COMMISSION_EARNED
+  category: TRANSACTIONAL
+  trigger: R-COMMISSION-INLINE (seeded disabled) · COMPLETED, commissionPoisha ne 0 ∧ txnType ne REVERSAL
+  recipient: COMMISSION_BENEFICIARY (commissionBeneficiaryWalletId)
+  channels:
+  - IN_APP
+  variables:
+  - name: commissionPoisha
+    type: MONEY
+    req: true
+    notes: net = commissionPoisha − aitPoisha
+  - name: txnType
+    type: TEXT
+    req: true
+    notes: txnType code
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← completedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: TXN_FAILED
+  category: TRANSACTIONAL
+  trigger: R-TXN-FAILED · txn.events TRANSACTION_FAILED, channel ne SYSTEM
+  recipient: FROM_WALLET
+  channels:
+  - IN_APP
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: txnType
+    type: TEXT
+    req: true
+    notes: ← txnType
+  - name: failureCode
+    type: TEXT
+    req: true
+    notes: failureCode enum; the template maps it to a localised reason
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← createdAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: WALLET_BLOCKED
+  category: SERVICE
+  trigger: R-WALLET-BLOCKED · wallet.events WALLET_UPSERTED status in [F,X,C], neqPath previousStatus, statusReasonCode nin [PARTNER_SUSPENDED, PARTNER_TERMINATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER]
+    (OPEN D-06)
+  recipient: DATA_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: msisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(walletId).msisdn
+  - name: reason
+    type: TEXT
+    req: true
+    notes: ← refdata(REASON_CODE, statusReasonCode).name
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ← param(SUPPORT.HELPLINE)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: WALLET_UNBLOCKED
+  category: SERVICE
+  trigger: R-WALLET-UNBLOCKED · status eq A, previousStatus in [F,X,C,D], statusReasonCode nin [PARTNER_REACTIVATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER, KYC_APPROVED, KYC_UPGRADE]
+  recipient: DATA_WALLET
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: msisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(walletId).msisdn
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ← param(SUPPORT.HELPLINE)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: WALLET_DORMANT
+  category: SERVICE
+  trigger: R-WALLET-DORMANT · status eq D, neqPath previousStatus
+  recipient: DATA_WALLET
+  channels:
+  - SMS
+  - IN_APP
+  variables:
+  - name: msisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(walletId).msisdn
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ← param(SUPPORT.HELPLINE)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: WALLET_CLOSED
+  category: SERVICE
+  trigger: R-WALLET-CLOSED · status eq Z, statusReasonCode ne CLOSURE
+  recipient: DATA_WALLET
+  channels:
+  - SMS
+  variables:
+  - name: msisdn
+    type: MSISDN
+    req: true
+    notes: ← contact(walletId).msisdn
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ← param(SUPPORT.HELPLINE)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: KYC_SUBMITTED
+  category: SERVICE
+  trigger: R-KYC-SUBMITTED · customer.events KYC_SUBMITTED
+  recipient: CUSTOMER_WALLETS
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: name
+    type: TEXT
+    req: false
+    notes: ← nameBn (bn) / nameEn
+  - name: targetTier
+    type: INT
+    req: false
+    notes: ← targetTier
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: KYC_APPROVED
+  category: SERVICE
+  trigger: R-KYC-APPROVED · customer.events KYC_APPROVED
+  recipient: CUSTOMER_WALLETS
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: name
+    type: TEXT
+    req: true
+    notes: ← nameBn (bn) / nameEn
+  - name: kycTier
+    type: INT
+    req: true
+    notes: ← kycTier
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: KYC_REJECTED
+  category: SERVICE
+  trigger: R-KYC-REJECTED · customer.events KYC_REJECTED
+  recipient: CUSTOMER_WALLETS
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: name
+    type: TEXT
+    req: true
+    notes: ← nameBn (bn) / nameEn
+  - name: reason
+    type: TEXT
+    req: false
+    notes: ← refdata(REASON_CODE, reasonCode).name (KYC group)
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ← param(SUPPORT.HELPLINE)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: LIMITS_CHANGED
+  category: SERVICE
+  trigger: R-KYC-TIER · customer.events KYC_TIER_CHANGED
+  recipient: CUSTOMER_WALLETS
+  channels:
+  - IN_APP
+  variables:
+  - name: kycTier
+    type: INT
+    req: true
+    notes: ← kycTier
+  - name: name
+    type: TEXT
+    req: false
+    notes: ← nameBn (bn) / nameEn
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: COMMISSION_SETTLED
+  category: TRANSACTIONAL
+  trigger: R-COMMISSION-SETTLED · commission.events COMMISSION_SETTLED
+  recipient: BENEFICIARY_WALLET (beneficiaryWalletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: netPoisha
+    type: MONEY
+    req: true
+    notes: ← netPoisha
+  - name: grossPoisha
+    type: MONEY
+    req: false
+    notes: ← grossPoisha
+  - name: aitPoisha
+    type: MONEY
+    req: false
+    notes: ← aitPoisha
+  - name: period
+    type: TEXT
+    req: true
+    notes: ← period
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ← txnRef (CMS-…)
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: DISBURSEMENT_CREDIT
+  category: TRANSACTIONAL
+  trigger: R-DISBURSEMENT-CREDIT · disbursement.events BATCH_ROW_PAID
+  recipient: DATA_WALLET (walletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ← amountPoisha
+  - name: payerName
+    type: TEXT
+    req: false
+    notes: ← contact(payerWalletId).name
+  - name: rowRef
+    type: TEXT
+    req: true
+    notes: ← rowRef {batchRef}-{rowNo} (OPEN D-13)
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ← postedAt
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASHBACK_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-CASHBACK · campaign.events REWARD_GRANTED, rewardType in [CASHBACK]
+  recipient: DATA_WALLET
+  channels:
+  - IN_APP
+  variables:
+  - name: rewardPoisha
+    type: MONEY
+    req: true
+    notes: ← rewardPoisha
+  - name: txnRef
+    type: TEXT
+    req: false
+    notes: ← txnRef (reward reference)
+  - name: triggerTxnRef
+    type: TEXT
+    req: false
+    notes: ← triggerTxnRef
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: REWARD_RECEIVED
+  category: TRANSACTIONAL
+  trigger: R-REWARD-BONUS · REWARD_GRANTED, rewardType nin [CASHBACK]
+  recipient: DATA_WALLET
+  channels:
+  - IN_APP
+  variables:
+  - name: rewardPoisha
+    type: MONEY
+    req: true
+    notes: ← rewardPoisha
+  - name: rewardType
+    type: TEXT
+    req: true
+    notes: ← rewardType
+  - name: txnRef
+    type: TEXT
+    req: false
+    notes: ← txnRef
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: CASHBACK_REVERSED
+  category: TRANSACTIONAL
+  trigger: R-CASHBACK-CLAWBACK · campaign.events REWARD_CLAWED_BACK
+  recipient: DATA_WALLET
+  channels:
+  - IN_APP
+  variables:
+  - name: rewardPoisha
+    type: MONEY
+    req: true
+    notes: ← rewardPoisha
+  - name: reasonCode
+    type: TEXT
+    req: true
+    notes: ← reasonCode ∈ {TRANSACTION_REVERSED, TRANSACTION_REFUNDED, FRAUD_CONFIRMED}
+  group: A
+  sentVia: event rule (never on notification.requests)
+- code: PAYREQ_REMINDER_ADVANCE
+  category: REMINDER
+  trigger: policy PAYMENT_REQUEST_DUE offset D-1 10:00 Asia/Dhaka (ENABLED; OPEN D-11)
+  recipient: payer walletId of the registering request
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: registering request
+  - name: requesterMsisdn
+    type: MSISDN
+    req: true
+    notes: registering request
+  - name: requestRef
+    type: TEXT
+    req: true
+    notes: RQ… registering request
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: registering request
+  - name: dueAt
+    type: DATETIME
+    req: true
+    notes: system (= reminder.dueAt = expiresAt)
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: PAYREQ_REMINDER_DUE
+  category: REMINDER
+  trigger: policy PAYMENT_REQUEST_DUE offset DUE (PT0S)
+  recipient: same
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: registering request
+  - name: requesterMsisdn
+    type: MSISDN
+    req: true
+    notes: registering request
+  - name: requestRef
+    type: TEXT
+    req: true
+    notes: RQ… registering request
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: registering request
+  - name: dueAt
+    type: DATETIME
+    req: true
+    notes: system (= reminder.dueAt = expiresAt)
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: PAYREQ_REMINDER_OVERDUE
+  category: REMINDER
+  trigger: policy PAYMENT_REQUEST_DUE offset OVERDUE +1 d 10:00
+  recipient: same
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: registering request
+  - name: requesterMsisdn
+    type: MSISDN
+    req: true
+    notes: registering request
+  - name: requestRef
+    type: TEXT
+    req: true
+    notes: RQ… registering request
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: registering request
+  - name: dueAt
+    type: DATETIME
+    req: true
+    notes: system (= reminder.dueAt = expiresAt)
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: SCHEDULED_TRANSFER_REMINDER
+  category: REMINDER
+  trigger: policy SCHEDULED_TRANSFER_PRE offset D-1 10:00 (ENABLED; OPEN D-11)
+  recipient: payer walletId of the registering request
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: registering request
+  - name: payeeNameMasked
+    type: TEXT
+    req: true
+    notes: registering request (masked by producer; never an MSISDN)
+  - name: scheduleId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: dueAt
+    type: DATETIME
+    req: true
+    notes: system (= occurrence execution time, UTC)
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: KYC_EXPIRY_REMINDER
+  category: REMINDER
+  trigger: policy KYC_EXPIRY — reserved, seeded DISABLED (wallet-service sends re-KYC reminders itself)
+  recipient: —
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: name
+    type: TEXT
+    req: false
+    notes: ''
+  - name: dueDate
+    type: DATE
+    req: true
+    notes: ''
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: NEW_DEVICE_LOGIN
+  category: SECURITY
+  trigger: rule reserved, disabled until the edge/auth layer exists (no R1 producer)
+  recipient: —
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ''
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ''
+  - name: deviceName
+    type: TEXT
+    req: false
+    notes: ''
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: PIN_CHANGED
+  category: SECURITY
+  trigger: same
+  recipient: —
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ''
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ''
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: FAILED_LOGIN_ALERT
+  category: SECURITY
+  trigger: same
+  recipient: —
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: time
+    type: DATETIME
+    req: true
+    notes: ''
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: ''
+  - name: attempts
+    type: INT
+    req: true
+    notes: ''
+  group: B
+  sentVia: reminder engine / reserved security rule (never on notification.requests)
+- code: GOV_ACTIVITY_ALERT
+  category: INTERNAL
+  trigger: monitoring rule fired; request priority SECURITY
+  recipient: staffUserId (+ msisdn override); one request per staff user, cap 20
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: ruleCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: actorUsername
+    type: TEXT
+    req: true
+    notes: ''
+  - name: observed
+    type: INT
+    req: true
+    notes: ''
+  - name: window
+    type: TEXT
+    req: true
+    notes: ISO-8601 duration
+  - name: severity
+    type: TEXT
+    req: true
+    notes: ''
+  - name: alertId
+    type: TEXT
+    req: true
+    notes: also dedupeKey
+  priority: SECURITY
+  group: C9
+  sentVia: notification.requests (language en)
+- code: GOV_APPROVAL_EXPIRING
+  category: INTERNAL
+  trigger: approval in governance inbox near expiresAt
+  recipient: checker staffUserIds (cap 20)
+  channels:
+  - IN_APP
+  variables:
+  - name: service
+    type: TEXT
+    req: true
+    notes: ''
+  - name: summary
+    type: TEXT
+    req: true
+    notes: ''
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: ''
+  - name: approvalId
+    type: TEXT
+    req: true
+    notes: also dedupeKey
+  group: C9
+  sentVia: notification.requests (language en)
+- code: GOV_AUDIT_INTEGRITY_BROKEN
+  category: INTERNAL
+  trigger: hash-chain verification failed; request priority SECURITY
+  recipient: AUDITOR + ADMIN staffUserIds
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: verificationId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: chainId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: seq
+    type: INT
+    req: true
+    notes: ''
+  - name: reason
+    type: TEXT
+    req: true
+    notes: ''
+  priority: SECURITY
+  group: C9
+  sentVia: notification.requests (language en)
+- code: GOV_STAFF_DORMANT_DISABLED
+  category: INTERNAL
+  trigger: dormant staff account disabled
+  recipient: ADMIN staffUserIds
+  channels:
+  - IN_APP
+  variables:
+  - name: username
+    type: TEXT
+    req: true
+    notes: ''
+  - name: daysInactive
+    type: INT
+    req: true
+    notes: ''
+  group: C9
+  sentVia: notification.requests (language en)
+notificationTemplatesSeededFromIndex:
+  source: ../../00-global/generated/notification-templates.json (written by contracts.py index from every sender's codes.yaml → notificationTemplates)
+  rule: admin-service seeds code, category, variables and allowed channels of every indexed template; BN/EN text lives in admin-service seed files. Groups A, B and C9 above are the templates admin-service
+    itself sends.
+refdataTypes:
+  attributesSchema: provided/data/refdata-attributes.v1.schema.json
+  systemParams: provided/data/refdata-system-params.v1.md
+  types:
+  - type: GEO
+    codeRegex: ^[0-9]{2}([0-9]{2}([0-9]{2}([0-9]{2})?)?)?$
+    parentCode: parent GEO code (null for divisions)
+    attributes: level enum{DIVISION,DISTRICT,UPAZILA,UNION} (req, must match code length); bbsCode (req); cityCorporation bool (opt); riskFlag bool (opt, default false); qrCity ≤ 15 ^[A-Z ]+$ (opt; fallback
+      upper-cased nameEn)
+  - type: MCC
+    codeRegex: ^[0-9]{4}$
+    parentCode: null
+    attributes: group string ^[0-9]{2}$ ∈ {01..07, 99}; riskLevel enum{LOW,MEDIUM,HIGH}
+  - type: PURPOSE_CODE
+    codeRegex: ^[A-Z_]{3,32}$
+    parentCode: null
+    attributes: appliesTo array<txnType>; requiresNote bool
+  - type: REASON_CODE
+    codeRegex: ^[A-Z_]{3,40}$
+    parentCode: null
+    attributes: domain enum{WALLET,REVERSAL,HOLD,REFUND,KYC,PARTNER,APPROVAL,OTHER} (informational, first group); customerVisible bool
+  - type: BANK
+    codeRegex: ^[A-Z0-9-]{3,12}$
+    parentCode: null
+    attributes: routingPrefix (opt); swift (opt); trustEligible bool
+  - type: HOLIDAY
+    codeRegex: ^\d{4}-\d{2}-\d{2}$
+    parentCode: null
+    attributes: date; kind enum{PUBLIC,BANK,OPTIONAL}; bankHoliday bool; provisional bool
+  - type: SYSTEM_PARAM
+    codeRegex: ^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)+$
+    parentCode: null
+    attributes: valueType (always) + value, or the FEATURE / RETENTION fields
+  businessDayRule: a date is a non-business day ⇔ its weekday ∈ CALENDAR.WEEKEND_DAYS or an ACTIVE HOLIDAY with bankHoliday = true exists for it
+metrics:
+- name: bitspay_governance_audit_ingested_total
+  type: counter
+  labels:
+  - partition
+  - source_topic
+- name: bitspay_governance_audit_ingest_lag_seconds
+  type: gauge
+  labels:
+  - partition
+- name: bitspay_governance_audit_chain_head_seq
+  type: gauge
+  labels:
+  - partition
+- name: bitspay_governance_audit_dlq_total
+  type: counter
+  labels:
+  - source_topic
+- name: bitspay_governance_audit_integrity_broken_total
+  type: counter
+  labels: []
+- name: bitspay_governance_audit_verification_duration_seconds
+  type: histogram
+  labels:
+  - scope
+- name: bitspay_governance_inbox_pending
+  type: gauge
+  labels:
+  - service
+  - bucket
+- name: bitspay_governance_inbox_overdue
+  type: gauge
+  labels:
+  - service
+- name: bitspay_governance_inbox_unrouted_total
+  type: counter
+  labels:
+  - service
+- name: bitspay_governance_refdata_published_total
+  type: counter
+  labels:
+  - type
+- name: bitspay_governance_monitoring_alerts_total
+  type: counter
+  labels:
+  - rule
+  - severity
+- name: bitspay_governance_monitoring_degraded
+  type: gauge
+  labels: []
+- name: bitspay_governance_staff_dormant_disabled_total
+  type: counter
+  labels: []
+- name: bitspay_governance_seed_import_total
+  type: counter
+  labels:
+  - kind
+  - result
+- name: bitspay_notification_events_consumed_total
+  type: counter
+  labels:
+  - topic
+  - event_type
+- name: bitspay_notification_notifications_created_total
+  type: counter
+  labels:
+  - template
+  - category
+- name: bitspay_notification_deliveries_total
+  type: counter
+  labels:
+  - channel
+  - status
+  - provider
+- name: bitspay_notification_delivery_latency_seconds
+  type: histogram
+  labels:
+  - channel
+  - stage
+- name: bitspay_notification_sms_segments_total
+  type: counter
+  labels:
+  - encoding
+- name: bitspay_notification_suppressed_total
+  type: counter
+  labels:
+  - reason
+- name: bitspay_notification_requests_rejected_total
+  type: counter
+  labels:
+  - reason
+- name: bitspay_notification_waiting_contact
+  type: gauge
+  labels: []
+- name: bitspay_notification_dispatch_queue_depth
+  type: gauge
+  labels: []
+- name: bitspay_notification_provider_cb_state
+  type: gauge
+  labels:
+  - provider
+- name: bitspay_notification_reminders_fired_total
+  type: counter
+  labels:
+  - policy
+- name: bitspay_notification_inbox_unread_cache_miss_total
+  type: counter
+  labels: []
+- name: bitspay_notification_selector_null_total
+  type: counter
+  labels:
+  - rule

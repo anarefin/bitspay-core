@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/support-service/support.events/DISPUTE_OPENED.v1.schema.json",
+  "title": "support.events DISPUTE_OPENED v1 — envelope.data",
+  "description": "Dispute created. Producer support-service; aggregateType Ticket; key = aggregateId = ticketId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "disputeId",
+    "ticketId",
+    "ticketNumber",
+    "disputeType",
+    "txnRef",
+    "txnType",
+    "amountPoisha",
+    "complainantWalletId",
+    "counterpartyWalletId",
+    "walletIds",
+    "holdCommandIds",
+    "openedAt"
+  ],
+  "properties": {
+    "disputeId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ticketId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ticketNumber": {
+      "type": "string",
+      "pattern": "^T\\d{6}\\d{6,}$",
+      "maxLength": 14
+    },
+    "disputeType": {
+      "type": "string",
+      "enum": [
+        "WRONG_TRANSFER",
+        "UNAUTHORISED_TXN",
+        "MERCHANT_DISPUTE",
+        "DUPLICATE_TXN",
+        "CASH_OUT_NOT_RECEIVED",
+        "OTHER"
+      ]
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "disputed transaction"
+    },
+    "txnType": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "transaction type of the disputed transaction"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "original principal"
+    },
+    "complainantWalletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "counterpartyWalletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "walletIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "description": "complainant + counterparty"
+    },
+    "holdCommandIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "description": "holds placed at creation; may be []"
+    },
+    "openedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

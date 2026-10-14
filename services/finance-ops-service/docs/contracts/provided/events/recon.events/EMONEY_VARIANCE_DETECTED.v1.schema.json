@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/finance-ops-service/recon.events/EMONEY_VARIANCE_DETECTED.v1.schema.json",
+  "title": "recon.events EMONEY_VARIANCE_DETECTED v1 — envelope.data (aggregateType ReconRun, key runId of the EMONEY run)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "businessDate",
+    "walletsTotalPoisha",
+    "trustMirrorPoisha",
+    "confirmedTrustPoisha",
+    "variancePoisha",
+    "runId",
+    "mode"
+  ],
+  "properties": {
+    "businessDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "walletsTotalPoisha": {
+      "type": "integer",
+      "description": "total outstanding e-money = all wallets + non-trust system accounts (poisha)"
+    },
+    "trustMirrorPoisha": {
+      "type": "integer"
+    },
+    "confirmedTrustPoisha": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Σ CLOSING confirmations; null if never confirmed"
+    },
+    "variancePoisha": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "walletsTotalPoisha − confirmedTrustPoisha (signed); null iff confirmedTrustPoisha null"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "EOD",
+        "LIVE"
+      ]
+    }
+  }
+}

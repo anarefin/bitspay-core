@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/kernel/envelope.schema.json",
+  "title": "Event envelope (kernel K4.1)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "producer", "aggregateType", "aggregateId", "correlationId", "data"],
+  "properties": {
+    "eventId": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "eventType": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "eventVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"},
+    "producer": {"type": "string", "pattern": "^([a-z][a-z-]*-service|archiver)$"},
+    "aggregateType": {"type": "string", "minLength": 1},
+    "aggregateId": {"type": "string", "minLength": 1},
+    "correlationId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "data": {"type": "object"}
+  }
+}

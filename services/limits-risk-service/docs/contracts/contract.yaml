@@ -1,0 +1,164 @@
+service: limits-risk-service
+number: "05"
+modules: []
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-5
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # 46 operations: 6 service contracts (evaluate, evaluate:batch, release, usage, blacklist check,
+      # blacklist proposal), staff config / rules / lists / approvals, 2 internal operations (x-audience).
+  events:
+    - topic: risk.alerts
+      key: "sender (from) walletId"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 12}
+      retention: 7d
+      transport: outbox
+      eventTypes:
+        - {type: RISK_ALERT_RAISED, version: 1, aggregateType: RiskAlert,
+           schema: provided/events/risk.alerts/RISK_ALERT_RAISED.v1.schema.json,
+           example: provided/events/risk.alerts/RISK_ALERT_RAISED.v1.example.json}
+    - topic: blacklist.events
+      key: "entryId"
+      compacted: true
+      tombstones: false
+      partitions: {dev: 1, prod: 3}
+      retention: compact
+      transport: outbox
+      eventTypes:
+        - {type: BLACKLIST_ENTRY_UPSERTED, version: 1, aggregateType: BlacklistEntry,
+           schema: provided/events/blacklist.events/BLACKLIST_ENTRY_UPSERTED.v1.schema.json,
+           example: provided/events/blacklist.events/BLACKLIST_ENTRY_UPSERTED.v1.example.json}
+  inboundTopics: []
+  data: []
+  codes: provided/codes.yaml
+
+consumes:
+  apis: []          # no synchronous outbound calls (wallet FRAUD_FREEZE status change is reserved, not called in R1)
+
+  events:
+    # ---- txn.events: reservations (intrinsic idempotency, no processed_event rows) ----
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.reservations
+      purpose: "commit the reservation (re-apply counters when it was expired/released, OPEN D-15); sender/receiver profile facts; partition watermark"
+      fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, amountPoisha, createdAt, completedAt]
+      codesUsed: [{set: txnType, values: [REVERSAL]}]
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_FAILED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.reservations
+      purpose: "release both parties' reservation exactly once; partition watermark"
+      fieldsUsed: [txnId, fromWalletId, toWalletId]
+      codesUsed: []
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REVERSED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.reservations
+      purpose: "only with bitspay.risk.limits.restore-on-reversal=true: decrement the original's counters when still in the same period; otherwise watermark only (FILTERED)"
+      fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, createdAt, reversedAmountPoisha]
+      codesUsed: []
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REFUNDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.reservations
+      purpose: "only with restore-on-reversal=true: decrement the original MERCHANT_PAYMENT counters by the refund delta when still in the same period; otherwise watermark only"
+      fieldsUsed: [txnId, txnType, fromWalletId, toWalletId, createdAt, refundedTotalPoisha]
+      codesUsed: []
+    # ---- txn.events: R2 history for back-testing (bitspay.risk.history.enabled) ----
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.history
+      purpose: "R2: append txn_history (90 days) for simulations"
+      fieldsUsed: &history [txnId, txnType, status, channel, fromWalletId, fromWalletType, toWalletId, toWalletType, amountPoisha, deviceId, riskDecision, riskScore]
+      codesUsed: []
+    - {producer: transaction-service, topic: txn.events, eventType: TRANSACTION_FAILED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.history, purpose: "R2: append txn_history", fieldsUsed: *history, codesUsed: []}
+    - {producer: transaction-service, topic: txn.events, eventType: TRANSACTION_REVERSED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.history, purpose: "R2: append txn_history", fieldsUsed: *history, codesUsed: []}
+    - {producer: transaction-service, topic: txn.events, eventType: TRANSACTION_REFUNDED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.history, purpose: "R2: append txn_history", fieldsUsed: *history, codesUsed: []}
+
+    # ---- wallet.events ----
+    - producer: wallet-service
+      topic: wallet.events
+      eventType: WALLET_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.wallet-events
+      purpose: "wallet profile fp:{walletId} for usage, MSISDN blacklist (HMAC of msisdn), fraud profile attributes, reactivation time"
+      fieldsUsed: [walletId, version, ownerType, walletType, msisdn, status, previousStatus, statusReasonCode, kycTier, categoryCode, createdAt, updatedAt]
+      codesUsed: [{set: walletStatus, values: [A, D]}]
+
+    # ---- customer.events (on by default) ----
+    - producer: wallet-service
+      topic: customer.events
+      eventType: CUSTOMER_REGISTERED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.customer-events
+      purpose: "risk grade and nidHash per wallet (NID blacklist, risk-grade tiers)"
+      fieldsUsed: &customer [customerId, walletIds, riskGrade, nidHash]
+      codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]
+    - {producer: wallet-service, topic: customer.events, eventType: KYC_APPROVED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.customer-events, purpose: "risk grade and nidHash per wallet", fieldsUsed: *customer,
+       codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]}
+    - {producer: wallet-service, topic: customer.events, eventType: RISK_GRADE_CHANGED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.customer-events, purpose: "risk grade per wallet", fieldsUsed: *customer,
+       codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]}
+    - {producer: wallet-service, topic: customer.events, eventType: CUSTOMER_PROFILE_UPDATED, version: 1, pinnedContractVersion: 1.0.0,
+       groupId: limits-risk-service.customer-events, purpose: "nidHash / risk grade refresh", fieldsUsed: *customer,
+       codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]}
+
+    # ---- partner.events (OPEN D-29) ----
+    - producer: wallet-service
+      topic: partner.events
+      eventType: PARTNER_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.partner-events
+      purpose: "partner wallet risk grade and PARTNER blacklist fingerprint HMAC(partnerId) (OPEN D-29)"
+      fieldsUsed: [partnerId, walletId, riskGrade, version]
+      codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]
+
+    # ---- disbursement.events ----
+    - producer: disbursement-service
+      topic: disbursement.events
+      eventType: BATCH_ROW_FAILED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: limits-risk-service.disbursement-events
+      purpose: "release the batch reservation whose id = row commandId (null commandId ignored) (OPEN D-14)"
+      fieldsUsed: [batchId, walletId, commandId]
+      codesUsed: []
+
+  inboundTopics:
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_REQUESTED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"],
+       entityTypes: [LimitChangeSet, EmergencyControl, FraudRuleVersion, RiskSettings, ListEntry, SelfLimit]}
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_DECIDED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"],
+       entityTypes: [LimitChangeSet, EmergencyControl, FraudRuleVersion, RiskSettings, ListEntry, SelfLimit]}
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_EXPIRED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"],
+       entityTypes: [LimitChangeSet, EmergencyControl, FraudRuleVersion, RiskSettings, ListEntry, SelfLimit]}
+    - {owner: admin-service, topic: audit.events, eventType: AUDIT_RECORDED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"]}
+    # notification.requests: not written (limits-risk-service sends no notifications)
+
+  data: []
+  codes: []
+  refdata: []       # limits-risk reads no refdata in R1

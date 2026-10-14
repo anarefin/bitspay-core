@@ -1,0 +1,31 @@
+{
+  "name": "GET /v1/history/transactions/{txnRef} → 404",
+  "priority": 9,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/history/transactions/[^/]+(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "404"
+      }
+    }
+  },
+  "response": {
+    "status": 404,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "NotFound",
+      "status": 404,
+      "code": "NOT_FOUND",
+      "correlationId": "c-0f3e9a"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "finance-ops-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

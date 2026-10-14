@@ -1,0 +1,2501 @@
+{
+  "schemaVersion": 1,
+  "seedChecksums": {
+    "coa-v0-provisional.csv": "43cc24d41199e8849f911f21c8301d70cb0aa0377703ecf7704cbc4a2570cdea",
+    "posting-rules-v1-provisional.yaml": "2fd49fed23557ec02c8802163d578496afb70c3a70114b77c7ed3abac18883e5",
+    "V3__coa_v0_provisional.sql": "99f1341ab7b14ea0f1515e4a311de4fee9cda6982156bb14726d96d0224731ee",
+    "V4__posting_rules_v1_provisional.sql": "8dc8b0461ba76ee9c09d564be10006d4e4307915bd934edf1cb78d166170b214"
+  },
+  "catalogueVersion": "1.4 + GL addendum 0.1 (draft)",
+  "coaVersion": "v0",
+  "ruleSetVersion": 1,
+  "rounding": "none (GL only sums poisha)",
+  "registry": {
+    "0192f2dd-0000-7000-8000-00000000d001": "D",
+    "0192f2ee-0000-7000-8000-00000000e001": "A",
+    "0192f2ff-0000-7000-8000-00000000f001": "M",
+    "0192f2aa-0000-7000-8000-00000000a001": "C",
+    "0192f2bb-0000-7000-8000-00000000b001": "C"
+  },
+  "vectors": [
+    {
+      "id": "V01",
+      "description": "P2P principal",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 1,
+          "legIndex": 0,
+          "code": 1001,
+          "debitAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "creditAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "amountPoisha": 50000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 50000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "P2P"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 50000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "P2P"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V02",
+      "description": "P2P fee (payer-borne)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 1,
+          "legIndex": 1,
+          "code": 2001,
+          "debitAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 500
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 500,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "P2P"
+          },
+          {
+            "glAccountCode": "4101",
+            "side": "CREDIT",
+            "amountPoisha": 500,
+            "ruleId": "F-FEE-P2P",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "P2P"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V03",
+      "description": "P2P VAT on fee",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 1,
+          "legIndex": 2,
+          "code": 2002,
+          "debitAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000210",
+          "amountPoisha": 75
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 75,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "P2P"
+          },
+          {
+            "glAccountCode": "2201",
+            "side": "CREDIT",
+            "amountPoisha": 75,
+            "ruleId": "V-210",
+            "sourceBucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "product": "P2P"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V04",
+      "description": "Cash-in principal",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 2,
+          "legIndex": 0,
+          "code": 1002,
+          "debitAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 100000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2102",
+            "side": "DEBIT",
+            "amountPoisha": 100000,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 100000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V05",
+      "description": "Cash-in commission net, operator-funded (COMMISSION_PAYABLE)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 2,
+          "legIndex": 3,
+          "code": 2003,
+          "debitAccountId": "00000000-0000-0000-0000-000000000220",
+          "creditAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "amountPoisha": 360
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5101",
+            "side": "DEBIT",
+            "amountPoisha": 360,
+            "ruleId": "C-COMM",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          },
+          {
+            "glAccountCode": "2102",
+            "side": "CREDIT",
+            "amountPoisha": 360,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V06",
+      "description": "Cash-in AIT withheld",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 2,
+          "legIndex": 4,
+          "code": 2004,
+          "debitAccountId": "00000000-0000-0000-0000-000000000220",
+          "creditAccountId": "00000000-0000-0000-0000-000000000230",
+          "amountPoisha": 40
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5101",
+            "side": "DEBIT",
+            "amountPoisha": 40,
+            "ruleId": "C-AIT",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          },
+          {
+            "glAccountCode": "2202",
+            "side": "CREDIT",
+            "amountPoisha": 40,
+            "ruleId": "A-230",
+            "sourceBucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "product": "CASH_IN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V07",
+      "description": "Cash-out principal",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 3,
+          "legIndex": 0,
+          "code": 1003,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "amountPoisha": 40000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 40000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          },
+          {
+            "glAccountCode": "2102",
+            "side": "CREDIT",
+            "amountPoisha": 40000,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V08",
+      "description": "Cash-out fee",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 3,
+          "legIndex": 1,
+          "code": 2001,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 600
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 600,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          },
+          {
+            "glAccountCode": "4103",
+            "side": "CREDIT",
+            "amountPoisha": 600,
+            "ruleId": "F-FEE-CO",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V09",
+      "description": "Cash-out VAT",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 3,
+          "legIndex": 2,
+          "code": 2002,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000210",
+          "amountPoisha": 90
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 90,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          },
+          {
+            "glAccountCode": "2201",
+            "side": "CREDIT",
+            "amountPoisha": 90,
+            "ruleId": "V-210",
+            "sourceBucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V10",
+      "description": "Cash-out commission net, from fee (PERCENT_OF_FEE)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 3,
+          "legIndex": 3,
+          "code": 2003,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "amountPoisha": 216
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5101",
+            "side": "DEBIT",
+            "amountPoisha": 216,
+            "ruleId": "F-COMM",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          },
+          {
+            "glAccountCode": "2102",
+            "side": "CREDIT",
+            "amountPoisha": 216,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V11",
+      "description": "Cash-out AIT from fee pool",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 3,
+          "legIndex": 4,
+          "code": 2004,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "00000000-0000-0000-0000-000000000230",
+          "amountPoisha": 24
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5101",
+            "side": "DEBIT",
+            "amountPoisha": 24,
+            "ruleId": "F-AIT",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          },
+          {
+            "glAccountCode": "2202",
+            "side": "CREDIT",
+            "amountPoisha": 24,
+            "ruleId": "A-230",
+            "sourceBucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "product": "CASH_OUT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V12",
+      "description": "Merchant payment principal",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 4,
+          "legIndex": 0,
+          "code": 1004,
+          "debitAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "creditAccountId": "0192f2ff-0000-7000-8000-00000000f001",
+          "amountPoisha": 35000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 35000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          },
+          {
+            "glAccountCode": "2104",
+            "side": "CREDIT",
+            "amountPoisha": 35000,
+            "ruleId": "W-130",
+            "sourceBucket": "WALLET:M",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V13",
+      "description": "MDR (payee-borne fee)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 4,
+          "legIndex": 1,
+          "code": 2001,
+          "debitAccountId": "0192f2ff-0000-7000-8000-00000000f001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 525
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2104",
+            "side": "DEBIT",
+            "amountPoisha": 525,
+            "ruleId": "W-130",
+            "sourceBucket": "WALLET:M",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          },
+          {
+            "glAccountCode": "4104",
+            "side": "CREDIT",
+            "amountPoisha": 525,
+            "ruleId": "F-FEE-MP",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V14",
+      "description": "VAT on MDR",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 4,
+          "legIndex": 2,
+          "code": 2002,
+          "debitAccountId": "0192f2ff-0000-7000-8000-00000000f001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000210",
+          "amountPoisha": 79
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2104",
+            "side": "DEBIT",
+            "amountPoisha": 79,
+            "ruleId": "W-130",
+            "sourceBucket": "WALLET:M",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          },
+          {
+            "glAccountCode": "2201",
+            "side": "CREDIT",
+            "amountPoisha": 79,
+            "ruleId": "V-210",
+            "sourceBucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "product": "MERCHANT_PAYMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V15",
+      "description": "Merchant refund principal",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 5,
+          "legIndex": 0,
+          "code": 1005,
+          "debitAccountId": "0192f2ff-0000-7000-8000-00000000f001",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 10000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2104",
+            "side": "DEBIT",
+            "amountPoisha": 10000,
+            "ruleId": "W-130",
+            "sourceBucket": "WALLET:M",
+            "trustIndex": null,
+            "product": "MERCHANT_REFUND"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 10000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "MERCHANT_REFUND"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V16",
+      "description": "E-money issuance to distributor (trust #01)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 9,
+          "legIndex": 0,
+          "code": 1008,
+          "debitAccountId": "00000000-0000-0000-0000-000000030001",
+          "creditAccountId": "0192f2dd-0000-7000-8000-00000000d001",
+          "amountPoisha": 100000000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1101-01",
+            "side": "DEBIT",
+            "amountPoisha": 100000000,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "EMONEY_ISSUE"
+          },
+          {
+            "glAccountCode": "2103",
+            "side": "CREDIT",
+            "amountPoisha": 100000000,
+            "ruleId": "W-120",
+            "sourceBucket": "WALLET:D",
+            "trustIndex": null,
+            "product": "EMONEY_ISSUE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V17",
+      "description": "E-money issuance to agent via trust #02 (instance account 1101-02 created from template)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 9,
+          "legIndex": 0,
+          "code": 1008,
+          "debitAccountId": "00000000-0000-0000-0000-000000030002",
+          "creditAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "amountPoisha": 5000000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1101-02",
+            "side": "DEBIT",
+            "amountPoisha": 5000000,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 2,
+            "product": "EMONEY_ISSUE"
+          },
+          {
+            "glAccountCode": "2102",
+            "side": "CREDIT",
+            "amountPoisha": 5000000,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "EMONEY_ISSUE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V18",
+      "description": "Float transfer distributor → agent",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 6,
+          "legIndex": 0,
+          "code": 1006,
+          "debitAccountId": "0192f2dd-0000-7000-8000-00000000d001",
+          "creditAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "amountPoisha": 10000000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2103",
+            "side": "DEBIT",
+            "amountPoisha": 10000000,
+            "ruleId": "W-120",
+            "sourceBucket": "WALLET:D",
+            "trustIndex": null,
+            "product": "FLOAT_TRANSFER"
+          },
+          {
+            "glAccountCode": "2102",
+            "side": "CREDIT",
+            "amountPoisha": 10000000,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "FLOAT_TRANSFER"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V19",
+      "description": "Reversal: principal mirror",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 7,
+          "legIndex": 1,
+          "code": 1013,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 10000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 10000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 10000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V20",
+      "description": "Reversal: fee mirror (reverseFee)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 7,
+          "legIndex": 2,
+          "code": 1013,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 500
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "4190",
+            "side": "DEBIT",
+            "amountPoisha": 500,
+            "ruleId": "F-REV-FEE",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 500,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V21",
+      "description": "Reversal: VAT mirror",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 7,
+          "legIndex": 3,
+          "code": 1013,
+          "debitAccountId": "00000000-0000-0000-0000-000000000210",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 75
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2201",
+            "side": "DEBIT",
+            "amountPoisha": 75,
+            "ruleId": "V-210",
+            "sourceBucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 75,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V22",
+      "description": "Reversal: commission mirror (reverseCommission)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 7,
+          "legIndex": 4,
+          "code": 1013,
+          "debitAccountId": "0192f2ee-0000-7000-8000-00000000e001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 216
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2102",
+            "side": "DEBIT",
+            "amountPoisha": 216,
+            "ruleId": "W-110",
+            "sourceBucket": "WALLET:A",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          },
+          {
+            "glAccountCode": "5190",
+            "side": "CREDIT",
+            "amountPoisha": 216,
+            "ruleId": "F-REV-COMM",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V23",
+      "description": "Reversal: AIT mirror",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 7,
+          "legIndex": 5,
+          "code": 1013,
+          "debitAccountId": "00000000-0000-0000-0000-000000000230",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 24
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2202",
+            "side": "DEBIT",
+            "amountPoisha": 24,
+            "ruleId": "A-230",
+            "sourceBucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          },
+          {
+            "glAccountCode": "5190",
+            "side": "CREDIT",
+            "amountPoisha": 24,
+            "ruleId": "F-REV-COMM",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "REVERSAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V24",
+      "description": "Redemption REVENUE_SWEEP (fee pool → operating bank)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 10,
+          "legIndex": 0,
+          "code": 1009,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "00000000-0000-0000-0000-000000030001",
+          "amountPoisha": 800
+        },
+        "reasonCode": "REVENUE_SWEEP"
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1201",
+            "side": "DEBIT",
+            "amountPoisha": 800,
+            "ruleId": "F-SWEEP",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "EMONEY_REDEEM"
+          },
+          {
+            "glAccountCode": "1101-01",
+            "side": "CREDIT",
+            "amountPoisha": 800,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "EMONEY_REDEEM"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V25",
+      "description": "Redemption VAT_REMITTANCE",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 10,
+          "legIndex": 0,
+          "code": 1009,
+          "debitAccountId": "00000000-0000-0000-0000-000000000210",
+          "creditAccountId": "00000000-0000-0000-0000-000000030001",
+          "amountPoisha": 244
+        },
+        "reasonCode": "VAT_REMITTANCE"
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2201",
+            "side": "DEBIT",
+            "amountPoisha": 244,
+            "ruleId": "V-210",
+            "sourceBucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "product": "EMONEY_REDEEM"
+          },
+          {
+            "glAccountCode": "1101-01",
+            "side": "CREDIT",
+            "amountPoisha": 244,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "EMONEY_REDEEM"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V26",
+      "description": "Redemption MERCHANT_SETTLEMENT",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 10,
+          "legIndex": 0,
+          "code": 1009,
+          "debitAccountId": "0192f2ff-0000-7000-8000-00000000f001",
+          "creditAccountId": "00000000-0000-0000-0000-000000030001",
+          "amountPoisha": 20000
+        },
+        "reasonCode": "MERCHANT_SETTLEMENT"
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2104",
+            "side": "DEBIT",
+            "amountPoisha": 20000,
+            "ruleId": "W-130",
+            "sourceBucket": "WALLET:M",
+            "trustIndex": null,
+            "product": "EMONEY_REDEEM"
+          },
+          {
+            "glAccountCode": "1101-01",
+            "side": "CREDIT",
+            "amountPoisha": 20000,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "EMONEY_REDEEM"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V27",
+      "description": "Reconciliation adjustment (bank charge) — no reason on the event, default rules",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 11,
+          "legIndex": 0,
+          "code": 1010,
+          "debitAccountId": "00000000-0000-0000-0000-000000000400",
+          "creditAccountId": "00000000-0000-0000-0000-000000030001",
+          "amountPoisha": 100
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1901",
+            "side": "DEBIT",
+            "amountPoisha": 100,
+            "ruleId": "S-400",
+            "sourceBucket": "SYS:SUSPENSE",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          },
+          {
+            "glAccountCode": "1101-01",
+            "side": "CREDIT",
+            "amountPoisha": 100,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "ADJUSTMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V28",
+      "description": "Manual journal SUSPENSE_CLEARING from fee pool (keyed by counterparty SUSPENSE, no reason needed)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 11,
+          "legIndex": 0,
+          "code": 1010,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "00000000-0000-0000-0000-000000000400",
+          "amountPoisha": 100
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5301",
+            "side": "DEBIT",
+            "amountPoisha": 100,
+            "ruleId": "F-ADJ-S-D",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          },
+          {
+            "glAccountCode": "1901",
+            "side": "CREDIT",
+            "amountPoisha": 100,
+            "ruleId": "S-400",
+            "sourceBucket": "SYS:SUSPENSE",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V29",
+      "description": "Manual journal COMMISSION_FUNDING (pool to pool, nets to zero in 1950)",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 11,
+          "legIndex": 0,
+          "code": 1010,
+          "debitAccountId": "00000000-0000-0000-0000-000000000200",
+          "creditAccountId": "00000000-0000-0000-0000-000000000220",
+          "amountPoisha": 400
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1950",
+            "side": "DEBIT",
+            "amountPoisha": 400,
+            "ruleId": "F-ADJ-220",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          },
+          {
+            "glAccountCode": "1950",
+            "side": "CREDIT",
+            "amountPoisha": 400,
+            "ruleId": "C-ADJ-200",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V30",
+      "description": "Pool transfer in the other direction (COMMISSION_PAYABLE → FEE_INCOME) — also 1950/1950",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 11,
+          "legIndex": 0,
+          "code": 1010,
+          "debitAccountId": "00000000-0000-0000-0000-000000000220",
+          "creditAccountId": "00000000-0000-0000-0000-000000000200",
+          "amountPoisha": 400
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1950",
+            "side": "DEBIT",
+            "amountPoisha": 400,
+            "ruleId": "C-ADJ-200",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          },
+          {
+            "glAccountCode": "1950",
+            "side": "CREDIT",
+            "amountPoisha": 400,
+            "ruleId": "F-ADJ-220",
+            "sourceBucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "product": "ADJUSTMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V31",
+      "description": "Lien creation (pending) — ignored",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [
+            "pending"
+          ],
+          "commandType": 14,
+          "legIndex": 0,
+          "code": 1014,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000420",
+          "amountPoisha": 10000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": true,
+        "lines": []
+      }
+    },
+    {
+      "id": "V32",
+      "description": "Lien release (void) — ignored",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [
+            "void_pending_transfer"
+          ],
+          "commandType": 15,
+          "legIndex": 0,
+          "code": 1014,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "00000000-0000-0000-0000-000000000420",
+          "amountPoisha": 10000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": true,
+        "lines": []
+      }
+    },
+    {
+      "id": "V33",
+      "description": "Trust rebalance #01 → #02",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 16,
+          "legIndex": 0,
+          "code": 1015,
+          "debitAccountId": "00000000-0000-0000-0000-000000030002",
+          "creditAccountId": "00000000-0000-0000-0000-000000030001",
+          "amountPoisha": 5000000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "1101-02",
+            "side": "DEBIT",
+            "amountPoisha": 5000000,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 2,
+            "product": "TRUST_REBALANCE"
+          },
+          {
+            "glAccountCode": "1101-01",
+            "side": "CREDIT",
+            "amountPoisha": 5000000,
+            "ruleId": "T-300",
+            "sourceBucket": "TRUST",
+            "trustIndex": 1,
+            "product": "TRUST_REBALANCE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V34",
+      "description": "Commission settlement (R2) net leg",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 13,
+          "legIndex": 0,
+          "code": 1012,
+          "debitAccountId": "00000000-0000-0000-0000-000000000220",
+          "creditAccountId": "0192f2dd-0000-7000-8000-00000000d001",
+          "amountPoisha": 108000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5102",
+            "side": "DEBIT",
+            "amountPoisha": 108000,
+            "ruleId": "C-CMS",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "COMMISSION_SETTLEMENT"
+          },
+          {
+            "glAccountCode": "2103",
+            "side": "CREDIT",
+            "amountPoisha": 108000,
+            "ruleId": "W-120",
+            "sourceBucket": "WALLET:D",
+            "trustIndex": null,
+            "product": "COMMISSION_SETTLEMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V35",
+      "description": "Commission settlement (R2) AIT leg",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 13,
+          "legIndex": 1,
+          "code": 2004,
+          "debitAccountId": "00000000-0000-0000-0000-000000000220",
+          "creditAccountId": "00000000-0000-0000-0000-000000000230",
+          "amountPoisha": 12000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "5102",
+            "side": "DEBIT",
+            "amountPoisha": 12000,
+            "ruleId": "C-CMS-AIT",
+            "sourceBucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "product": "COMMISSION_SETTLEMENT"
+          },
+          {
+            "glAccountCode": "2202",
+            "side": "CREDIT",
+            "amountPoisha": 12000,
+            "ruleId": "A-230",
+            "sourceBucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "product": "COMMISSION_SETTLEMENT"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V36",
+      "description": "Closure payout to the same person's other wallet",
+      "input": {
+        "data": {
+          "pendingId": null,
+          "flags": [],
+          "commandType": 17,
+          "legIndex": 0,
+          "code": 1016,
+          "debitAccountId": "0192f2bb-0000-7000-8000-00000000b001",
+          "creditAccountId": "0192f2aa-0000-7000-8000-00000000a001",
+          "amountPoisha": 1000
+        },
+        "reasonCode": null
+      },
+      "expected": {
+        "ignored": false,
+        "lines": [
+          {
+            "glAccountCode": "2101",
+            "side": "DEBIT",
+            "amountPoisha": 1000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CLOSURE_PAYOUT"
+          },
+          {
+            "glAccountCode": "2101",
+            "side": "CREDIT",
+            "amountPoisha": 1000,
+            "ruleId": "W-100",
+            "sourceBucket": "WALLET:C",
+            "trustIndex": null,
+            "product": "CLOSURE_PAYOUT"
+          }
+        ]
+      }
+    }
+  ],
+  "dayVectors": [
+    {
+      "id": "GLD-1",
+      "businessDate": "2026-10-09",
+      "description": "Golden day: S1 e-money issued to Padma (trust #01); S4 float Padma → Salma; S4 cash-in 1,000 Tk Salma → Rahim; commission 40 bps = 400, AIT 10% = 40; S5 P2P 500 Tk Rahim → Karim; fee 5 + VAT 0.75; S6 cash-out 400 Tk Karim at Salma; fee 150 bps = 600, VAT 90, commission 40% of fee = 240 (AIT 24); S6 QR payment 350 Tk Rahim → Nirob; MDR 150 bps = 525 payee-borne, VAT 79 (78.75 HALF_EVEN); S6 partial refund 100 Tk Nirob → Rahim (no fee)",
+      "inputFixture": "fixtures/events/ledger.changes.2026-10-09.jsonl",
+      "reasons": {},
+      "expected": {
+        "subledgerSummaryRowCount": 34,
+        "ledgerDayJournal": {
+          "totalDebitPoisha": 110237509,
+          "totalCreditPoisha": 110237509,
+          "lines": [
+            {
+              "lineNo": 1,
+              "glAccountCode": "1101-01",
+              "side": "DEBIT",
+              "product": "EMONEY_ISSUE",
+              "transferCode": 1008,
+              "sourceBucket": "TRUST",
+              "trustIndex": 1,
+              "reasonCode": null,
+              "amountPoisha": 100000000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 2,
+              "glAccountCode": "2101",
+              "side": "CREDIT",
+              "product": "CASH_IN",
+              "transferCode": 1002,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 100000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 3,
+              "glAccountCode": "2101",
+              "side": "CREDIT",
+              "product": "MERCHANT_REFUND",
+              "transferCode": 1005,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 4,
+              "glAccountCode": "2101",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 1001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 50000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 5,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "CASH_OUT",
+              "transferCode": 1003,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 40000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 6,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "CASH_OUT",
+              "transferCode": 2001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 600,
+              "legCount": 1
+            },
+            {
+              "lineNo": 7,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "CASH_OUT",
+              "transferCode": 2002,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 90,
+              "legCount": 1
+            },
+            {
+              "lineNo": 8,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 1004,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 35000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 9,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 1001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 50000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 10,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 2001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 500,
+              "legCount": 1
+            },
+            {
+              "lineNo": 11,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 2002,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 75,
+              "legCount": 1
+            },
+            {
+              "lineNo": 12,
+              "glAccountCode": "2102",
+              "side": "CREDIT",
+              "product": "CASH_IN",
+              "transferCode": 2003,
+              "sourceBucket": "WALLET:A",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 360,
+              "legCount": 1
+            },
+            {
+              "lineNo": 13,
+              "glAccountCode": "2102",
+              "side": "CREDIT",
+              "product": "CASH_OUT",
+              "transferCode": 1003,
+              "sourceBucket": "WALLET:A",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 40000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 14,
+              "glAccountCode": "2102",
+              "side": "CREDIT",
+              "product": "CASH_OUT",
+              "transferCode": 2003,
+              "sourceBucket": "WALLET:A",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 216,
+              "legCount": 1
+            },
+            {
+              "lineNo": 15,
+              "glAccountCode": "2102",
+              "side": "CREDIT",
+              "product": "FLOAT_TRANSFER",
+              "transferCode": 1006,
+              "sourceBucket": "WALLET:A",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 16,
+              "glAccountCode": "2102",
+              "side": "DEBIT",
+              "product": "CASH_IN",
+              "transferCode": 1002,
+              "sourceBucket": "WALLET:A",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 100000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 17,
+              "glAccountCode": "2103",
+              "side": "CREDIT",
+              "product": "EMONEY_ISSUE",
+              "transferCode": 1008,
+              "sourceBucket": "WALLET:D",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 100000000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 18,
+              "glAccountCode": "2103",
+              "side": "DEBIT",
+              "product": "FLOAT_TRANSFER",
+              "transferCode": 1006,
+              "sourceBucket": "WALLET:D",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 19,
+              "glAccountCode": "2104",
+              "side": "CREDIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 1004,
+              "sourceBucket": "WALLET:M",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 35000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 20,
+              "glAccountCode": "2104",
+              "side": "DEBIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 2001,
+              "sourceBucket": "WALLET:M",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 525,
+              "legCount": 1
+            },
+            {
+              "lineNo": 21,
+              "glAccountCode": "2104",
+              "side": "DEBIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 2002,
+              "sourceBucket": "WALLET:M",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 79,
+              "legCount": 1
+            },
+            {
+              "lineNo": 22,
+              "glAccountCode": "2104",
+              "side": "DEBIT",
+              "product": "MERCHANT_REFUND",
+              "transferCode": 1005,
+              "sourceBucket": "WALLET:M",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 23,
+              "glAccountCode": "2201",
+              "side": "CREDIT",
+              "product": "CASH_OUT",
+              "transferCode": 2002,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 90,
+              "legCount": 1
+            },
+            {
+              "lineNo": 24,
+              "glAccountCode": "2201",
+              "side": "CREDIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 2002,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 79,
+              "legCount": 1
+            },
+            {
+              "lineNo": 25,
+              "glAccountCode": "2201",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 2002,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 75,
+              "legCount": 1
+            },
+            {
+              "lineNo": 26,
+              "glAccountCode": "2202",
+              "side": "CREDIT",
+              "product": "CASH_IN",
+              "transferCode": 2004,
+              "sourceBucket": "SYS:AIT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 40,
+              "legCount": 1
+            },
+            {
+              "lineNo": 27,
+              "glAccountCode": "2202",
+              "side": "CREDIT",
+              "product": "CASH_OUT",
+              "transferCode": 2004,
+              "sourceBucket": "SYS:AIT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 24,
+              "legCount": 1
+            },
+            {
+              "lineNo": 28,
+              "glAccountCode": "4101",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 2001,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 500,
+              "legCount": 1
+            },
+            {
+              "lineNo": 29,
+              "glAccountCode": "4103",
+              "side": "CREDIT",
+              "product": "CASH_OUT",
+              "transferCode": 2001,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 600,
+              "legCount": 1
+            },
+            {
+              "lineNo": 30,
+              "glAccountCode": "4104",
+              "side": "CREDIT",
+              "product": "MERCHANT_PAYMENT",
+              "transferCode": 2001,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 525,
+              "legCount": 1
+            },
+            {
+              "lineNo": 31,
+              "glAccountCode": "5101",
+              "side": "DEBIT",
+              "product": "CASH_IN",
+              "transferCode": 2003,
+              "sourceBucket": "SYS:COMMISSION_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 360,
+              "legCount": 1
+            },
+            {
+              "lineNo": 32,
+              "glAccountCode": "5101",
+              "side": "DEBIT",
+              "product": "CASH_IN",
+              "transferCode": 2004,
+              "sourceBucket": "SYS:COMMISSION_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 40,
+              "legCount": 1
+            },
+            {
+              "lineNo": 33,
+              "glAccountCode": "5101",
+              "side": "DEBIT",
+              "product": "CASH_OUT",
+              "transferCode": 2003,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 216,
+              "legCount": 1
+            },
+            {
+              "lineNo": 34,
+              "glAccountCode": "5101",
+              "side": "DEBIT",
+              "product": "CASH_OUT",
+              "transferCode": 2004,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 24,
+              "legCount": 1
+            }
+          ]
+        },
+        "trialBalance": [
+          {
+            "glAccountCode": "1101-01",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 100000000,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 100000000
+          },
+          {
+            "glAccountCode": "2101",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 126265,
+            "creditMovementPoisha": 160000,
+            "closingNetDebitPoisha": -33735
+          },
+          {
+            "glAccountCode": "2102",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 100000,
+            "creditMovementPoisha": 10040576,
+            "closingNetDebitPoisha": -9940576
+          },
+          {
+            "glAccountCode": "2103",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 10000000,
+            "creditMovementPoisha": 100000000,
+            "closingNetDebitPoisha": -90000000
+          },
+          {
+            "glAccountCode": "2104",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 10604,
+            "creditMovementPoisha": 35000,
+            "closingNetDebitPoisha": -24396
+          },
+          {
+            "glAccountCode": "2201",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 244,
+            "closingNetDebitPoisha": -244
+          },
+          {
+            "glAccountCode": "2202",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 64,
+            "closingNetDebitPoisha": -64
+          },
+          {
+            "glAccountCode": "4101",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 500,
+            "closingNetDebitPoisha": -500
+          },
+          {
+            "glAccountCode": "4103",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 600,
+            "closingNetDebitPoisha": -600
+          },
+          {
+            "glAccountCode": "4104",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 525,
+            "closingNetDebitPoisha": -525
+          },
+          {
+            "glAccountCode": "5101",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 640,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 640
+          }
+        ],
+        "statements": {
+          "assetsPoisha": 100000000,
+          "liabilitiesPoisha": 99999015,
+          "equityPoisha": 0,
+          "incomePoisha": 1625,
+          "expensePoisha": 640,
+          "netResultPoisha": 985,
+          "balanced": true
+        },
+        "controlTotals": [
+          {
+            "bucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 0,
+            "creditsPostedPoisha": 64,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 64,
+            "legCount": 2
+          },
+          {
+            "bucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 400,
+            "creditsPostedPoisha": 0,
+            "dayDebitPoisha": 400,
+            "dayCreditPoisha": 0,
+            "legCount": 2
+          },
+          {
+            "bucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "debitsPostedPoisha": 240,
+            "creditsPostedPoisha": 1625,
+            "dayDebitPoisha": 240,
+            "dayCreditPoisha": 1625,
+            "legCount": 5
+          },
+          {
+            "bucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 0,
+            "creditsPostedPoisha": 244,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 244,
+            "legCount": 3
+          },
+          {
+            "bucket": "TRUST",
+            "trustIndex": 1,
+            "debitsPostedPoisha": 100000000,
+            "creditsPostedPoisha": 0,
+            "dayDebitPoisha": 100000000,
+            "dayCreditPoisha": 0,
+            "legCount": 1
+          },
+          {
+            "bucket": "WALLET:A",
+            "trustIndex": null,
+            "debitsPostedPoisha": 100000,
+            "creditsPostedPoisha": 10040576,
+            "dayDebitPoisha": 100000,
+            "dayCreditPoisha": 10040576,
+            "legCount": 5
+          },
+          {
+            "bucket": "WALLET:C",
+            "trustIndex": null,
+            "debitsPostedPoisha": 126265,
+            "creditsPostedPoisha": 160000,
+            "dayDebitPoisha": 126265,
+            "dayCreditPoisha": 160000,
+            "legCount": 10
+          },
+          {
+            "bucket": "WALLET:D",
+            "trustIndex": null,
+            "debitsPostedPoisha": 10000000,
+            "creditsPostedPoisha": 100000000,
+            "dayDebitPoisha": 10000000,
+            "dayCreditPoisha": 100000000,
+            "legCount": 2
+          },
+          {
+            "bucket": "WALLET:M",
+            "trustIndex": null,
+            "debitsPostedPoisha": 10604,
+            "creditsPostedPoisha": 35000,
+            "dayDebitPoisha": 10604,
+            "dayCreditPoisha": 35000,
+            "legCount": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "GLD-2",
+      "businessDate": "2026-10-10",
+      "description": "Golden day: P2P 100 Tk Rahim → Karim (wrong recipient); S10 hold on Karim (pending — not posted); S10 reversal with reverseFee: void hold, mirror principal/fee/VAT; Treasury redemption REVENUE_SWEEP 8 Tk to operating bank; Treasury redemption VAT_REMITTANCE 2.44 Tk; Reconciliation adjustment RCA RECON_BANK_CHARGE 1 Tk (no business event); Treasury manual journal SUSPENSE_CLEARING 1 Tk; Treasury manual journal COMMISSION_FUNDING 4 Tk",
+      "inputFixture": "fixtures/events/ledger.changes.2026-10-10.jsonl",
+      "reasons": {
+        "0192f3c1-0000-7000-8000-00000000000e": "REVENUE_SWEEP",
+        "0192f3c1-0000-7000-8000-00000000000f": "VAT_REMITTANCE",
+        "0192f3c1-0000-7000-8000-000000000011": "SUSPENSE_CLEARING",
+        "0192f3c1-0000-7000-8000-000000000012": "COMMISSION_FUNDING"
+      },
+      "expected": {
+        "subledgerSummaryRowCount": 22,
+        "ledgerDayJournal": {
+          "totalDebitPoisha": 22794,
+          "totalCreditPoisha": 22794,
+          "lines": [
+            {
+              "lineNo": 1,
+              "glAccountCode": "1101-01",
+              "side": "CREDIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "TRUST",
+              "trustIndex": 1,
+              "reasonCode": null,
+              "amountPoisha": 100,
+              "legCount": 1
+            },
+            {
+              "lineNo": 2,
+              "glAccountCode": "1101-01",
+              "side": "CREDIT",
+              "product": "EMONEY_REDEEM",
+              "transferCode": 1009,
+              "sourceBucket": "TRUST",
+              "trustIndex": 1,
+              "reasonCode": "REVENUE_SWEEP",
+              "amountPoisha": 800,
+              "legCount": 1
+            },
+            {
+              "lineNo": 3,
+              "glAccountCode": "1101-01",
+              "side": "CREDIT",
+              "product": "EMONEY_REDEEM",
+              "transferCode": 1009,
+              "sourceBucket": "TRUST",
+              "trustIndex": 1,
+              "reasonCode": "VAT_REMITTANCE",
+              "amountPoisha": 244,
+              "legCount": 1
+            },
+            {
+              "lineNo": 4,
+              "glAccountCode": "1201",
+              "side": "DEBIT",
+              "product": "EMONEY_REDEEM",
+              "transferCode": 1009,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": "REVENUE_SWEEP",
+              "amountPoisha": 800,
+              "legCount": 1
+            },
+            {
+              "lineNo": 5,
+              "glAccountCode": "1901",
+              "side": "CREDIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "SYS:SUSPENSE",
+              "trustIndex": null,
+              "reasonCode": "SUSPENSE_CLEARING",
+              "amountPoisha": 100,
+              "legCount": 1
+            },
+            {
+              "lineNo": 6,
+              "glAccountCode": "1901",
+              "side": "DEBIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "SYS:SUSPENSE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 100,
+              "legCount": 1
+            },
+            {
+              "lineNo": 7,
+              "glAccountCode": "1950",
+              "side": "CREDIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "SYS:COMMISSION_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": "COMMISSION_FUNDING",
+              "amountPoisha": 400,
+              "legCount": 1
+            },
+            {
+              "lineNo": 8,
+              "glAccountCode": "1950",
+              "side": "DEBIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": "COMMISSION_FUNDING",
+              "amountPoisha": 400,
+              "legCount": 1
+            },
+            {
+              "lineNo": 9,
+              "glAccountCode": "2101",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 1001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 10,
+              "glAccountCode": "2101",
+              "side": "CREDIT",
+              "product": "REVERSAL",
+              "transferCode": 1013,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10575,
+              "legCount": 3
+            },
+            {
+              "lineNo": 11,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 1001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 12,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 2001,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 500,
+              "legCount": 1
+            },
+            {
+              "lineNo": 13,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "P2P",
+              "transferCode": 2002,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 75,
+              "legCount": 1
+            },
+            {
+              "lineNo": 14,
+              "glAccountCode": "2101",
+              "side": "DEBIT",
+              "product": "REVERSAL",
+              "transferCode": 1013,
+              "sourceBucket": "WALLET:C",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 10000,
+              "legCount": 1
+            },
+            {
+              "lineNo": 15,
+              "glAccountCode": "2201",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 2002,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 75,
+              "legCount": 1
+            },
+            {
+              "lineNo": 16,
+              "glAccountCode": "2201",
+              "side": "DEBIT",
+              "product": "EMONEY_REDEEM",
+              "transferCode": 1009,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": "VAT_REMITTANCE",
+              "amountPoisha": 244,
+              "legCount": 1
+            },
+            {
+              "lineNo": 17,
+              "glAccountCode": "2201",
+              "side": "DEBIT",
+              "product": "REVERSAL",
+              "transferCode": 1013,
+              "sourceBucket": "SYS:VAT_PAYABLE",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 75,
+              "legCount": 1
+            },
+            {
+              "lineNo": 18,
+              "glAccountCode": "4101",
+              "side": "CREDIT",
+              "product": "P2P",
+              "transferCode": 2001,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 500,
+              "legCount": 1
+            },
+            {
+              "lineNo": 19,
+              "glAccountCode": "4190",
+              "side": "DEBIT",
+              "product": "REVERSAL",
+              "transferCode": 1013,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": null,
+              "amountPoisha": 500,
+              "legCount": 1
+            },
+            {
+              "lineNo": 20,
+              "glAccountCode": "5301",
+              "side": "DEBIT",
+              "product": "ADJUSTMENT",
+              "transferCode": 1010,
+              "sourceBucket": "SYS:FEE_INCOME",
+              "trustIndex": null,
+              "reasonCode": "SUSPENSE_CLEARING",
+              "amountPoisha": 100,
+              "legCount": 1
+            }
+          ]
+        },
+        "trialBalance": [
+          {
+            "glAccountCode": "1101-01",
+            "openingNetDebitPoisha": 100000000,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 1144,
+            "closingNetDebitPoisha": 99998856
+          },
+          {
+            "glAccountCode": "1201",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 800,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 800
+          },
+          {
+            "glAccountCode": "1901",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 100,
+            "creditMovementPoisha": 100,
+            "closingNetDebitPoisha": 0
+          },
+          {
+            "glAccountCode": "1950",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 400,
+            "creditMovementPoisha": 400,
+            "closingNetDebitPoisha": 0
+          },
+          {
+            "glAccountCode": "2101",
+            "openingNetDebitPoisha": -33735,
+            "debitMovementPoisha": 20575,
+            "creditMovementPoisha": 20575,
+            "closingNetDebitPoisha": -33735
+          },
+          {
+            "glAccountCode": "2102",
+            "openingNetDebitPoisha": -9940576,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -9940576
+          },
+          {
+            "glAccountCode": "2103",
+            "openingNetDebitPoisha": -90000000,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -90000000
+          },
+          {
+            "glAccountCode": "2104",
+            "openingNetDebitPoisha": -24396,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -24396
+          },
+          {
+            "glAccountCode": "2201",
+            "openingNetDebitPoisha": -244,
+            "debitMovementPoisha": 319,
+            "creditMovementPoisha": 75,
+            "closingNetDebitPoisha": 0
+          },
+          {
+            "glAccountCode": "2202",
+            "openingNetDebitPoisha": -64,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -64
+          },
+          {
+            "glAccountCode": "4101",
+            "openingNetDebitPoisha": -500,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 500,
+            "closingNetDebitPoisha": -1000
+          },
+          {
+            "glAccountCode": "4103",
+            "openingNetDebitPoisha": -600,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -600
+          },
+          {
+            "glAccountCode": "4104",
+            "openingNetDebitPoisha": -525,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": -525
+          },
+          {
+            "glAccountCode": "4190",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 500,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 500
+          },
+          {
+            "glAccountCode": "5101",
+            "openingNetDebitPoisha": 640,
+            "debitMovementPoisha": 0,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 640
+          },
+          {
+            "glAccountCode": "5301",
+            "openingNetDebitPoisha": 0,
+            "debitMovementPoisha": 100,
+            "creditMovementPoisha": 0,
+            "closingNetDebitPoisha": 100
+          }
+        ],
+        "statements": {
+          "assetsPoisha": 99999656,
+          "liabilitiesPoisha": 99998771,
+          "equityPoisha": 0,
+          "incomePoisha": 1625,
+          "expensePoisha": 740,
+          "netResultPoisha": 885,
+          "balanced": true
+        },
+        "controlTotals": [
+          {
+            "bucket": "SYS:AIT_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 0,
+            "creditsPostedPoisha": 64,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 0,
+            "legCount": 0
+          },
+          {
+            "bucket": "SYS:COMMISSION_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 400,
+            "creditsPostedPoisha": 400,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 400,
+            "legCount": 1
+          },
+          {
+            "bucket": "SYS:FEE_INCOME",
+            "trustIndex": null,
+            "debitsPostedPoisha": 2040,
+            "creditsPostedPoisha": 2125,
+            "dayDebitPoisha": 1800,
+            "dayCreditPoisha": 500,
+            "legCount": 5
+          },
+          {
+            "bucket": "SYS:SUSPENSE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 100,
+            "creditsPostedPoisha": 100,
+            "dayDebitPoisha": 100,
+            "dayCreditPoisha": 100,
+            "legCount": 2
+          },
+          {
+            "bucket": "SYS:VAT_PAYABLE",
+            "trustIndex": null,
+            "debitsPostedPoisha": 319,
+            "creditsPostedPoisha": 319,
+            "dayDebitPoisha": 319,
+            "dayCreditPoisha": 75,
+            "legCount": 3
+          },
+          {
+            "bucket": "TRUST",
+            "trustIndex": 1,
+            "debitsPostedPoisha": 100000000,
+            "creditsPostedPoisha": 1144,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 1144,
+            "legCount": 3
+          },
+          {
+            "bucket": "WALLET:A",
+            "trustIndex": null,
+            "debitsPostedPoisha": 100000,
+            "creditsPostedPoisha": 10040576,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 0,
+            "legCount": 0
+          },
+          {
+            "bucket": "WALLET:C",
+            "trustIndex": null,
+            "debitsPostedPoisha": 146840,
+            "creditsPostedPoisha": 180575,
+            "dayDebitPoisha": 20575,
+            "dayCreditPoisha": 20575,
+            "legCount": 8
+          },
+          {
+            "bucket": "WALLET:D",
+            "trustIndex": null,
+            "debitsPostedPoisha": 10000000,
+            "creditsPostedPoisha": 100000000,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 0,
+            "legCount": 0
+          },
+          {
+            "bucket": "WALLET:M",
+            "trustIndex": null,
+            "debitsPostedPoisha": 10604,
+            "creditsPostedPoisha": 35000,
+            "dayDebitPoisha": 0,
+            "dayCreditPoisha": 0,
+            "legCount": 0
+          }
+        ]
+      }
+    }
+  ]
+}

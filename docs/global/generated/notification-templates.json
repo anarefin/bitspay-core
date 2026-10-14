@@ -1,0 +1,3755 @@
+[
+  {
+    "code": "WALLET_CLOSURE_REQUESTED",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "closureId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "requestedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "awaitingZeroBalance",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{true,false}"
+      }
+    ],
+    "module": "wallet",
+    "trigger": "closure request accepted",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "WALLET_CLOSURE_APPROVED",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "closureId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "settleAfter",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "required"
+      }
+    ],
+    "module": "wallet",
+    "trigger": "closure approved",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "WALLET_CLOSURE_COMPLETED",
+    "category": "SERVICE",
+    "recipient": "msisdn only (closed wallet)",
+    "channels": [
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "closureId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "closedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "wallet",
+    "trigger": "wallet closed (Z, reason CLOSURE)",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "WALLET_CLOSURE_REVERTED",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "closureId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "blocking check code, e.g. BALANCE_NOT_ZERO, AWAITING_ZERO_BALANCE"
+      }
+    ],
+    "module": "wallet",
+    "trigger": "closure reverted (blocking final check or payout rejected)",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "WALLET_DORMANCY_WARNING",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "SMS",
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "dormantFrom",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "inactiveDays",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "wallet",
+    "trigger": "dormancy warning job",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "KYC_REVIEW_DUE",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "SMS",
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "dueDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "wallet",
+    "trigger": "re-KYC due job (single sender of re-KYC reminders, OPEN D-11)",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "KYC_REVIEW_OVERDUE",
+    "category": "SERVICE",
+    "recipient": "wallet holder (walletId)",
+    "channels": [
+      "SMS",
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "dueDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "restrictFrom",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "wallet",
+    "trigger": "re-KYC overdue job",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_APPLICATION_RECEIVED",
+    "category": "SERVICE",
+    "recipient": "applicant msisdn",
+    "channels": [
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "applicationId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "partnerType",
+        "type": "TEXT",
+        "req": true,
+        "notes": "partner type"
+      }
+    ],
+    "module": "partner",
+    "trigger": "application submitted",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_APPLICATION_RETURNED",
+    "category": "SERVICE",
+    "recipient": "applicant msisdn + initiator staffUserId (one request each)",
+    "channels": [],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "REASON_CODE code"
+      }
+    ],
+    "module": "partner",
+    "trigger": "application returned for correction",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_APPLICATION_REJECTED",
+    "category": "SERVICE",
+    "recipient": "applicant msisdn",
+    "channels": [
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "REASON_CODE code"
+      }
+    ],
+    "module": "partner",
+    "trigger": "application rejected",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_ACTIVATED",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "partnerCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "displayName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "partner activated",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_SUSPENDED",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId); + parent wallet for DST-008",
+    "channels": [],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "partner status reason code"
+      },
+      {
+        "name": "until",
+        "type": "DATE",
+        "req": false,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "partner suspended",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_REACTIVATED",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId); + parent wallet for DST-008",
+    "channels": [],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "until",
+        "type": "DATE",
+        "req": false,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "partner reactivated",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_TERMINATED",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId)",
+    "channels": [],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "until",
+        "type": "DATE",
+        "req": false,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "partner terminated",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "AGREEMENT_EXPIRING",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId); second request recipient.role = PARTNER_OPS_MAKER (IN_APP)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "expiryDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "daysLeft",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "agreement expiry job",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "TRADE_LICENCE_EXPIRING",
+    "category": "SERVICE",
+    "recipient": "partner wallet (walletId); second request recipient.role = PARTNER_OPS_MAKER (IN_APP)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "expiryDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "daysLeft",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "trade-licence expiry job",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "PARTNER_APPLICATION_SLA_BREACHED",
+    "category": "INTERNAL",
+    "recipient": "recipient.role = the stage's role (one request per role)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "applicationId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "stageCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "module": "partner",
+    "trigger": "application stage SLA breached / screening timeout",
+    "sender": "wallet-service"
+  },
+  {
+    "code": "COMMISSION_NEGATIVE_BALANCE",
+    "module": "pricing",
+    "category": "INTERNAL",
+    "recipient": "recipient.role = FIN_MAKER",
+    "trigger": "carried negative commission of a beneficiary above bitspay.pricing.clawback.alert-threshold-poisha or older than 90 days",
+    "dedupeKey": "CNB:{walletId}:{businessDate}",
+    "variables": [
+      {
+        "name": "walletId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "partnerId",
+        "type": "TEXT",
+        "req": false,
+        "notes": "uuid text"
+      },
+      {
+        "name": "partnerName",
+        "type": "TEXT",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "carriedNegativePoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "positive magnitude"
+      },
+      {
+        "name": "oldestAccrualDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "thresholdPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "pricing-service"
+  },
+  {
+    "code": "CAMPAIGN_FUNDING_LOW",
+    "module": "campaign",
+    "category": "INTERNAL",
+    "recipient": "recipient.role = FIN_MAKER",
+    "trigger": "ledger rejected a reward with INSUFFICIENT_FUNDS (CAMPAIGN_FUNDING empty); monetary campaigns auto-paused",
+    "dedupeKey": "CFL:{businessDate}",
+    "variables": [
+      {
+        "name": "availablePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "pendingFundingCount",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "pendingFundingPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "pausedCampaignCount",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "detectedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "pricing-service"
+  },
+  {
+    "code": "CAMPAIGN_BUDGET_EXHAUSTED",
+    "module": "campaign",
+    "category": "INTERNAL",
+    "recipient": "recipient.staffUserId = campaign maker, plus one request to recipient.role = OPS_MAKER",
+    "trigger": "campaign moved to BUDGET_EXHAUSTED",
+    "dedupeKey": "CBE:{campaignId}",
+    "variables": [
+      {
+        "name": "campaignId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "campaignCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "campaignName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "totalPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "grantedPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "reservedPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "remainingPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "exhaustedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "pricing-service"
+  },
+  {
+    "code": "REWARD_CLAWBACK_MANUAL_REQUIRED",
+    "module": "campaign",
+    "category": "INTERNAL",
+    "recipient": "recipient.role = FIN_MAKER",
+    "trigger": "clawback needs manual handling (manual adapter in use)",
+    "dedupeKey": "RCM:{rewardId}",
+    "variables": [
+      {
+        "name": "rewardId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "campaignId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "campaignCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "walletId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "rewardPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "rewardTxnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "rewardCommandId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "reasonCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "TRANSACTION_REVERSED | TRANSACTION_REFUNDED | FRAUD_CONFIRMED"
+      }
+    ],
+    "sender": "pricing-service"
+  },
+  {
+    "code": "EDU_<CODE>",
+    "module": "campaign",
+    "category": "MARKETING",
+    "recipient": "recipient.walletId (each wallet of the segment snapshot)",
+    "trigger": "educational campaign send at notificationSpec.sendAt (priority null)",
+    "dedupeKey": null,
+    "pattern": "^EDU_[A-Z0-9_]{1,60}$",
+    "variables": [
+      {
+        "name": "campaignName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "(declared)",
+        "type": "per template",
+        "req": true,
+        "notes": "variables declared when the EDU_ template is created; template must be ACTIVE before sendAt"
+      }
+    ],
+    "sender": "pricing-service"
+  },
+  {
+    "code": "FLOAT_LOW_BALANCE",
+    "category": "SERVICE",
+    "trigger": "LIQUIDITY_THRESHOLD_BREACHED LOW",
+    "recipient": "partner walletId; parent walletId; each configured liquidity ops staffUserId",
+    "variables": [
+      {
+        "name": "partnerName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "availablePoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "thresholdPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "detectedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "FLOAT_HIGH_BALANCE",
+    "category": "SERVICE",
+    "trigger": "threshold breach HIGH",
+    "recipient": "same as FLOAT_LOW_BALANCE",
+    "variables": [
+      {
+        "name": "partnerName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "availablePoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "thresholdPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "detectedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "FLOAT_STOCK_OUT",
+    "category": "SERVICE",
+    "trigger": "threshold breach STOCK_OUT",
+    "recipient": "same as FLOAT_LOW_BALANCE",
+    "variables": [
+      {
+        "name": "partnerName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "availablePoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "thresholdPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "= stock-out threshold"
+      },
+      {
+        "name": "detectedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "FLOAT_REQUEST_RECEIVED",
+    "category": "SERVICE",
+    "trigger": "float request created",
+    "recipient": "counterparty walletId; OPERATOR/BANK approver → recipient.role = OPS_CHECKER",
+    "variables": [
+      {
+        "name": "requesterName",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "direction",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{TOP_UP,RETURN}"
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "FLOAT_REQUEST_DECIDED",
+    "category": "SERVICE",
+    "trigger": "float request approved / rejected / completed",
+    "recipient": "requester walletId",
+    "variables": [
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{APPROVED,REJECTED,COMPLETED}"
+      },
+      {
+        "name": "direction",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": false,
+        "notes": "FT… when executed"
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "FLOAT_REQUEST_FAILED",
+    "category": "SERVICE",
+    "trigger": "float request failed / stuck / expired",
+    "recipient": "requester walletId; STUCK → recipient.role = OPS_CHECKER",
+    "variables": [
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{FAILED,STUCK,EXPIRED}"
+      },
+      {
+        "name": "direction",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "failureCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "EMONEY_ISSUED_PARTNER",
+    "category": "SERVICE",
+    "trigger": "e-money issuance posted to a partner wallet",
+    "recipient": "destination walletId",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "EI…"
+      },
+      {
+        "name": "postedAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "TRUST_CONFIRMATION_STALE",
+    "category": "INTERNAL",
+    "trigger": "latest trust-balance confirmation older than the staleness window (OPEN D-39)",
+    "recipient": "recipient.role FIN_MAKER and FIN_CHECKER (one request per role)",
+    "variables": [
+      {
+        "name": "bankCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "BANK code"
+      },
+      {
+        "name": "trustIndex",
+        "type": "INT",
+        "req": true,
+        "notes": "01..99"
+      },
+      {
+        "name": "lastConfirmedAt",
+        "type": "DATETIME",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "ageHours",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "HARD_CONTROL_FAILED",
+    "category": "INTERNAL",
+    "trigger": "issuance hard control failed",
+    "recipient": "recipient.role FIN_MAKER and FIN_CHECKER",
+    "variables": [
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "bankCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "mirrorPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "confirmedPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "APPROVAL_PENDING_AGEING",
+    "category": "INTERNAL",
+    "trigger": "treasury approval pending beyond ageing threshold",
+    "recipient": "recipient.role = each of the approval's checkerRoles",
+    "variables": [
+      {
+        "name": "approvalId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "entityType",
+        "type": "TEXT",
+        "req": true,
+        "notes": "registered entityType"
+      },
+      {
+        "name": "summary",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "ageHours",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "treasury-service"
+  },
+  {
+    "code": "SCHEDULED_TRANSFER_FAILED",
+    "category": "SERVICE",
+    "recipient": "payer walletId",
+    "trigger": "scheduled occurrence FAILED",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "payeeNameMasked",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "occurrenceDate",
+        "type": "DATE",
+        "req": true
+      },
+      {
+        "name": "failureCode",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "scheduleId",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "SCHEDULED_TRANSFER_SUSPENDED",
+    "category": "SERVICE",
+    "recipient": "payer walletId",
+    "trigger": "schedule suspended after consecutive failures",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "payeeNameMasked",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "consecutiveFailures",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "scheduleId",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "PAYMENT_REQUEST_RECEIVED",
+    "category": "SERVICE",
+    "recipient": "payer walletId",
+    "trigger": "payment request created",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "requesterMsisdn",
+        "type": "MSISDN",
+        "req": true
+      },
+      {
+        "name": "requesterNameMasked",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "note",
+        "type": "TEXT",
+        "req": false,
+        "notes": "<= 140, may be empty"
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "RQ..."
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "PAYMENT_REQUEST_DECLINED",
+    "category": "SERVICE",
+    "recipient": "requester walletId (declined) / payer walletId (cancelled)",
+    "trigger": "payer declined / requester cancelled",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "payerMsisdn",
+        "type": "MSISDN",
+        "req": true
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{DECLINED,CANCELLED}"
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "PAYMENT_REQUEST_EXPIRED",
+    "category": "SERVICE",
+    "recipient": "requester walletId",
+    "trigger": "expiry job",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "payerMsisdn",
+        "type": "MSISDN",
+        "req": true
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "DISBURSEMENT_BATCH_COMPLETED",
+    "category": "SERVICE",
+    "recipient": "payer institution walletId",
+    "trigger": "BATCH_COMPLETED",
+    "variables": [
+      {
+        "name": "batchRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "BD..."
+      },
+      {
+        "name": "title",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{COMPLETED,PARTIALLY_FAILED,CANCELLED}"
+      },
+      {
+        "name": "paidCount",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "failedCount",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "paidPoisha",
+        "type": "MONEY",
+        "req": true
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "DISBURSEMENT_BATCH_PAUSED",
+    "category": "SERVICE",
+    "recipient": "payer institution walletId",
+    "trigger": "batch PAUSED",
+    "variables": [
+      {
+        "name": "batchRef",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "title",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "pauseReason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{INSUFFICIENT_FUNDING,OPERATOR,DEPENDENCY_UNAVAILABLE,PRODUCT_DISABLED}"
+      },
+      {
+        "name": "requiredPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "availablePoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "0 when not a funding pause"
+      }
+    ],
+    "sender": "disbursement-service"
+  },
+  {
+    "code": "TXN_RECEIPT",
+    "category": "TRANSACTIONAL",
+    "trigger": "service action RESEND_RECEIPT (≤ receiptResendPerTxnPerDay = 3 per txn per day)",
+    "recipient": "ticket's walletId",
+    "dedupeKey": "rcpt:{actionId}",
+    "variables": [
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "txnType",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "fee + VAT"
+      },
+      {
+        "name": "counterpartyMsisdn",
+        "type": "MSISDN",
+        "req": false,
+        "notes": "full 13-digit; masked by template"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "completion time"
+      }
+    ],
+    "sender": "support-service"
+  },
+  {
+    "code": "FUNDS_HELD_NOTICE",
+    "category": "SERVICE",
+    "trigger": "hold ACTIVE and HOLD_POLICY notifyCounterparty",
+    "recipient": "counterparty walletId",
+    "dedupeKey": "hold:{holdCommandId}",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "ticketNumber",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "heldUntil",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "support-service"
+  },
+  {
+    "code": "FUNDS_RELEASED_NOTICE",
+    "category": "SERVICE",
+    "trigger": "hold released (expiry / manual / dispute rejected)",
+    "recipient": "counterparty walletId",
+    "dedupeKey": "release:{holdCommandId}",
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "ticketNumber",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "support-service"
+  },
+  {
+    "code": "TICKET_UPDATE",
+    "category": "SERVICE",
+    "trigger": "ticket created; every customer-visible status change; dispute resolved (SRS SUP-002/004). Never for internal tickets (category REVERSAL_RECOMMENDATION, tipping-off). OPEN D-12",
+    "recipient": "ticket walletId, else msisdn (SMS only)",
+    "dedupeKey": "tk:{ticketId}:{event}:{status}",
+    "variables": [
+      {
+        "name": "ticketNumber",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "event",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{CREATED,STATUS_CHANGED,DISPUTE_RESOLVED}"
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "customerVisibleStatus"
+      },
+      {
+        "name": "outcome",
+        "type": "TEXT",
+        "req": false,
+        "notes": "enum{UPHELD,REJECTED,WITHDRAWN} on DISPUTE_RESOLVED"
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": false,
+        "notes": "resolution due"
+      }
+    ],
+    "sender": "support-service"
+  },
+  {
+    "code": "SUPPORT_ESCALATION",
+    "category": "INTERNAL",
+    "trigger": "SLA 75 % warning, breach, escalation, hold expiring, reversal EXECUTING > 30 min",
+    "recipient": "assignee staffUserId or recipient.role SUP_MAKER / SUP_CHECKER",
+    "dedupeKey": "esc:{ticketId}:{kind}:{escalationLevel}",
+    "variables": [
+      {
+        "name": "ticketNumber",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "priority",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "kind",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{SLA_WARNING,SLA_BREACHED,ESCALATED,HOLD_EXPIRING,REVERSAL_STUCK}"
+      },
+      {
+        "name": "escalationLevel",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "support-service"
+  },
+  {
+    "code": "CASE_ASSIGNED",
+    "category": "INTERNAL",
+    "recipient": "assignee `recipient.staffUserId`",
+    "trigger": "case assigned",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "caseNo",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "domain",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{AML, FRAUD}"
+      },
+      {
+        "name": "caseType",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "priority",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "slaDueAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "CASE_SLA_WARNING",
+    "category": "INTERNAL",
+    "recipient": "assignee `recipient.staffUserId`",
+    "trigger": "case SLA warning (80 % elapsed)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "caseNo",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "priority",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "slaDueAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "percentElapsed",
+        "type": "INT",
+        "req": true,
+        "notes": "JSON integer, e.g. 80"
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "CASE_SLA_BREACHED",
+    "category": "INTERNAL",
+    "recipient": "`recipient.role` RISK_CHECKER (FRAUD) / CAMLCO (AML) + assignee `recipient.staffUserId` (one request each)",
+    "trigger": "case SLA breached",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "caseNo",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "domain",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "priority",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "slaDueAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "escalationLevel",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "CASE_UNASSIGNED",
+    "category": "INTERNAL",
+    "recipient": "`recipient.role` RISK_CHECKER (FRAUD) / CAMLCO (AML)",
+    "trigger": "case open without assignee for > 2 h",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "caseNo",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "domain",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "priority",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "openedAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "SANCTIONS_AUTO_FREEZE",
+    "category": "INTERNAL",
+    "recipient": "`recipient.role` = CAMLCO",
+    "trigger": "sanctions auto-freeze executed",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "caseNo",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "listCode",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "walletCount",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "frozenAt",
+        "type": "DATETIME",
+        "req": true
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "FREEZE_FAILED",
+    "category": "INTERNAL",
+    "recipient": "`recipient.role` CAMLCO (AML) / RISK_CHECKER (FRAUD)",
+    "trigger": "freeze could not be applied (FAILED)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "freezeType",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "reference",
+        "type": "TEXT",
+        "req": true,
+        "notes": "<= 64"
+      },
+      {
+        "name": "walletIdMasked",
+        "type": "TEXT",
+        "req": true,
+        "notes": "first 8 chars + `…`"
+      },
+      {
+        "name": "lastError",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "deepLink",
+        "type": "TEXT",
+        "req": true
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "WALLET_RESTRICTED_NOTICE",
+    "category": "SERVICE",
+    "recipient": "wallet holder `recipient.walletId`; channels IN_APP, SMS",
+    "trigger": "regulatory-instruction freeze applied, only when `freeze.notify-customer-on-regulatory = true` (OPEN D-06)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "neutral text \"regulatory instruction\"; never the AML reason code"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "<- param(SUPPORT.HELPLINE); filled by notification, not sent by compliance"
+      }
+    ],
+    "sender": "compliance-service"
+  },
+  {
+    "code": "EMONEY_VARIANCE",
+    "module": "reconciliation",
+    "category": "INTERNAL",
+    "trigger": "daily e-money reconciliation VARIANCE / INCOMPLETE",
+    "recipient": "Finance + Compliance: configured staffUserIds, else recipient.role FIN_CHECKER and COMPLIANCE_OFFICER (one request per role)",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{VARIANCE,INCOMPLETE}"
+      },
+      {
+        "name": "variancePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "walletsTotalPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "trustMirrorPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "confirmedTrustPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "runId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "TRIAL_BALANCE_BREAK",
+    "module": "reconciliation",
+    "category": "INTERNAL",
+    "trigger": "trial-balance check failed",
+    "recipient": "Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "revision",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "failedChecks",
+        "type": "TEXT",
+        "req": true,
+        "notes": "comma list, e.g. TB-1,TB-3"
+      },
+      {
+        "name": "netCreditTotalPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "runId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "EOD_FAILED",
+    "module": "reconciliation",
+    "category": "INTERNAL",
+    "trigger": "EOD failed / waiting for watermark",
+    "recipient": "Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{FAILED,AWAITING_WATERMARK}"
+      },
+      {
+        "name": "errorCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "blockedMinutes",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "RECON_CRITICAL_EXCEPTION",
+    "module": "reconciliation",
+    "category": "INTERNAL",
+    "trigger": "CRITICAL exception opened",
+    "recipient": "Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER",
+    "variables": [
+      {
+        "name": "exceptionId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "category",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "signed"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "REPORT_READY",
+    "module": "reporting",
+    "category": "INTERNAL",
+    "trigger": "report run completed (async or scheduled)",
+    "recipient": "requesting staffUserId (schedules: notify_staff_ids)",
+    "variables": [
+      {
+        "name": "code",
+        "type": "TEXT",
+        "req": true,
+        "notes": "report code"
+      },
+      {
+        "name": "runId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "format",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": false,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "STATEMENT_READY",
+    "module": "reporting",
+    "category": "SERVICE",
+    "trigger": "statement export ready",
+    "recipient": "walletId (holder) or staffUserId (staff requester)",
+    "variables": [
+      {
+        "name": "exportId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "walletId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "from",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "to",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "format",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "REGULATORY_REVIEW_PENDING",
+    "module": "reporting",
+    "category": "INTERNAL",
+    "trigger": "regulatory run awaiting review",
+    "recipient": "recipient.role = dataset checker role (one request per role)",
+    "variables": [
+      {
+        "name": "rrCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "regulatoryRunId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "periodStart",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "periodEnd",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "sender": "finance-ops-service"
+  },
+  {
+    "code": "P2P_SENT",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-P2P-SENT · txn.events TRANSACTION_COMPLETED, txnType = P2P",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) only when feeBearer = PAYER; section hidden when 0"
+      },
+      {
+        "name": "counterpartyMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(toWalletId).msisdn"
+      },
+      {
+        "name": "counterpartyName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(toWalletId).name"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "P2P_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-P2P-RECEIVED · same event",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "counterpartyMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(fromWalletId).msisdn"
+      },
+      {
+        "name": "counterpartyName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(fromWalletId).name"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASH_IN_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHIN-CUST · COMPLETED CASH_IN",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) when feeBearer = PAYER"
+      },
+      {
+        "name": "agentMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(fromWalletId).msisdn"
+      },
+      {
+        "name": "agentName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(fromWalletId).name"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASH_IN_AGENT_CONFIRM",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHIN-AGENT · COMPLETED CASH_IN (SMS cost OPEN D-40)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "customerMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(toWalletId).msisdn"
+      },
+      {
+        "name": "commissionPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← commissionPoisha"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASH_OUT_SUCCESS",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHOUT-CUST · COMPLETED CASH_OUT",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) when feeBearer = PAYER"
+      },
+      {
+        "name": "agentMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(toWalletId).msisdn"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASH_OUT_AGENT_CONFIRM",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHOUT-AGENT · COMPLETED CASH_OUT (OPEN D-40)",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "customerMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(fromWalletId).msisdn"
+      },
+      {
+        "name": "commissionPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← commissionPoisha"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "MERCHANT_PAYMENT_SENT",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-MERCHANT-CUST · COMPLETED MERCHANT_PAYMENT",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "feePoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← sum(feePoisha, vatPoisha) when feeBearer = PAYER"
+      },
+      {
+        "name": "merchantName",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← contact(toWalletId).name"
+      },
+      {
+        "name": "merchantReference",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← merchantReference (≤ 64)"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "MERCHANT_PAYMENT_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-MERCHANT-MER · COMPLETED MERCHANT_PAYMENT (OPEN D-40)",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "customerMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(fromWalletId).msisdn"
+      },
+      {
+        "name": "merchantReference",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← merchantReference"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "MERCHANT_REFUND_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-REFUND · COMPLETED MERCHANT_REFUND",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "merchantName",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← contact(fromWalletId).name"
+      },
+      {
+        "name": "originalTxnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← originalTxnRef"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "MERCHANT_REFUND_SENT",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-REFUND-MER · COMPLETED MERCHANT_REFUND (SMS OPEN D-40)",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "originalTxnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← originalTxnRef"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "FLOAT_TRANSFER_SENT",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-FLOAT-SENT · COMPLETED FLOAT_TRANSFER",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "counterpartyName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(toWalletId).name"
+      },
+      {
+        "name": "counterpartyMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(toWalletId).msisdn"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "FLOAT_TRANSFER_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-FLOAT-RECEIVED · COMPLETED FLOAT_TRANSFER",
+    "recipient": "TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "counterpartyName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(fromWalletId).name"
+      },
+      {
+        "name": "counterpartyMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(fromWalletId).msisdn"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "TXN_REVERSED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-REVERSAL-FROM / R-REVERSAL-TO · COMPLETED REVERSAL",
+    "recipient": "FROM_WALLET and TO_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha of the REVERSAL transaction (partial: the reversed amount)"
+      },
+      {
+        "name": "originalTxnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← originalTxnRef"
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← refdata(REASON_CODE, reasonCode).name"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "txnRef of the REVERSAL"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "COMMISSION_EARNED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-COMMISSION-INLINE (seeded disabled) · COMPLETED, commissionPoisha ne 0 ∧ txnType ne REVERSAL",
+    "recipient": "COMMISSION_BENEFICIARY (commissionBeneficiaryWalletId)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "commissionPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "net = commissionPoisha − aitPoisha"
+      },
+      {
+        "name": "txnType",
+        "type": "TEXT",
+        "req": true,
+        "notes": "txnType code"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← completedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "TXN_FAILED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-TXN-FAILED · txn.events TRANSACTION_FAILED, channel ne SYSTEM",
+    "recipient": "FROM_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "txnType",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnType"
+      },
+      {
+        "name": "failureCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "failureCode enum; the template maps it to a localised reason"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← createdAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "WALLET_BLOCKED",
+    "category": "SERVICE",
+    "trigger": "R-WALLET-BLOCKED · wallet.events WALLET_UPSERTED status in [F,X,C], neqPath previousStatus, statusReasonCode nin [PARTNER_SUSPENDED, PARTNER_TERMINATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER] (OPEN D-06)",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(walletId).msisdn"
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← refdata(REASON_CODE, statusReasonCode).name"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← param(SUPPORT.HELPLINE)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "WALLET_UNBLOCKED",
+    "category": "SERVICE",
+    "trigger": "R-WALLET-UNBLOCKED · status eq A, previousStatus in [F,X,C,D], statusReasonCode nin [PARTNER_REACTIVATED, AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER, KYC_APPROVED, KYC_UPGRADE]",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(walletId).msisdn"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← param(SUPPORT.HELPLINE)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "WALLET_DORMANT",
+    "category": "SERVICE",
+    "trigger": "R-WALLET-DORMANT · status eq D, neqPath previousStatus",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "SMS",
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(walletId).msisdn"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← param(SUPPORT.HELPLINE)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "WALLET_CLOSED",
+    "category": "SERVICE",
+    "trigger": "R-WALLET-CLOSED · status eq Z, statusReasonCode ne CLOSURE",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "msisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "← contact(walletId).msisdn"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← param(SUPPORT.HELPLINE)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "KYC_SUBMITTED",
+    "category": "SERVICE",
+    "trigger": "R-KYC-SUBMITTED · customer.events KYC_SUBMITTED",
+    "recipient": "CUSTOMER_WALLETS",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "name",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← nameBn (bn) / nameEn"
+      },
+      {
+        "name": "targetTier",
+        "type": "INT",
+        "req": false,
+        "notes": "← targetTier"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "KYC_APPROVED",
+    "category": "SERVICE",
+    "trigger": "R-KYC-APPROVED · customer.events KYC_APPROVED",
+    "recipient": "CUSTOMER_WALLETS",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "name",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← nameBn (bn) / nameEn"
+      },
+      {
+        "name": "kycTier",
+        "type": "INT",
+        "req": true,
+        "notes": "← kycTier"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "KYC_REJECTED",
+    "category": "SERVICE",
+    "trigger": "R-KYC-REJECTED · customer.events KYC_REJECTED",
+    "recipient": "CUSTOMER_WALLETS",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "name",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← nameBn (bn) / nameEn"
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← refdata(REASON_CODE, reasonCode).name (KYC group)"
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← param(SUPPORT.HELPLINE)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "LIMITS_CHANGED",
+    "category": "SERVICE",
+    "trigger": "R-KYC-TIER · customer.events KYC_TIER_CHANGED",
+    "recipient": "CUSTOMER_WALLETS",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "kycTier",
+        "type": "INT",
+        "req": true,
+        "notes": "← kycTier"
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← nameBn (bn) / nameEn"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "COMMISSION_SETTLED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-COMMISSION-SETTLED · commission.events COMMISSION_SETTLED",
+    "recipient": "BENEFICIARY_WALLET (beneficiaryWalletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "netPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← netPoisha"
+      },
+      {
+        "name": "grossPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← grossPoisha"
+      },
+      {
+        "name": "aitPoisha",
+        "type": "MONEY",
+        "req": false,
+        "notes": "← aitPoisha"
+      },
+      {
+        "name": "period",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← period"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← txnRef (CMS-…)"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "DISBURSEMENT_CREDIT",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-DISBURSEMENT-CREDIT · disbursement.events BATCH_ROW_PAID",
+    "recipient": "DATA_WALLET (walletId)",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← amountPoisha"
+      },
+      {
+        "name": "payerName",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← contact(payerWalletId).name"
+      },
+      {
+        "name": "rowRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← rowRef {batchRef}-{rowNo} (OPEN D-13)"
+      },
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "← postedAt"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASHBACK_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHBACK · campaign.events REWARD_GRANTED, rewardType in [CASHBACK]",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "rewardPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← rewardPoisha"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← txnRef (reward reference)"
+      },
+      {
+        "name": "triggerTxnRef",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← triggerTxnRef"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "REWARD_RECEIVED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-REWARD-BONUS · REWARD_GRANTED, rewardType nin [CASHBACK]",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "rewardPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← rewardPoisha"
+      },
+      {
+        "name": "rewardType",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← rewardType"
+      },
+      {
+        "name": "txnRef",
+        "type": "TEXT",
+        "req": false,
+        "notes": "← txnRef"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "CASHBACK_REVERSED",
+    "category": "TRANSACTIONAL",
+    "trigger": "R-CASHBACK-CLAWBACK · campaign.events REWARD_CLAWED_BACK",
+    "recipient": "DATA_WALLET",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "rewardPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "← rewardPoisha"
+      },
+      {
+        "name": "reasonCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "← reasonCode ∈ {TRANSACTION_REVERSED, TRANSACTION_REFUNDED, FRAUD_CONFIRMED}"
+      }
+    ],
+    "group": "A",
+    "sentVia": "event rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "PAYREQ_REMINDER_ADVANCE",
+    "category": "REMINDER",
+    "trigger": "policy PAYMENT_REQUEST_DUE offset D-1 10:00 Asia/Dhaka (ENABLED; OPEN D-11)",
+    "recipient": "payer walletId of the registering request",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requesterMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "RQ… registering request"
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "system (= reminder.dueAt = expiresAt)"
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "PAYREQ_REMINDER_DUE",
+    "category": "REMINDER",
+    "trigger": "policy PAYMENT_REQUEST_DUE offset DUE (PT0S)",
+    "recipient": "same",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requesterMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "RQ… registering request"
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "system (= reminder.dueAt = expiresAt)"
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "PAYREQ_REMINDER_OVERDUE",
+    "category": "REMINDER",
+    "trigger": "policy PAYMENT_REQUEST_DUE offset OVERDUE +1 d 10:00",
+    "recipient": "same",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requesterMsisdn",
+        "type": "MSISDN",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "requestRef",
+        "type": "TEXT",
+        "req": true,
+        "notes": "RQ… registering request"
+      },
+      {
+        "name": "requestId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "system (= reminder.dueAt = expiresAt)"
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "SCHEDULED_TRANSFER_REMINDER",
+    "category": "REMINDER",
+    "trigger": "policy SCHEDULED_TRANSFER_PRE offset D-1 10:00 (ENABLED; OPEN D-11)",
+    "recipient": "payer walletId of the registering request",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "registering request"
+      },
+      {
+        "name": "payeeNameMasked",
+        "type": "TEXT",
+        "req": true,
+        "notes": "registering request (masked by producer; never an MSISDN)"
+      },
+      {
+        "name": "scheduleId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid text"
+      },
+      {
+        "name": "dueAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": "system (= occurrence execution time, UTC)"
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "KYC_EXPIRY_REMINDER",
+    "category": "REMINDER",
+    "trigger": "policy KYC_EXPIRY — reserved, seeded DISABLED (wallet-service sends re-KYC reminders itself)",
+    "recipient": "—",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "name",
+        "type": "TEXT",
+        "req": false,
+        "notes": ""
+      },
+      {
+        "name": "dueDate",
+        "type": "DATE",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "NEW_DEVICE_LOGIN",
+    "category": "SECURITY",
+    "trigger": "rule reserved, disabled until the edge/auth layer exists (no R1 producer)",
+    "recipient": "—",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "deviceName",
+        "type": "TEXT",
+        "req": false,
+        "notes": ""
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "PIN_CHANGED",
+    "category": "SECURITY",
+    "trigger": "same",
+    "recipient": "—",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "FAILED_LOGIN_ALERT",
+    "category": "SECURITY",
+    "trigger": "same",
+    "recipient": "—",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "time",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "helpline",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "attempts",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "group": "B",
+    "sentVia": "reminder engine / reserved security rule (never on notification.requests)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "GOV_ACTIVITY_ALERT",
+    "category": "INTERNAL",
+    "trigger": "monitoring rule fired; request priority SECURITY",
+    "recipient": "staffUserId (+ msisdn override); one request per staff user, cap 20",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "ruleCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "actorUsername",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "observed",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "window",
+        "type": "TEXT",
+        "req": true,
+        "notes": "ISO-8601 duration"
+      },
+      {
+        "name": "severity",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "alertId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "also dedupeKey"
+      }
+    ],
+    "priority": "SECURITY",
+    "group": "C9",
+    "sentVia": "notification.requests (language en)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "GOV_APPROVAL_EXPIRING",
+    "category": "INTERNAL",
+    "trigger": "approval in governance inbox near expiresAt",
+    "recipient": "checker staffUserIds (cap 20)",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "service",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "summary",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "expiresAt",
+        "type": "DATETIME",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "approvalId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "also dedupeKey"
+      }
+    ],
+    "group": "C9",
+    "sentVia": "notification.requests (language en)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "GOV_AUDIT_INTEGRITY_BROKEN",
+    "category": "INTERNAL",
+    "trigger": "hash-chain verification failed; request priority SECURITY",
+    "recipient": "AUDITOR + ADMIN staffUserIds",
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "variables": [
+      {
+        "name": "verificationId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "chainId",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "seq",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "reason",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "priority": "SECURITY",
+    "group": "C9",
+    "sentVia": "notification.requests (language en)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "GOV_STAFF_DORMANT_DISABLED",
+    "category": "INTERNAL",
+    "trigger": "dormant staff account disabled",
+    "recipient": "ADMIN staffUserIds",
+    "channels": [
+      "IN_APP"
+    ],
+    "variables": [
+      {
+        "name": "username",
+        "type": "TEXT",
+        "req": true,
+        "notes": ""
+      },
+      {
+        "name": "daysInactive",
+        "type": "INT",
+        "req": true,
+        "notes": ""
+      }
+    ],
+    "group": "C9",
+    "sentVia": "notification.requests (language en)",
+    "sender": "admin-service"
+  },
+  {
+    "code": "GL_DAY_CLOSE_BLOCKED",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER and FIN_CHECKER (one request each)",
+    "trigger": "a GL day is not closed 90 min after cut-off; repeated every 60 min while blocked",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": "date"
+      },
+      {
+        "name": "minutesLate",
+        "type": "INT",
+        "req": true,
+        "notes": "int32; minutes since cut-off"
+      },
+      {
+        "name": "partitionsReady",
+        "type": "INT",
+        "req": true,
+        "notes": "int32"
+      },
+      {
+        "name": "partitionsTotal",
+        "type": "INT",
+        "req": true,
+        "notes": "int32"
+      },
+      {
+        "name": "deferredTransfers",
+        "type": "INT",
+        "req": true,
+        "notes": "int32; unresolved deferred legs with valueDate ≤ businessDate"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_DAY_CLOSED_WITH_EXCEPTIONS",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER and FIN_CHECKER",
+    "trigger": "a day closes CLOSED_WITH_EXCEPTIONS or a close attempt fails (FAILED)",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": "date"
+      },
+      {
+        "name": "revision",
+        "type": "INT",
+        "req": true,
+        "notes": "int32"
+      },
+      {
+        "name": "failedChecks",
+        "type": "TEXT",
+        "req": true,
+        "notes": "string; comma list of GlDayChecks member names that are FAIL"
+      },
+      {
+        "name": "exceptionCount",
+        "type": "INT",
+        "req": true,
+        "notes": "int64; open HIGH+ exceptions for the day"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_DAY_CERTIFICATION_FAILED",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_CHECKER",
+    "trigger": "reconciliation GL tie-out for the current revision did not match",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": "date"
+      },
+      {
+        "name": "revision",
+        "type": "INT",
+        "req": true,
+        "notes": "int32"
+      },
+      {
+        "name": "breakCount",
+        "type": "INT",
+        "req": true,
+        "notes": "int64"
+      },
+      {
+        "name": "reconRunId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "uuid"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_UNMAPPED_POSTING",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER",
+    "trigger": "a close books a leg combination to 1999 (one per combination and day)",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true,
+        "notes": "date"
+      },
+      {
+        "name": "amountPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "int64 poisha"
+      },
+      {
+        "name": "combination",
+        "type": "TEXT",
+        "req": true,
+        "notes": "string ≤ 200, e.g. tbAccountType=220 side=DEBIT transferCode=1010 commandType=11 counterparty=400"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_PERIOD_CLOSED",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER and FIN_CHECKER",
+    "trigger": "a month or fiscal year is closed",
+    "variables": [
+      {
+        "name": "periodId",
+        "type": "TEXT",
+        "req": true,
+        "notes": "string"
+      },
+      {
+        "name": "periodKind",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{MONTH, FISCAL_YEAR}"
+      },
+      {
+        "name": "netResultPoisha",
+        "type": "MONEY",
+        "req": true,
+        "notes": "int64 poisha, signed"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_EXPORT_READY",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER",
+    "trigger": "an ERP export version is generated",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true
+      },
+      {
+        "name": "exportVersion",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "fileName",
+        "type": "TEXT",
+        "req": true
+      },
+      {
+        "name": "lineCount",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "totalDebitPoisha",
+        "type": "MONEY",
+        "req": true
+      },
+      {
+        "name": "superseded",
+        "type": "TEXT",
+        "req": false,
+        "notes": "boolean flag sent as TEXT \"true\"/\"false\" (template variable types have no boolean); \"true\" when it replaces an earlier export of the same date"
+      }
+    ],
+    "sender": "general-ledger-service"
+  },
+  {
+    "code": "GL_EXPORT_FAILED",
+    "category": "INTERNAL",
+    "recipient": "recipient.role FIN_MAKER",
+    "trigger": "an ERP export build fails (unbalanced or technical error)",
+    "variables": [
+      {
+        "name": "businessDate",
+        "type": "DATE",
+        "req": true
+      },
+      {
+        "name": "exportVersion",
+        "type": "INT",
+        "req": true
+      },
+      {
+        "name": "variant",
+        "type": "TEXT",
+        "req": true,
+        "notes": "enum{FAILED, RESTATED}; general-ledger-service sends FAILED (a restatement regenerates and sends GL_EXPORT_READY with superseded=true)"
+      },
+      {
+        "name": "errorCode",
+        "type": "TEXT",
+        "req": true,
+        "notes": "UNBALANCED or a technical error code"
+      }
+    ],
+    "sender": "general-ledger-service"
+  }
+]

@@ -1,0 +1,38 @@
+{
+  "name": "GET /v1/refdata/{type} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/refdata/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "type": "GEO",
+          "code": "3026",
+          "parentCode": "30",
+          "nameEn": "Dhaka",
+          "nameBn": "ঢাকা",
+          "attributes": {
+            "level": "DISTRICT",
+            "bbsCode": "26"
+          },
+          "version": 2,
+          "active": true,
+          "effectiveFrom": "2026-10-09T05:10:11.000Z"
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "admin-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,290 @@
+# disbursement-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# Producer-owned. Additive changes (new value) = MINOR; removal/rename = breaking (CHANGE-PROCESS).
+
+codeSets:
+  batchStatus:
+    description: "DisbursementBatch.status (REST Batch.status; BATCH_COMPLETED.status uses the terminal subset)"
+    values:
+      - {code: DRAFT, description: "upload accepted, file stored, rows being parsed"}
+      - {code: VALIDATING, description: "rows parsed, validation running"}
+      - {code: VALIDATION_FAILED, description: "malformed file or limits exceeded (terminal)"}
+      - {code: VALIDATED, description: "every row VALID or INVALID; ready to submit"}
+      - {code: PENDING_APPROVAL, description: "submitted, maker-checker pending"}
+      - {code: APPROVED, description: "final level approved; waiting for funding check / scheduledStartAt"}
+      - {code: RUNNING, description: "execution chunks being processed"}
+      - {code: PAUSED, description: "stopped; see batchPauseReason"}
+      - {code: COMPLETED, description: "every valid row PAID (terminal unless no further action)"}
+      - {code: PARTIALLY_FAILED, description: "no VALID/PROCESSING rows left, >= 1 FAILED; retry-failed possible"}
+      - {code: CANCELLED, description: "cancelled (terminal)"}
+      - {code: REJECTED, description: "checker rejected (terminal)"}
+  batchCompletionStatus:
+    description: "BATCH_COMPLETED.status and template variable DISBURSEMENT_BATCH_COMPLETED.status"
+    values:
+      - {code: COMPLETED}
+      - {code: PARTIALLY_FAILED}
+      - {code: CANCELLED}
+  batchPauseReason:
+    description: "Producer-local pause reasons (Batch.pauseReason, template variable DISBURSEMENT_BATCH_PAUSED.pauseReason). Not REASON_CODE refdata."
+    values:
+      - {code: INSUFFICIENT_FUNDING, description: "payer available balance < amount of VALID + PROCESSING rows, or ledger REJECTED INSUFFICIENT_FUNDS"}
+      - {code: OPERATOR, description: "paused by an operator or by an integration anomaly (row/chunk idempotency conflict, ledger 400/403)"}
+      - {code: DEPENDENCY_UNAVAILABLE, description: "ledger unavailable for > 10 min of consecutive chunk failures; auto-resumed"}
+      - {code: PRODUCT_DISABLED, description: "FEATURE.DISBURSEMENT switched off (kernel K3.7); auto-resumed when re-enabled"}
+  batchSource:
+    values:
+      - {code: CSV}
+      - {code: API}
+  rowStatus:
+    description: "Batch row status (REST BatchRow.status, report CSV)"
+    values:
+      - {code: PARSED}
+      - {code: VALID}
+      - {code: INVALID}
+      - {code: PROCESSING}
+      - {code: PAID}
+      - {code: FAILED}
+      - {code: SKIPPED}
+  rowFailureCode:
+    description: "BATCH_ROW_FAILED.failureCode and BatchRow.failureCode of FAILED rows. Open enum: consumers tolerate new values. DEPENDENCY_UNAVAILABLE is never a final row code."
+    values:
+      - {code: WALLET_NOT_TRANSACTABLE, retryable: true, description: "status re-check refused credit, or ledger ACCOUNT_NOT_FOUND / ACCOUNT_CLOSED"}
+      - {code: LIMIT_EXCEEDED, retryable: true, description: "evaluate:batch decision LIMIT_EXCEEDED"}
+      - {code: RISK_BLOCKED, retryable: false, description: "evaluate:batch decision BLOCK"}
+      - {code: RISK_HELD_FOR_REVIEW, retryable: true, description: "decision HOLD (tolerant reader)"}
+      - {code: RISK_STEP_UP_REQUIRED, retryable: false, description: "decision STEP_UP (tolerant reader)"}
+      - {code: SERVICE_DISABLED, retryable: false, description: "decision SERVICE_DISABLED (emergency control)"}
+      - {code: MAX_BALANCE_EXCEEDED, retryable: true, description: "ledger REJECTED MAX_BALANCE_EXCEEDED"}
+      - {code: LEDGER_INVALID_AMOUNT, retryable: false, description: "ledger REJECTED INVALID_AMOUNT"}
+      - {code: LEDGER_OTHER, retryable: false, description: "ledger REJECTED OTHER (incl. ACCOUNT_TYPE_MISMATCH) or any other rejection code"}
+  rowInvalidCode:
+    description: "BatchRow.failureCode of INVALID rows (validation only; never on events)"
+    values:
+      - {code: INVALID_MSISDN}
+      - {code: INVALID_AMOUNT}
+      - {code: DUPLICATE_IN_BATCH}
+      - {code: WALLET_NOT_FOUND}
+      - {code: WALLET_TYPE_NOT_ALLOWED}
+      - {code: WALLET_NOT_TRANSACTABLE}
+      - {code: LIMIT_EXCEEDED}
+      - {code: RISK_BLOCKED}
+      - {code: SERVICE_DISABLED}
+  rowInvalidDetail:
+    description: "Machine tokens used in BatchRow.failureDetail (besides a limitCode or a preRegister reason)"
+    values:
+      - {code: PRE_REGISTRATION_PENDING}
+      - {code: PRE_REGISTRATION_FAILED}
+  reservationReleaseReason:
+    description: "Producer-local reasonCode sent on POST /v1/limits/reservations/{txnId}:release (informational). Not REASON_CODE refdata."
+    values:
+      - {code: ROW_FAILED, description: "row FAILED after its attempt was reserved"}
+      - {code: ROW_SKIPPED, description: "row SKIPPED on cancel"}
+      - {code: ROW_RETRY, description: "row reset to VALID (INSUFFICIENT_FUNDS, evaluated-but-unposted, unknown evaluate outcome)"}
+  scheduleStatus:
+    values:
+      - {code: ACTIVE}
+      - {code: PAUSED}
+      - {code: SUSPENDED, description: "after suspendAfterFailures consecutive FAILED occurrences"}
+      - {code: COMPLETED}
+      - {code: CANCELLED}
+  scheduleFrequency:
+    values:
+      - {code: ONCE}
+      - {code: DAILY}
+      - {code: WEEKLY}
+      - {code: MONTHLY}
+  occurrenceStatus:
+    values:
+      - {code: PENDING}
+      - {code: REMINDED, description: "legacy value kept for reads; reminders are run by the notification reminder engine"}
+      - {code: EXECUTING}
+      - {code: COMPLETED}
+      - {code: FAILED}
+      - {code: SKIPPED}
+  occurrenceOutcome:
+    description: "SCHEDULED_TRANSFER_EXECUTED.outcome"
+    values:
+      - {code: COMPLETED}
+      - {code: FAILED}
+      - {code: SKIPPED}
+  paymentRequestStatus:
+    values:
+      - {code: PENDING}
+      - {code: ACCEPTING, description: "P2P in flight or outcome unknown; never reset to PENDING without a definitive answer"}
+      - {code: PAID}
+      - {code: DECLINED}
+      - {code: CANCELLED}
+      - {code: EXPIRED}
+  paymentRequestCloseReason:
+    description: "PAYMENT_REQUEST_DECLINED.reason"
+    values:
+      - {code: DECLINED}
+      - {code: CANCELLED}
+      - {code: EXPIRED}
+  reminderCancelReason:
+    description: "Producer-local reason sent on NOTIFICATION_REMINDER_CANCELLED (informational, <= 40)"
+    values:
+      - {code: ACCEPTED}
+      - {code: DECLINED}
+      - {code: EXPIRED}
+      - {code: EXECUTED}
+      - {code: SKIPPED}
+      - {code: PAUSED}
+      - {code: CANCELLED}
+  auditEntityType:
+    description: "audit.events entityType values emitted by this service"
+    values:
+      - {code: DisbursementBatch}
+      - {code: ScheduledTransfer}
+      - {code: PaymentRequest}
+      - {code: RateLimit}
+  auditAction:
+    description: "audit.events action values emitted by this service (^[A-Z][A-Z0-9_]{1,63}$)"
+    values:
+      - {code: BATCH_CREATED, entityType: DisbursementBatch}
+      - {code: BATCH_SUBMITTED, entityType: DisbursementBatch}
+      - {code: BATCH_APPROVAL_DECIDED, entityType: DisbursementBatch}
+      - {code: BATCH_STARTED, entityType: DisbursementBatch}
+      - {code: BATCH_PAUSED, entityType: DisbursementBatch}
+      - {code: BATCH_RESUMED, entityType: DisbursementBatch}
+      - {code: BATCH_CANCELLED, entityType: DisbursementBatch}
+      - {code: BATCH_RETRY_REQUESTED, entityType: DisbursementBatch}
+      - {code: BATCH_COMPLETED, entityType: DisbursementBatch}
+      - {code: SCHEDULE_CREATED, entityType: ScheduledTransfer}
+      - {code: SCHEDULE_UPDATED, entityType: ScheduledTransfer}
+      - {code: SCHEDULE_PAUSED, entityType: ScheduledTransfer}
+      - {code: SCHEDULE_RESUMED, entityType: ScheduledTransfer}
+      - {code: SCHEDULE_CANCELLED, entityType: ScheduledTransfer}
+      - {code: SCHEDULE_SUSPENDED, entityType: ScheduledTransfer}
+      - {code: OCCURRENCE_SKIPPED, entityType: ScheduledTransfer}
+      - {code: PAYMENT_REQUEST_CREATED, entityType: PaymentRequest}
+      - {code: PAYMENT_REQUEST_ACCEPTED, entityType: PaymentRequest}
+      - {code: PAYMENT_REQUEST_DECLINED, entityType: PaymentRequest}
+      - {code: PAYMENT_REQUEST_CANCELLED, entityType: PaymentRequest}
+      - {code: PAYMENT_REQUEST_EXPIRED, entityType: PaymentRequest}
+      - {code: RATE_LIMIT_CHANGED, entityType: RateLimit}
+
+problemReasons:
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["GET /v1/disbursement/batches", "GET /v1/disbursement/batches/{batchId}/rows", "GET /v1/approvals", "GET /v1/scheduled-transfers", "GET /v1/scheduled-transfers/{scheduleId}/occurrences", "GET /v1/payment-requests"], note: "kernel-reserved"}
+  - {code: VALIDATION_FAILED, reason: FILE_INVALID, operations: ["POST /v1/disbursement/batches"], note: "CSV unreadable, missing required header, > maxRowsPerBatch, > maxFileBytes, JSON > maxJsonRows"}
+  - {code: VALIDATION_FAILED, reason: NO_VALID_ROWS, operations: ["POST /v1/disbursement/batches/{batchId}:submit"]}
+  - {code: VALIDATION_FAILED, reason: INVALID_ROWS_PRESENT, operations: ["POST /v1/disbursement/batches/{batchId}:submit"], note: "invalidRows > 0 and excludeInvalidRows = false"}
+  - {code: VALIDATION_FAILED, reason: ROW_NOT_RETRYABLE, operations: ["POST /v1/disbursement/batches/{batchId}:retry-failed"]}
+  - {code: VALIDATION_FAILED, reason: SCHEDULE_CAP_EXCEEDED, operations: ["POST /v1/scheduled-transfers"]}
+  - {code: VALIDATION_FAILED, reason: REQUEST_CAP_EXCEEDED, operations: ["POST /v1/payment-requests"]}
+  - {code: STATE_CONFLICT, reason: DUPLICATE_FILE, operations: ["POST /v1/disbursement/batches"], note: "same (payerWalletId, SHA-256) with a live batch; detail names the existing batchRef as human text"}
+  - {code: STATE_CONFLICT, reason: INVALID_TRANSITION, operations: ["POST /v1/disbursement/batches/{batchId}:submit", "POST /v1/disbursement/batches/{batchId}:cancel", "POST /v1/disbursement/batches/{batchId}:pause", "POST /v1/disbursement/batches/{batchId}:resume", "POST /v1/disbursement/batches/{batchId}:retry-failed", "POST /v1/scheduled-transfers/{scheduleId}:pause", "POST /v1/scheduled-transfers/{scheduleId}:resume", "POST /v1/scheduled-transfers/{scheduleId}:cancel", "POST /v1/scheduled-transfers/{scheduleId}/occurrences/{occurrenceDate}:skip", "PATCH /v1/scheduled-transfers/{scheduleId}", "POST /v1/payment-requests/{requestId}:accept", "POST /v1/payment-requests/{requestId}:decline", "POST /v1/payment-requests/{requestId}:cancel", "POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: STATE_CONFLICT, reason: ROWS_IN_FLIGHT, operations: ["POST /v1/disbursement/batches/{batchId}:cancel"], note: "rows PROCESSING; retry shortly"}
+  - {code: STATE_CONFLICT, reason: APPROVAL_EXPIRED, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+
+problemExtensions:
+  - {name: batch, type: "object (Batch)", when: "422 INSUFFICIENT_FUNDS from POST /v1/disbursement/batches/{batchId}:resume or the final-level POST /v1/approvals/{id}:approve", schemaRef: "openapi.yaml#/components/schemas/Batch"}
+  - {name: paymentRequest, type: "object (PaymentRequest)", when: "a transaction-service refusal relayed by POST /v1/payment-requests/{requestId}:accept (any relayed 409/422/503)", schemaRef: "openapi.yaml#/components/schemas/PaymentRequest"}
+  - {name: transaction, type: "object (PaymentResult, pass-through)", when: "relayed unchanged by POST /v1/payment-requests/{requestId}:accept when the consumed P2P problem carried it (intent persisted)", schemaRef: "openapi.yaml#/components/schemas/PaymentResult", passThrough: "transaction-service POST /v1/payments/p2p problem member `transaction`"}
+  - {name: limitCode, type: string, when: "relayed 422 LIMIT_EXCEEDED on :accept (pass-through)"}
+  - {name: limitParty, type: "enum{FROM,TO}", when: "relayed 422 LIMIT_EXCEEDED on :accept (pass-through)"}
+  - {name: remainingPoisha, type: "int64|null", when: "relayed 422 LIMIT_EXCEEDED on :accept (pass-through)"}
+  - {name: remainingCount, type: "int32|null", when: "relayed 422 LIMIT_EXCEEDED on :accept (pass-through)"}
+  - {name: resetsAt, type: "timestamp|null", when: "relayed 422 LIMIT_EXCEEDED on :accept (pass-through)"}
+  - {name: walletId, type: uuid, when: "422 WALLET_NOT_TRANSACTABLE (own refusal, or relayed on :accept)"}
+  - {name: walletStatus, type: string, when: "422 WALLET_NOT_TRANSACTABLE; wallet status NAME (e.g. DEBIT_BLOCKED)"}
+
+entityTypes:
+  - module: null
+    values: [DisbursementBatch]
+    actions: {DisbursementBatch: [EXECUTE]}
+    checkerRoles: {level1: [OPS_CHECKER], level2: [FIN_CHECKER]}
+
+notificationTemplates:
+  - code: SCHEDULED_TRANSFER_FAILED
+    category: SERVICE
+    recipient: "payer walletId"
+    trigger: "scheduled occurrence FAILED"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true}
+      - {name: payeeNameMasked, type: TEXT, req: true}
+      - {name: occurrenceDate, type: DATE, req: true}
+      - {name: failureCode, type: TEXT, req: true}
+      - {name: scheduleId, type: TEXT, req: true}
+  - code: SCHEDULED_TRANSFER_SUSPENDED
+    category: SERVICE
+    recipient: "payer walletId"
+    trigger: "schedule suspended after consecutive failures"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true}
+      - {name: payeeNameMasked, type: TEXT, req: true}
+      - {name: consecutiveFailures, type: INT, req: true}
+      - {name: scheduleId, type: TEXT, req: true}
+  - code: PAYMENT_REQUEST_RECEIVED
+    category: SERVICE
+    recipient: "payer walletId"
+    trigger: "payment request created"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true}
+      - {name: requesterMsisdn, type: MSISDN, req: true}
+      - {name: requesterNameMasked, type: TEXT, req: true}
+      - {name: note, type: TEXT, req: false, notes: "<= 140, may be empty"}
+      - {name: requestRef, type: TEXT, req: true, notes: "RQ..."}
+      - {name: expiresAt, type: DATETIME, req: true}
+      - {name: requestId, type: TEXT, req: true}
+  - code: PAYMENT_REQUEST_DECLINED
+    category: SERVICE
+    recipient: "requester walletId (declined) / payer walletId (cancelled)"
+    trigger: "payer declined / requester cancelled"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true}
+      - {name: payerMsisdn, type: MSISDN, req: true}
+      - {name: requestRef, type: TEXT, req: true}
+      - {name: reason, type: TEXT, req: true, notes: "enum{DECLINED,CANCELLED}"}
+  - code: PAYMENT_REQUEST_EXPIRED
+    category: SERVICE
+    recipient: "requester walletId"
+    trigger: "expiry job"
+    variables:
+      - {name: amountPoisha, type: MONEY, req: true}
+      - {name: payerMsisdn, type: MSISDN, req: true}
+      - {name: requestRef, type: TEXT, req: true}
+  - code: DISBURSEMENT_BATCH_COMPLETED
+    category: SERVICE
+    recipient: "payer institution walletId"
+    trigger: "BATCH_COMPLETED"
+    variables:
+      - {name: batchRef, type: TEXT, req: true, notes: "BD..."}
+      - {name: title, type: TEXT, req: true}
+      - {name: status, type: TEXT, req: true, notes: "enum{COMPLETED,PARTIALLY_FAILED,CANCELLED}"}
+      - {name: paidCount, type: INT, req: true}
+      - {name: failedCount, type: INT, req: true}
+      - {name: paidPoisha, type: MONEY, req: true}
+  - code: DISBURSEMENT_BATCH_PAUSED
+    category: SERVICE
+    recipient: "payer institution walletId"
+    trigger: "batch PAUSED"
+    variables:
+      - {name: batchRef, type: TEXT, req: true}
+      - {name: title, type: TEXT, req: true}
+      - {name: pauseReason, type: TEXT, req: true, notes: "enum{INSUFFICIENT_FUNDING,OPERATOR,DEPENDENCY_UNAVAILABLE,PRODUCT_DISABLED}"}
+      - {name: requiredPoisha, type: MONEY, req: true}
+      - {name: availablePoisha, type: MONEY, req: true, notes: "0 when not a funding pause"}
+
+reasonCodes: []   # no governance REASON_CODE items; pause and release reasons are producer-local code sets above
+
+txnRefPrefixes:
+  - {prefix: BD, kind: non-ledger-reference, meaning: "batchRef of a disbursement batch (never sent to the ledger, never a txnRef)", format: "BD{yyMMdd}{8 Crockford base32}", length: 16, example: BD261009K7Q2M4ZD, open: "D-13"}
+  - {prefix: RQ, kind: non-ledger-reference, meaning: "requestRef of a payment request (never sent to the ledger, never a txnRef)", format: "RQ{yyMMdd}{8 Crockford base32}", length: 16, example: RQ261009P3X8K2NM, open: "D-13"}
+  - {prefix: "BD…-", kind: derived-reference, meaning: "rowRef = {batchRef}-{rowNo}: human-readable ID of one disbursement credit (not a txnRef; no per-row txnRef prefix exists)", format: "{batchRef}-{rowNo}", length: "<= 24", example: BD261009K7Q2M4ZD-42, open: "D-13"}
+
+productCodes: [DISBURSEMENT, SCHEDULED_TRANSFER, REQUEST_MONEY]
+
+metrics:
+  - {name: bitspay_disbursement_rows_total, type: counter, labels: [outcome]}
+  - {name: bitspay_disbursement_rows_per_second, type: gauge, labels: []}
+  - {name: bitspay_disbursement_chunk_seconds, type: histogram, labels: [step]}
+  - {name: bitspay_disbursement_batches, type: gauge, labels: [status]}
+  - {name: bitspay_disbursement_lease_expired_total, type: counter, labels: [kind]}
+  - {name: bitspay_disbursement_rate_limit_current, type: gauge, labels: []}
+  - {name: bitspay_disbursement_ledger_errors_total, type: counter, labels: [status]}
+  - {name: bitspay_disbursement_reservation_release_failures_total, type: counter, labels: []}
+  - {name: bitspay_disbursement_reservations_outstanding, type: gauge, labels: []}
+  - {name: bitspay_disbursement_scheduled_occurrences_total, type: counter, labels: [outcome]}
+  - {name: bitspay_disbursement_scheduled_unknown_outcome, type: gauge, labels: []}
+  - {name: bitspay_disbursement_payment_requests_total, type: counter, labels: [outcome]}
+  - {name: bitspay_disbursement_payment_requests_accepting, type: gauge, labels: []}

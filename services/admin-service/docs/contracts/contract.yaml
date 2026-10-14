@@ -1,0 +1,1102 @@
+# admin-service (SVC-15) contract manifest — CONTRACT-MODEL §3. Modules: governance (lead) and notification.
+service: admin-service
+number: '15'
+modules:
+- governance
+- notification
+contractVersion: 1.0.0
+kernel: '1.0'
+owner: Dev-8
+provides:
+  apis:
+  - openapi: provided/openapi.yaml
+    major: 1
+  events:
+  - topic: refdata.events
+    key: '{type}:{code}'
+    compacted: true
+    tombstones: false
+    partitions:
+      dev: 1
+      prod: 3
+    retention: compacted (no time retention)
+    transport: outbox
+    module: governance
+    eventTypes:
+    - type: REFDATA_UPSERTED
+      version: 1
+      aggregateType: RefData
+      schema: provided/events/refdata.events/REFDATA_UPSERTED.v1.schema.json
+      example: provided/events/refdata.events/REFDATA_UPSERTED.v1.example.json
+  inboundTopics:
+  - topic: notification.requests
+    module: notification
+    key: 'first non-null of recipient.walletId → recipient.staffUserId → recipient.msisdn → recipient.role (never a partnerId); NOTIFICATION_REMINDER_CANCELLED: the key of the registering request'
+    compacted: false
+    tombstones: false
+    partitions:
+      dev: 3
+      prod: 24
+    retention: 7d
+    transport: outbox (each writer's own)
+    eventTypes:
+    - type: NOTIFICATION_REQUESTED
+      version: 1
+      aggregateType: Notification
+      schema: provided/events/notification.requests/NOTIFICATION_REQUESTED.v1.schema.json
+      example: provided/events/notification.requests/NOTIFICATION_REQUESTED.v1.example.json
+    - type: NOTIFICATION_REMINDER_CANCELLED
+      version: 1
+      aggregateType: Notification
+      schema: provided/events/notification.requests/NOTIFICATION_REMINDER_CANCELLED.v1.schema.json
+      example: provided/events/notification.requests/NOTIFICATION_REMINDER_CANCELLED.v1.example.json
+    writerObligations: templateCode and variables exactly as declared in the writer's own codes.yaml → notificationTemplates; variables is generic object<string, string|int64>
+  - topic: approval.events
+    module: governance
+    key: approvalId
+    compacted: false
+    tombstones: false
+    partitions:
+      dev: 3
+      prod: 6
+    retention: 7d
+    transport: outbox (each writer's own)
+    eventTypes:
+    - type: APPROVAL_REQUESTED
+      version: 1
+      aggregateType: Approval
+      schema: provided/events/approval.events/APPROVAL_REQUESTED.v1.schema.json
+      example: provided/events/approval.events/APPROVAL_REQUESTED.v1.example.json
+    - type: APPROVAL_DECIDED
+      version: 1
+      aggregateType: Approval
+      schema: provided/events/approval.events/APPROVAL_DECIDED.v1.schema.json
+      example: provided/events/approval.events/APPROVAL_DECIDED.v1.example.json
+    - type: APPROVAL_EXPIRED
+      version: 1
+      aggregateType: Approval
+      schema: provided/events/approval.events/APPROVAL_EXPIRED.v1.schema.json
+      example: provided/events/approval.events/APPROVAL_EXPIRED.v1.example.json
+    writerObligations: entityType from the writer's own codes.yaml → entityTypes; checkerRoles mandatory (kernel K7 roles); service = bare name + module for merged services
+  - topic: audit.events
+    module: governance
+    key: entityId
+    compacted: false
+    tombstones: false
+    partitions:
+      dev: 6
+      prod: 48
+    retention: 14d
+    transport: outbox (each writer's own)
+    eventTypes:
+    - type: AUDIT_RECORDED
+      version: 1
+      aggregateType: Audit
+      schema: provided/events/audit.events/AUDIT_RECORDED.v1.schema.json
+      example: provided/events/audit.events/AUDIT_RECORDED.v1.example.json
+    writerObligations: kernel K6 PII rules for before/after; actorRoles kernel K7 codes
+  data:
+  - id: refdata-attributes
+    version: 1
+    file: provided/data/refdata-attributes.v1.schema.json
+    kind: json-schema
+    description: per-type attribute schemas of refdata items (code set / data contract)
+  - id: refdata-system-params
+    version: 1
+    file: provided/data/refdata-system-params.v1.md
+    kind: code-set
+    description: reserved SYSTEM_PARAM namespaces, attribute shapes and seed values
+  codes: provided/codes.yaml
+consumes:
+  apis:
+  - producer: wallet-service
+    operation: GET /v1/wallets/{walletId}
+    major: 1
+    pinnedContractVersion: 1.0.0
+    module: notification
+    purpose: contact fallback when an SMS delivery waits ≥ 60 s for a wallet not yet seen on wallet.events; the copy is overwritten only when version is newer
+    fieldsUsed:
+    - path.walletId
+    - res.msisdn
+    - res.displayName
+    - res.language
+    - res.status
+    - res.walletType
+    - res.version
+    codesUsed:
+    - set: walletStatus
+      values:
+      - A
+      - D
+      - F
+      - X
+      - C
+      - Z
+    resilience:
+      timeoutMs: 1000
+      connectTimeoutMs: 300
+      circuitBreaker: true
+      rateLimitPerPod: 200
+      onFailure: delivery stays WAITING_CONTACT, retried each minute up to contact.wait-max (10 min), then FAILED(NO_CONTACT); IN_APP never blocked
+  events:
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-txn
+    purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: governance
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-txn
+    purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: governance
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REVERSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-txn
+    purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: governance
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REFUNDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-txn
+    purpose: 'governance: chain the whole redacted envelope into the tamper-evident audit hash chain (payment-outcome audit trail; OPEN D-05)'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: governance
+  - producer: admin-service
+    topic: audit.events
+    eventType: AUDIT_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-audit
+    purpose: 'governance: inbound topic owned by this service (O6); store every record hash-chained; staff last-activity; activity monitoring'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: governance
+    inboundTopic: true
+    writers: any service
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-approvals
+    purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
+    fieldsUsed:
+    - approvalId
+    - service
+    - module
+    - entityType
+    - entityId
+    - action
+    - makerId
+    - checkerId
+    - level
+    - requiredLevels
+    - checkerRoles
+    - amountPoisha
+    - status
+    - summary
+    - deepLink
+    - requestedAt
+    - decidedAt
+    - expiresAt
+    codesUsed:
+    - set: approvalStatus
+      values: '*'
+    module: governance
+    inboundTopic: true
+    writers: every service with maker-checker
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-approvals
+    purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
+    fieldsUsed:
+    - approvalId
+    - service
+    - module
+    - entityType
+    - entityId
+    - action
+    - makerId
+    - checkerId
+    - level
+    - requiredLevels
+    - checkerRoles
+    - amountPoisha
+    - status
+    - summary
+    - deepLink
+    - requestedAt
+    - decidedAt
+    - expiresAt
+    codesUsed:
+    - set: approvalStatus
+      values: '*'
+    module: governance
+    inboundTopic: true
+    writers: every service with maker-checker
+  - producer: admin-service
+    topic: approval.events
+    eventType: APPROVAL_EXPIRED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.governance-approvals
+    purpose: 'governance: inbound topic owned by this service (O6); approval-inbox projection'
+    fieldsUsed:
+    - approvalId
+    - service
+    - module
+    - entityType
+    - entityId
+    - action
+    - makerId
+    - checkerId
+    - level
+    - requiredLevels
+    - checkerRoles
+    - amountPoisha
+    - status
+    - summary
+    - deepLink
+    - requestedAt
+    - decidedAt
+    - expiresAt
+    codesUsed:
+    - set: approvalStatus
+      values: '*'
+    module: governance
+    inboundTopic: true
+    writers: every service with maker-checker
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-txn
+    purpose: 'notification: rules R-P2P-*, R-CASHIN-*, R-CASHOUT-*, R-MERCHANT-*, R-REFUND*, R-FLOAT-*, R-REVERSAL-*, R-COMMISSION-INLINE (group A templates)'
+    fieldsUsed:
+    - txnType
+    - txnRef
+    - fromWalletId
+    - toWalletId
+    - amountPoisha
+    - feePoisha
+    - vatPoisha
+    - feeBearer
+    - commissionPoisha
+    - aitPoisha
+    - commissionBeneficiaryWalletId
+    - merchantReference
+    - reasonCode
+    - originalTxnRef
+    - completedAt
+    codesUsed:
+    - set: txnType
+      values:
+      - P2P
+      - CASH_IN
+      - CASH_OUT
+      - MERCHANT_PAYMENT
+      - MERCHANT_REFUND
+      - FLOAT_TRANSFER
+      - REVERSAL
+    module: notification
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-txn
+    purpose: 'notification: rule R-TXN-FAILED (initiator, IN_APP, channel ≠ SYSTEM)'
+    fieldsUsed:
+    - txnType
+    - txnRef
+    - channel
+    - fromWalletId
+    - amountPoisha
+    - failureCode
+    - createdAt
+    codesUsed:
+    - set: txnType
+      values: '*'
+    - set: failureCode
+      values: '*'
+    module: notification
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REVERSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-txn
+    purpose: 'notification: subscribed, no rule — a reversal / refund is notified from the REVERSAL / MERCHANT_REFUND transaction''s own TRANSACTION_COMPLETED'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: transaction-service
+    topic: txn.events
+    eventType: TRANSACTION_REFUNDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-txn
+    purpose: 'notification: subscribed, no rule — a reversal / refund is notified from the REVERSAL / MERCHANT_REFUND transaction''s own TRANSACTION_COMPLETED'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: wallet.events
+    eventType: WALLET_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-wallet
+    purpose: 'notification: the only contact source for wallets (msisdn, language, display name, type, status); rules R-WALLET-BLOCKED/UNBLOCKED/DORMANT/CLOSED; compacted-topic replay guard'
+    fieldsUsed:
+    - walletId
+    - version
+    - ownerType
+    - ownerId
+    - walletType
+    - msisdn
+    - status
+    - previousStatus
+    - statusReasonCode
+    - displayName
+    - language
+    - updatedAt
+    codesUsed:
+    - set: walletStatus
+      values:
+      - A
+      - D
+      - F
+      - X
+      - C
+      - Z
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_SUBMITTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: rule R-KYC-SUBMITTED'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    - targetTier
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_APPROVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: rule R-KYC-APPROVED'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    - kycTier
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_REJECTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: rule R-KYC-REJECTED'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    - reasonCode
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: KYC_TIER_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: rule R-KYC-TIER'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    - kycTier
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: CUSTOMER_REGISTERED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: Bangla/English name of the customer''s wallet contacts'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: customer.events
+    eventType: CUSTOMER_PROFILE_UPDATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-customer
+    purpose: 'notification: Bangla/English name of the customer''s wallet contacts'
+    fieldsUsed:
+    - customerId
+    - walletIds
+    - nameEn
+    - nameBn
+    codesUsed: []
+    module: notification
+  - producer: wallet-service
+    topic: partner.events
+    eventType: PARTNER_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-partner
+    purpose: 'notification: partner metadata of partner wallets (owner type); never overwrites msisdn/name of a wallet contact; skips walletId = null'
+    fieldsUsed:
+    - partnerId
+    - partnerType
+    - walletId
+    - status
+    - version
+    codesUsed: []
+    module: notification
+  - producer: pricing-service
+    topic: commission.events
+    eventType: COMMISSION_SETTLED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-commission
+    purpose: 'notification: rule R-COMMISSION-SETTLED'
+    fieldsUsed:
+    - beneficiaryWalletId
+    - period
+    - grossPoisha
+    - aitPoisha
+    - netPoisha
+    - txnRef
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_PAID
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: rule R-DISBURSEMENT-CREDIT'
+    fieldsUsed:
+    - walletId
+    - amountPoisha
+    - payerWalletId
+    - rowRef
+    - postedAt
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_SUBMITTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_APPROVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_ROW_FAILED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: BATCH_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: SCHEDULED_TRANSFER_EXECUTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_CREATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_ACCEPTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: disbursement-service
+    topic: disbursement.events
+    eventType: PAYMENT_REQUEST_DECLINED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-disbursement
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_GRANTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-campaign
+    purpose: 'notification: rules R-CASHBACK, R-REWARD-BONUS'
+    fieldsUsed:
+    - walletId
+    - rewardPoisha
+    - rewardType
+    - txnRef
+    - triggerTxnRef
+    codesUsed:
+    - set: rewardType
+      values:
+      - CASHBACK
+    module: notification
+  - producer: pricing-service
+    topic: campaign.events
+    eventType: REWARD_CLAWED_BACK
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-campaign
+    purpose: 'notification: rule R-CASHBACK-CLAWBACK'
+    fieldsUsed:
+    - walletId
+    - rewardPoisha
+    - reasonCode
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_ISSUED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEEMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: EMONEY_REDEMPTION_PAID_OUT
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_BALANCE_CONFIRMED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: FLOAT_REQUEST_UPDATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: LIQUIDITY_THRESHOLD_BREACHED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: MANUAL_JOURNAL_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_REBALANCED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: treasury-service
+    topic: treasury.events
+    eventType: TRUST_INTEREST_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-treasury
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: TICKET_CREATED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: TICKET_STATUS_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: DISPUTE_OPENED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: DISPUTE_RESOLVED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: REVERSAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: support-service
+    topic: support.events
+    eventType: REVERSAL_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-support
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: SCREENING_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: SCREENING_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: CASE_OPENED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: CASE_CLOSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: FREEZE_APPLIED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: FREEZE_LIFTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: RISK_REGRADE_RECOMMENDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: compliance-service
+    topic: case.events
+    eventType: REVERSAL_RECOMMENDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-case
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself; never customer-facing (tipping-off)'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: finance-ops-service
+    topic: recon.events
+    eventType: RECON_RUN_COMPLETED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-recon
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: finance-ops-service
+    topic: recon.events
+    eventType: EMONEY_VARIANCE_DETECTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-recon
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: finance-ops-service
+    topic: recon.events
+    eventType: RECON_EXCEPTION_RAISED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-recon
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_DAY_CLOSED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_DAY_CERTIFIED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_PERIOD_STATUS_CHANGED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_JOURNAL_POSTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_ACCOUNT_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: general-ledger-service
+    topic: gl.events
+    eventType: GL_EXCEPTION_RAISED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-gl
+    purpose: 'notification: subscribed, no R1 rules: the event is counted and ignored (FILTERED); the producer sends notification.requests itself'
+    fieldsUsed: []
+    codesUsed: []
+    module: notification
+  - producer: admin-service
+    topic: notification.requests
+    eventType: NOTIFICATION_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-requests
+    purpose: 'notification: inbound topic owned by this service (O6); direct sends and reminder registration'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: notification
+    inboundTopic: true
+    writers: any service
+  - producer: admin-service
+    topic: notification.requests
+    eventType: NOTIFICATION_REMINDER_CANCELLED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-requests
+    purpose: 'notification: inbound topic owned by this service (O6); cancel reminder occurrences'
+    fieldsUsed:
+    - '*'
+    codesUsed: []
+    module: notification
+    inboundTopic: true
+    writers: any service
+  - producer: admin-service
+    topic: refdata.events
+    eventType: REFDATA_UPSERTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    groupId: admin-service.notification-refdata
+    purpose: 'notification: localised REASON_CODE names and SYSTEM_PARAM SUPPORT.HELPLINE for templates (own topic, read like every other reader)'
+    fieldsUsed:
+    - type
+    - code
+    - nameEn
+    - nameBn
+    - attributes
+    - version
+    - active
+    codesUsed:
+    - set: refdataType
+      values:
+      - REASON_CODE
+      - SYSTEM_PARAM
+    module: notification
+  inboundTopics:
+  - owner: admin-service
+    topic: notification.requests
+    eventType: NOTIFICATION_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    module: governance
+    fieldsUsed:
+    - '*'
+    templates:
+    - GOV_ACTIVITY_ALERT
+    - GOV_APPROVAL_EXPIRING
+    - GOV_AUDIT_INTEGRITY_BROKEN
+    - GOV_STAFF_DORMANT_DISABLED
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_REQUESTED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    modules:
+    - governance
+    - notification
+    fieldsUsed:
+    - '*'
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_DECIDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    modules:
+    - governance
+    - notification
+    fieldsUsed:
+    - '*'
+  - owner: admin-service
+    topic: approval.events
+    eventType: APPROVAL_EXPIRED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    modules:
+    - governance
+    - notification
+    fieldsUsed:
+    - '*'
+  - owner: admin-service
+    topic: audit.events
+    eventType: AUDIT_RECORDED
+    version: 1
+    pinnedContractVersion: 1.0.0
+    modules:
+    - governance
+    - notification
+    fieldsUsed:
+    - '*'
+  data: []
+  codes:
+  - producer: transaction-service
+    set: txnType
+    values: '*'
+  - producer: transaction-service
+    set: failureCode
+    values: '*'
+  - producer: wallet-service
+    set: walletStatus
+    values:
+    - A
+    - D
+    - F
+    - X
+    - C
+    - Z
+  - producer: pricing-service
+    set: rewardType
+    values:
+    - CASHBACK
+  refdata:
+  - type: REASON_CODE
+    codes: '*'
+    module: notification
+    use: 'localised reason names in templates (fallback: the code)'
+  - type: SYSTEM_PARAM
+    codes:
+    - SUPPORT.HELPLINE
+    module: notification
+    use: 'helpline variable (fallback: bitspay.notification.helpline-default)'
+  generatedIndex:
+    description: 'Build-time input, not a runtime dependency: the seed import reads the generated contract index copied into the build'
+    files:
+    - ../../00-global/generated/notification-templates.json
+    - ../../00-global/generated/reason-codes.json
+    - ../../00-global/generated/product-codes.json

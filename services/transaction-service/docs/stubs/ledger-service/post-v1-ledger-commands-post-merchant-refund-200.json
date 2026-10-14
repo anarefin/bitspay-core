@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/post-merchant-refund → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-merchant\\-refund(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3d3-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "63521298-cb3c-e735-2dfb-3f1a63a25554"
+      ],
+      "postedAt": "2026-10-09T08:30:00.412Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,340 @@
+# pricing-service — contract manifest (CONTRACT-MODEL §3)
+service: pricing-service
+number: "06"
+modules: [pricing, campaign]
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-6            # service lead, module pricing; module campaign: Dev-4
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+  events:
+    - topic: fee.rules
+      key: "planId"
+      compacted: true
+      tombstones: true          # OPEN D-31 — null value (no envelope) when a plan is retired
+      partitions: {dev: 1, prod: 1}
+      retention: compacted
+      transport: outbox
+      module: pricing
+      eventTypes:
+        - {type: PRICING_PLAN_UPSERTED, version: 1, aggregateType: PricingPlan,
+           schema: provided/events/fee.rules/PRICING_PLAN_UPSERTED.v1.schema.json}
+    - topic: commission.events
+      key: "beneficiaryWalletId"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 12}
+      retention: 7d
+      transport: outbox
+      module: pricing
+      eventTypes:
+        - {type: COMMISSION_ACCRUED, version: 1, aggregateType: CommissionAccrual,
+           schema: provided/events/commission.events/COMMISSION_ACCRUED.v1.schema.json}
+        - {type: COMMISSION_SETTLED, version: 1, aggregateType: CommissionSettlement,
+           schema: provided/events/commission.events/COMMISSION_SETTLED.v1.schema.json}
+    - topic: campaign.events
+      key: "walletId (beneficiary)"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 12}
+      retention: 7d
+      transport: outbox
+      module: campaign
+      eventTypes:
+        - {type: REWARD_GRANTED, version: 1, aggregateType: Reward,
+           schema: provided/events/campaign.events/REWARD_GRANTED.v1.schema.json}
+        - {type: REWARD_CLAWED_BACK, version: 1, aggregateType: Reward,
+           schema: provided/events/campaign.events/REWARD_CLAWED_BACK.v1.schema.json}
+  inboundTopics: []
+  data:
+    - {id: pricing-algorithm, version: 1, file: provided/data/pricing-algorithm.v1.md, kind: algorithm}
+    - {id: pricing-golden-vectors, version: 1, file: provided/data/pricing-golden-vectors.v1.json, kind: golden-vectors}
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    # ---------------- ledger-service ----------------
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-commission-settlement"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: pricing
+      purpose: "post a commission settlement (command 13): COMMISSION_PAYABLE -> beneficiary net, AIT leg to AIT_PAYABLE"
+      fieldsUsed: ["req.commandId", "req.txnRef", "req.beneficiaryAccountId", "req.grossPoisha", "req.aitPoisha",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]},
+                  {set: rejectionCode, values: [INVALID_AMOUNT, ACCOUNT_NOT_FOUND, ACCOUNT_CLOSED, OTHER]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 2000, circuitBreaker: true, retry: "none inline; job retries same commandId (1, 2, 5, 10, 30 min, then every 30 min)", onFailure: "settlement stays POSTING"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-campaign-reward"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "credit a reward from CAMPAIGN_FUNDING (command 12)"
+      fieldsUsed: ["req.commandId", "req.txnRef", "req.toAccountId", "req.amountPoisha", "req.constraints.destinationMaxBalancePoisha",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]},
+                  {set: rejectionCode, values: [INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, ACCOUNT_NOT_FOUND, ACCOUNT_CLOSED, OTHER]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 1000, circuitBreaker: true, retry: "executor backoff min(2^attempts s, 300 s), same commandId", onFailure: "reward stays PENDING"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-reversal"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "claw back an own reward (type-12 original only, flags false)"
+      fieldsUsed: ["req.commandId", "req.txnRef", "req.originalCommandId", "req.reverseFee", "req.reverseCommission",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]},
+                  {set: rejectionCode, values: [ALREADY_REVERSED, INSUFFICIENT_FUNDS, ORIGINAL_NOT_FOUND, ACCOUNT_CLOSED, OTHER]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 1000, circuitBreaker: true, retry: "503/timeout: same commandId; INSUFFICIENT_FUNDS: new attempt every 24 h, max 30", onFailure: "reward stays CLAWBACK_PENDING"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "CAMPAIGN_FUNDING (00000000-0000-0000-0000-000000000240) funding check at submit / budget increase and PENDING_FUNDING recheck"
+      fieldsUsed: ["path.id", "res.availableBalancePoisha", "res.asOf"]
+      codesUsed: []
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 1000, circuitBreaker: true, onFailure: "WARN mode: sufficient = null; BLOCK mode: 503 DEPENDENCY_UNAVAILABLE"}
+    # ---------------- wallet-service ----------------
+    - producer: wallet-service
+      operation: "POST /v1/wallets/status:batchGet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "wallet missing from the campaign projection at evaluation; re-check before bulk DRAW/LIST rewards"
+      fieldsUsed: ["req.walletIds", "res.items[].walletId", "res.items[].version", "res.items[].status", "res.items[].kycTier",
+                   "res.items[].walletType", "res.items[].categoryCode", "res.items[].flags", "res.notFound"]
+      codesUsed: [{set: walletStatus, values: "*"}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 2000, circuitBreaker: true, retry: "3 batch retries on 503", onFailure: "NOT_ELIGIBLE WALLET_UNKNOWN; draw execution 503"}
+    # ---------------- limits-risk-service ----------------
+    - producer: limits-risk-service
+      operation: "POST /v1/risk/evaluate:batch"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "receiver limits, max balance and blacklist for rewards (limitsCheck.enabled, default true — OPEN D-09)"
+      fieldsUsed: ["req.dryRun", "req.items[].txnId", "req.items[].txnType", "req.items[].channel", "req.items[].amountPoisha",
+                   "req.items[].from", "req.items[].to", "req.items[].at",
+                   "res.items[].txnId", "res.items[].decision", "res.items[].reservationId", "res.items[].receiverMaxBalancePoisha",
+                   "res.items[].violatedLimit.limitCode", "problem.txnIds"]
+      codesUsed: [{set: riskDecision, values: [ALLOW, BLOCK, LIMIT_EXCEEDED, SERVICE_DISABLED]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 2000, circuitBreaker: true, onFailure: "rewards stay PENDING (nothing reserved)"}
+    - producer: limits-risk-service
+      operation: "POST /v1/limits/reservations/{txnId}:release"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: campaign
+      purpose: "release the batch reservation of every reward attempt that will not be paid"
+      fieldsUsed: ["path.txnId", "req.reasonCode", "res.txnId", "res.released", "res.state"]
+      codesUsed: [{set: releaseState, values: [RELEASED, COMMITTED, EXPIRED, NOT_FOUND]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 1000, circuitBreaker: true, retry: "durable job until a final state, backoff to 1 h", onFailure: "stays in limits_release_pending; alert > 1 h"}
+    # ---------------- admin-service ----------------
+    - producer: admin-service
+      operation: "GET /v1/refdata/{type}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: both
+      purpose: "start-up bootstrap of SYSTEM_PARAM FEATURE.CAMPAIGN and CUTOFF.EOD before refdata.events catches up"
+      fieldsUsed: ["path.type", "query.cursor", "query.limit", "res.items[].type", "res.items[].code", "res.items[].attributes",
+                   "res.items[].version", "res.items[].active", "res.nextCursor"]
+      codesUsed: [{set: refdataType, values: [SYSTEM_PARAM]}]
+      resilience: {connectTimeoutMs: 300, readTimeoutMs: 1000, circuitBreaker: true, onFailure: "fall back to config (feature per config, cutoff 00:00) and keep consuming refdata.events"}
+
+  events:
+    # ---------------- transaction-service: txn.events ----------------
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.txn
+      module: pricing
+      purpose: "INLINE accrual, hierarchical SHARE accruals, incentive counters; REVERSAL rows ignored"
+      fieldsUsed: [txnId, txnRef, txnType, amountPoisha, feePoisha, commissionPoisha, aitPoisha, commissionBeneficiaryWalletId,
+                   fromWalletId, toWalletId, completedAt]
+      codesUsed: [{set: txnType, values: [CASH_IN, CASH_OUT, P2P, MERCHANT_PAYMENT, FLOAT_TRANSFER, REVERSAL]}]
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REVERSED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.txn
+      module: pricing
+      purpose: "commission clawback of the original's INLINE and SHARE accruals; incentive counter decrement"
+      fieldsUsed: [txnId, txnRef, txnType, amountPoisha, completedAt, reverseCommission, reversedAmountPoisha, toWalletId, fromWalletId, commissionBeneficiaryWalletId]
+      codesUsed: []
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-txn
+      module: campaign
+      purpose: "activity projection, first-txn, trigger evaluation, rewards, draw entries, points, referral FIRST_TXN qualification"
+      fieldsUsed: [txnId, txnRef, txnType, status, channel, fromWalletId, fromWalletType, toWalletId, toWalletType, amountPoisha,
+                   feePoisha, vatPoisha, feeBearer, riskDecision, deviceId, completedAt]
+      codesUsed: [{set: txnType, values: "*"}, {producer: limits-risk-service, set: riskDecision, values: [ALLOW, ALLOW_AND_ALERT]}]
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REVERSED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-txn
+      module: campaign
+      purpose: "cancel or claw back rewards triggered by the original (partial reversal = reversal)"
+      fieldsUsed: [txnId, txnRef, amountPoisha, reversedAmountPoisha]
+      codesUsed: []
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REFUNDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-txn
+      module: campaign
+      purpose: "full or below-minimum partial refund of a trigger merchant payment -> clawback"
+      fieldsUsed: [txnId, txnRef, status, amountPoisha, refundedTotalPoisha]
+      codesUsed: [{set: transactionStatus, values: [PARTIALLY_REFUNDED, REFUNDED]}]
+    # ---------------- wallet-service: partner.events, wallet.events, customer.events ----------------
+    - producer: wallet-service
+      topic: partner.events
+      eventType: PARTNER_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.partner
+      module: pricing
+      purpose: "partner projection, effective-dated hierarchy, default settlement profiles, AIT rate (tinPresent), retry of parked txns"
+      fieldsUsed: [partnerId, partnerType, subType, categoryCode, walletId, status, displayName, ancestorPartnerIds, ancestorWalletIds,
+                   version, effectiveFrom, tinPresent]
+      codesUsed: [{set: partnerStatus, values: "*"}, {set: partnerType, values: [AGENT, DISTRIBUTOR, MERCHANT, INSTITUTION]}]
+    - producer: wallet-service
+      topic: partner.events
+      eventType: PARTNER_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-partner
+      module: campaign
+      purpose: "payee filters (category, MCC, partnerId) and underPartner / partnerType segment clauses"
+      fieldsUsed: [partnerId, walletId, partnerType, subType, categoryCode, mcc, territory.district, status, ancestorPartnerIds, version]
+      codesUsed: [{set: partnerStatus, values: [ACTIVE]}]
+    - producer: wallet-service
+      topic: wallet.events
+      eventType: WALLET_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-wallet
+      module: campaign
+      purpose: "wallet projection for eligibility and segmentation; resolve LIST members by MSISDN hash (MSISDN never stored)"
+      fieldsUsed: [walletId, version, ownerType, ownerId, walletType, msisdn, status, kycTier, categoryCode, flags, language, createdAt]
+      codesUsed: [{set: walletStatus, values: "*"}]
+    - producer: wallet-service
+      topic: customer.events
+      eventType: CUSTOMER_REGISTERED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-customer
+      module: campaign
+      purpose: "customer projection; CUSTOMER_EVENT triggers; referralCode -> referral claim"
+      fieldsUsed: [customerId, walletIds, nidHash, dob, gender, district, upazila, kycTier, riskGrade, language, registeredAt, referralCode]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_APPROVED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-customer
+      module: campaign
+      purpose: "customer projection; CUSTOMER_EVENT triggers; referral qualification KYC_APPROVED"
+      fieldsUsed: [customerId, walletIds, nidHash, dob, gender, district, upazila, kycTier, riskGrade, language]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_TIER_CHANGED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-customer
+      module: campaign
+      purpose: "customer projection"
+      fieldsUsed: [customerId, walletIds, kycTier]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: RISK_GRADE_CHANGED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-customer
+      module: campaign
+      purpose: "customer projection (riskGrade clause)"
+      fieldsUsed: [customerId, walletIds, riskGrade]
+      codesUsed: [{set: riskGrade, values: [LOW, MEDIUM, HIGH]}]
+    - producer: wallet-service
+      topic: customer.events
+      eventType: CUSTOMER_PROFILE_UPDATED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.campaign-customer
+      module: campaign
+      purpose: "customer projection (geography, birth year, gender, language)"
+      fieldsUsed: [customerId, walletIds, nidHash, dob, gender, district, upazila, language]
+      codesUsed: []
+    # ---------------- admin-service: refdata.events ----------------
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: pricing-service.refdata
+      module: both
+      purpose: "SYSTEM_PARAM FEATURE.CAMPAIGN (product switch) and CUTOFF.EOD (business date); other items ignored"
+      fieldsUsed: [type, code, attributes, version, active]
+      codesUsed: [{set: refdataType, values: [SYSTEM_PARAM]}]
+
+  inboundTopics:
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: [COMMISSION_NEGATIVE_BALANCE, CAMPAIGN_FUNDING_LOW, CAMPAIGN_BUDGET_EXHAUSTED, REWARD_CLAWBACK_MANUAL_REQUIRED, "EDU_<CODE>"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      entityTypes: provided/codes.yaml#entityTypes
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_EXPIRED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: audit.events
+      eventType: AUDIT_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+
+  data: []
+
+  codes:
+    - {producer: admin-service, set: refdataType, values: [SYSTEM_PARAM]}
+    - {producer: ledger-service, set: rejectionCode, values: [INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, ACCOUNT_NOT_FOUND, ACCOUNT_CLOSED, ALREADY_REVERSED, ORIGINAL_NOT_FOUND, INVALID_AMOUNT, OTHER]}
+    - {producer: wallet-service, set: walletStatus, values: "*"}
+    - {producer: wallet-service, set: partnerStatus, values: "*"}
+    - {producer: limits-risk-service, set: riskDecision, values: [ALLOW, BLOCK, LIMIT_EXCEEDED, SERVICE_DISABLED]}
+    - {producer: transaction-service, set: txnType, values: "*"}
+
+  refdata:
+    - {type: SYSTEM_PARAM, codes: ["FEATURE.CAMPAIGN", "CUTOFF.EOD"]}

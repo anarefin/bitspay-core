@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/limits-risk-service/blacklist.events/BLACKLIST_ENTRY_UPSERTED.v1.schema.json",
+  "title": "blacklist.events BLACKLIST_ENTRY_UPSERTED v1 (envelope.data)",
+  "description": "Compacted topic, no tombstones. aggregateType BlacklistEntry; key = aggregateId = entryId. Emitted when a BLACK entry becomes ACTIVE (approval), INACTIVE (deactivation approved) or EXPIRED (expiry job, <= 1 min). Never for PENDING_APPROVAL / REJECTED entries, never for whitelist entries. An inactive entry stays on the topic as active = false.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["entryId", "type", "valueHash", "active", "expiresAt", "reasonCode"],
+  "properties": {
+    "entryId": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "description": "= key"},
+    "type": {"type": "string", "enum": ["NID", "MSISDN", "DEVICE", "WALLET", "BANK_ACCOUNT", "IP", "PARTNER"]},
+    "valueHash": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "kernel K2 HMAC over the normalised value; WALLET/PARTNER over the lower-case UUID"},
+    "active": {"type": "boolean", "description": "false for INACTIVE / EXPIRED"},
+    "expiresAt": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$", "description": "null = no expiry"},
+    "reasonCode": {"type": "string", "enum": ["FRAUD_CONFIRMED", "MULE_ACCOUNT", "IDENTITY_FRAUD", "AML_SUSPICION", "REGULATORY_INSTRUCTION", "SANCTIONS", "OTHER"], "description": "Blacklist entry reason group (OPEN D-32)"}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "eventId": "0192f806-0000-7000-8000-000000000011",
+  "eventType": "DISPUTE_RESOLVED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T09:30:30.010Z",
+  "producer": "support-service",
+  "aggregateType": "Ticket",
+  "aggregateId": "0192f800-0000-7000-8000-000000000123",
+  "correlationId": "c-77a1",
+  "data": {
+    "disputeId": "0192f801-0000-7000-8000-000000000005",
+    "ticketId": "0192f800-0000-7000-8000-000000000123",
+    "outcome": "UPHELD",
+    "reasonCode": "WRONG_TRANSFER",
+    "txnRef": "PP26100900W7RT2X9B",
+    "reversalRequestId": "0192f803-0000-7000-8000-000000000007",
+    "walletIds": [
+      "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+      "0192f2ee-5c6d-7e8f-9a0b-1c2d3e4f5a6b"
+    ],
+    "resolvedAt": "2026-10-09T09:30:30.000Z"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "eventId": "0192f201-1000-7000-8000-000000000e05",
+  "eventType": "FLOAT_REQUEST_UPDATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T08:20:00.050Z",
+  "producer": "treasury-service",
+  "aggregateType": "FloatRequest",
+  "aggregateId": "0192f2ee-0000-7000-8000-00000000e001",
+  "correlationId": "c-7e2a01",
+  "data": {
+    "requestId": "0192f201-0000-7000-8000-000000000001",
+    "requesterWalletId": "0192f2ee-0000-7000-8000-00000000e001",
+    "requesterPartnerId": "0192f2e0-0000-7000-8000-00000000e000",
+    "direction": "TOP_UP",
+    "counterparty": "PARENT",
+    "counterpartyWalletId": "0192f2dd-0000-7000-8000-00000000d001",
+    "amountPoisha": 2000000,
+    "status": "COMPLETED",
+    "previousStatus": "EXECUTING",
+    "txnRef": "FT26100900AB12CD34",
+    "issuanceId": null,
+    "redemptionId": null,
+    "failureCode": null,
+    "updatedAt": "2026-10-09T08:20:00.050Z"
+  }
+}

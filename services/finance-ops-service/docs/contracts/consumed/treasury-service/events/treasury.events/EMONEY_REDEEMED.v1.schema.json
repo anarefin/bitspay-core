@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/EMONEY_REDEEMED.v1.schema.json",
+  "title": "treasury.events EMONEY_REDEEMED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType EmoneyRedemption; Kafka key = aggregateId = data.trustAccountId. Trigger: redemption POSTED (ledger OK/EXISTS), same DB transaction.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "redemptionId",
+    "txnRef",
+    "trustAccountId",
+    "ledgerTrustAccountId",
+    "bankCode",
+    "sourceType",
+    "sourceAccountId",
+    "sourceAccountType",
+    "amountPoisha",
+    "reasonCode",
+    "bankReference",
+    "makerId",
+    "checkerIds",
+    "ledgerCommandId",
+    "ledgerTransferIds",
+    "floatRequestId",
+    "businessDate",
+    "postedAt"
+  ],
+  "properties": {
+    "redemptionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= ledgerCommandId"
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "ER{yyMMdd}{10 Crockford} (18); opaque 1..32 for consumers"
+    },
+    "trustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ledgerTrustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "…0000000300nn credit side"
+    },
+    "bankCode": {
+      "type": "string"
+    },
+    "sourceType": {
+      "type": "string",
+      "enum": [
+        "WALLET",
+        "SYSTEM_ACCOUNT"
+      ]
+    },
+    "sourceAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "wallet id or fixed system account id debit side"
+    },
+    "sourceAccountType": {
+      "type": "string",
+      "enum": [
+        "AGENT_WALLET",
+        "DISTRIBUTOR_WALLET",
+        "MERCHANT_WALLET",
+        "INSTITUTION_WALLET",
+        "FEE_INCOME",
+        "VAT_PAYABLE",
+        "AIT_PAYABLE",
+        "CAMPAIGN_FUNDING"
+      ],
+      "description": "ledger account-type names"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "1 … 10^13"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "FLOAT_RETURN_TO_BANK",
+        "MERCHANT_SETTLEMENT",
+        "REVENUE_SWEEP",
+        "VAT_REMITTANCE",
+        "AIT_REMITTANCE",
+        "CAMPAIGN_FUNDING_RETURN",
+        "CLOSURE_PAYOUT",
+        "OTHER"
+      ],
+      "description": "E-money redemption reason group"
+    },
+    "bankReference": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "≤ 64; null unless the maker supplied one OPEN D-22: the payout reference is published by EMONEY_REDEMPTION_PAID_OUT"
+    },
+    "makerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "checkerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 3,
+      "description": "1–3 items"
+    },
+    "ledgerCommandId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ledgerTransferIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "1 item"
+    },
+    "floatRequestId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "set for a float RETURN to BANK"
+    },
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "postedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$",
+      "description": "ledger postedAt"
+    }
+  }
+}

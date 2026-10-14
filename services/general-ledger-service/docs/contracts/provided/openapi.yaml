@@ -1,0 +1,6318 @@
+# general-ledger-service — provided REST contract (v6 pack, contractVersion 1.0.0). OpenAPI 3.1.
+# Every operation: x-audience, x-actors, operationId, per-operation problem reasons, request/2xx examples.
+openapi: 3.1.0
+info:
+  title: general-ledger-service
+  version: 1.0.0
+  description: 'Provided REST contract of general-ledger-service (SVC-16): the Operator''s books. Chart of accounts, posting rules, journals,
+    GL days and control totals, periods and fiscal years, reports, ERP export, exceptions and the maker-checker approval API. Kernel rules apply
+    (headers K3.1, idempotency K3.3, pagination K3.4, problem+json K3.6). Every operation carries x-audience and x-actors; x-actors lists the
+    allowed actor types with STAFF roles, or the allowed X-Actor-Id values for SERVICE callers. Read-only operations take no Idempotency-Key.
+    Every list and report operation that declares text/csv also answers Accept: text/csv.'
+servers:
+- url: http://localhost:8000/general-ledger
+- url: http://localhost:8116
+tags:
+- name: Chart of accounts
+- name: Posting rules
+- name: Journals
+- name: Days
+- name: Periods
+- name: Reports
+- name: Exports
+- name: Exceptions
+- name: Approvals
+- name: Internal
+paths:
+  /v1/gl/accounts:
+    get:
+      summary: List chart-of-accounts entries
+      tags:
+      - Chart of accounts
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          - PENDING_APPROVAL
+      - name: accountClass
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ASSET
+          - LIABILITY
+          - EQUITY
+          - INCOME
+          - EXPENSE
+      - name: parentCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: postable
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlAccountPage'
+              example:
+                items:
+                - code: '2101'
+                  nameEn: E-money liability - customers
+                  nameBn: null
+                  accountClass: LIABILITY
+                  normalSide: CREDIT
+                  contra: false
+                  parentCode: '2100'
+                  level: 3
+                  postable: true
+                  ledgerControlled: true
+                  manualPostingAllowed: false
+                  mustBeZero: false
+                  status: ACTIVE
+                  provisional: true
+                  version: 1
+                  updatedAt: '2026-10-01T00:00:05.000Z'
+                  templateCode: null
+                  description: All CUSTOMER_WALLET (100) accounts
+                  effectiveFrom: '2026-10-01'
+                  createdAt: '2026-10-01T00:00:05.000Z'
+                - code: '5301'
+                  nameEn: Bank charges
+                  nameBn: null
+                  accountClass: EXPENSE
+                  normalSide: DEBIT
+                  contra: false
+                  parentCode: '5300'
+                  level: 3
+                  postable: true
+                  ledgerControlled: false
+                  manualPostingAllowed: true
+                  mustBeZero: false
+                  status: ACTIVE
+                  provisional: true
+                  version: 3
+                  updatedAt: '2026-10-01T00:00:05.000Z'
+                  templateCode: null
+                  description: Operating bank account charges
+                  effectiveFrom: '2026-10-01'
+                  createdAt: '2026-10-01T00:00:05.000Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listGlAccounts
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+    post:
+      summary: Propose a new GL account (maker-checker GlAccount/CREATE)
+      tags:
+      - Chart of accounts
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlAccountCreate'
+            example:
+              code: '5302'
+              nameEn: Bank charges - trust accounts
+              nameBn: null
+              accountClass: EXPENSE
+              contra: false
+              parentCode: '5300'
+              postable: true
+              ledgerControlled: false
+              manualPostingAllowed: true
+              mustBeZero: false
+              description: Charges levied on trust bank accounts
+              effectiveFrom: '2026-11-01'
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlAccount
+                entityId: '5302'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {PARENT_CLASS_MISMATCH, MANUAL_POSTING_NOT_ALLOWED}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PARENT_CLASS_MISMATCH
+                      - MANUAL_POSTING_NOT_ALLOWED
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {PERIOD_CLOSED}; IDEMPOTENCY_CONFLICT when the key was used with another
+            payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PERIOD_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: createGlAccount
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/accounts/{code}:
+    get:
+      summary: Get a GL account
+      tags:
+      - Chart of accounts
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(-[0-9]{2})?$
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlAccount'
+              example:
+                code: '5301'
+                nameEn: Bank charges
+                nameBn: null
+                accountClass: EXPENSE
+                normalSide: DEBIT
+                contra: false
+                parentCode: '5300'
+                level: 3
+                postable: true
+                ledgerControlled: false
+                manualPostingAllowed: true
+                mustBeZero: false
+                status: ACTIVE
+                provisional: true
+                version: 3
+                updatedAt: '2026-10-01T00:00:05.000Z'
+                templateCode: null
+                description: Operating bank account charges
+                effectiveFrom: '2026-10-01'
+                createdAt: '2026-10-01T00:00:05.000Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getGlAccount
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+    patch:
+      summary: Propose a change (maker-checker GlAccount/UPDATE)
+      tags:
+      - Chart of accounts
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(-[0-9]{2})?$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlAccountUpdate'
+            example:
+              nameEn: Bank charges - operating account
+              expectedVersion: 3
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlAccount
+                entityId: '5301'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {PARENT_CLASS_MISMATCH, MANUAL_POSTING_NOT_ALLOWED}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PARENT_CLASS_MISMATCH
+                      - MANUAL_POSTING_NOT_ALLOWED
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; IDEMPOTENCY_CONFLICT when the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: updateGlAccount
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/accounts/{code}:deactivate:
+    post:
+      summary: Propose deactivation (zero balance, no rule targets it)
+      tags:
+      - Chart of accounts
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(-[0-9]{2})?$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+            example:
+              reason: Account replaced by 5302; zero balance in every open period
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlAccount
+                entityId: '5301'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {ACCOUNT_IN_USE}; IDEMPOTENCY_CONFLICT when the key was used with another
+            payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - ACCOUNT_IN_USE
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: deactivateGlAccount
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/rule-sets:
+    get:
+      summary: List posting rule sets
+      tags:
+      - Posting rules
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleSetSummaryPage'
+              example:
+                items:
+                - version: 1
+                  status: APPROVED
+                  effectiveFrom: '2026-10-01'
+                  description: Initial provisional rule set for R1 internal products
+                  checksum: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
+                  ruleCount: 51
+                  provisional: true
+                  approvalId: null
+                  createdBy: flyway-seed
+                  activatedAt: '2026-10-01T00:00:00.000Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listRuleSets
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+    post:
+      summary: Propose a new rule set (validated, then maker-checker PostingRuleSet)
+      tags:
+      - Posting rules
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleSetRequest'
+            example:
+              effectiveFrom: '2026-11-01'
+              description: 'Rule set 2: MDR to new account 4108'
+              rules:
+              - id: W-100
+                priority: 100
+                tbAccountType: 100
+                side: null
+                transferCode: null
+                commandType: null
+                legIndex: null
+                reasonCode: null
+                counterpartyAccountType: null
+                glAccount: '2101'
+                note: customer wallets
+              - id: F-MDR
+                priority: 10
+                tbAccountType: 200
+                side: CREDIT
+                transferCode: 2001
+                commandType: 4
+                legIndex: null
+                reasonCode: null
+                counterpartyAccountType: null
+                glAccount: '4108'
+                note: MDR income
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: PostingRuleSet
+                entityId: '2'
+                status: PENDING
+                requiredLevels: 2
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {RULE_SET_INVALID}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - RULE_SET_INVALID
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {PERIOD_CLOSED}; IDEMPOTENCY_CONFLICT when the key was used with another
+            payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PERIOD_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: proposeRuleSet
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/rule-sets:validate:
+    post:
+      summary: Validate a rule set against the CoA and the posting universe (no side effects)
+      tags:
+      - Posting rules
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleSetRequest'
+            example:
+              effectiveFrom: '2026-11-01'
+              description: 'Rule set 2: MDR to new account 4108'
+              rules:
+              - id: W-100
+                priority: 100
+                tbAccountType: 100
+                side: null
+                transferCode: null
+                commandType: null
+                legIndex: null
+                reasonCode: null
+                counterpartyAccountType: null
+                glAccount: '2101'
+                note: customer wallets
+              - id: F-MDR
+                priority: 10
+                tbAccountType: 200
+                side: CREDIT
+                transferCode: 2001
+                commandType: 4
+                legIndex: null
+                reasonCode: null
+                counterpartyAccountType: null
+                glAccount: '4108'
+                note: MDR income
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationReport'
+              example:
+                valid: true
+                coveredCombinations: 986
+                issues:
+                - severity: WARNING
+                  code: MAPS_TO_SUSPENSE
+                  ruleIds:
+                  - C-ADJ-OTHER
+                  combination:
+                    tbAccountType: 220
+                    side: DEBIT
+                    transferCode: 1010
+                    commandType: 11
+                    legIndex: 0
+                    counterpartyAccountType: 400
+                  message: reviewed combination maps to 1999
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: validateRuleSet
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/rule-sets/{version}:
+    get:
+      summary: Get a rule set with its rules
+      tags:
+      - Posting rules
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleSet'
+              example:
+                version: 1
+                status: APPROVED
+                effectiveFrom: '2026-10-01'
+                description: Initial provisional rule set for R1 internal products
+                checksum: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
+                ruleCount: 51
+                provisional: true
+                approvalId: null
+                createdBy: flyway-seed
+                activatedAt: '2026-10-01T00:00:00.000Z'
+                rules:
+                - id: W-100
+                  priority: 100
+                  tbAccountType: 100
+                  side: null
+                  transferCode: null
+                  commandType: null
+                  legIndex: null
+                  reasonCode: null
+                  counterpartyAccountType: null
+                  glAccount: '2101'
+                  note: customer wallets
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getRuleSet
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/rule-sets/{version}:simulate:
+    post:
+      summary: Map sample ledger transfers with this rule set (no side effects)
+      tags:
+      - Posting rules
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulateRequest'
+            example:
+              transfers:
+              - transferId: fc214b7c-f80c-8143-4f0e-107e2518a302
+                commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                commandType: 1
+                legIndex: 0
+                code: 1001
+                debitAccountId: 0192f2aa-0000-7000-8000-00000000a001
+                creditAccountId: 0192f2bb-0000-7000-8000-00000000b001
+                amountPoisha: 50000
+                pendingId: null
+                flags:
+                - linked
+                timestamp: 1791533002123000000
+              walletTypes: null
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulateResponse'
+              example:
+                lines:
+                - transferId: fc214b7c-f80c-8143-4f0e-107e2518a302
+                  glAccountCode: '2101'
+                  side: DEBIT
+                  amountPoisha: 50000
+                  ruleId: W-100
+                  sourceBucket: WALLET:C
+                  ignored: false
+                - transferId: fc214b7c-f80c-8143-4f0e-107e2518a302
+                  glAccountCode: '2101'
+                  side: CREDIT
+                  amountPoisha: 50000
+                  ruleId: W-100
+                  sourceBucket: WALLET:C
+                  ignored: false
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: simulateRuleSet
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/journals:
+    get:
+      summary: List journals
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: businessDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: fromDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: source
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: glAccountCode
+        in: query
+        required: false
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JournalSummaryPage'
+              example:
+                items:
+                - journalId: 0192f700-0000-7000-8000-000000000001
+                  journalRef: GLJ-20261010-M-000001
+                  source: MANUAL
+                  businessDate: '2026-10-10'
+                  revision: null
+                  status: POSTED
+                  narration: Monthly account maintenance charge debited by the operating bank
+                  totalDebitPoisha: 57500
+                  totalCreditPoisha: 57500
+                  lineCount: 2
+                  reversesJournalId: null
+                  autoReverseOn: null
+                  approvalId: 0192f701-0000-7000-8000-000000000001
+                  makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                  checkerIds:
+                  - 0192f0a1-0000-7000-8000-0000000000f2
+                  createdAt: '2026-10-10T09:30:00.120Z'
+                  postedAt: '2026-10-10T09:41:05.100Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR, RANGE_TOO_LARGE}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - RANGE_TOO_LARGE
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listJournals
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+    post:
+      summary: Create a manual or accrual journal (maker-checker GlManualJournal)
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualJournalRequest'
+            example:
+              businessDate: '2026-10-10'
+              kind: MANUAL
+              documentReference: BANKADV-20261010-17
+              narration: Monthly account maintenance charge debited by the operating bank
+              autoReverseOn: null
+              lines:
+              - glAccountCode: '5301'
+                side: DEBIT
+                amountPoisha: 57500
+              - glAccountCode: '1201'
+                side: CREDIT
+                amountPoisha: 57500
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+              example:
+                journalId: 0192f700-0000-7000-8000-000000000001
+                journalRef: GLJ-20261010-M-000001
+                source: MANUAL
+                businessDate: '2026-10-10'
+                revision: null
+                status: PENDING_APPROVAL
+                narration: Monthly account maintenance charge debited by the operating bank
+                totalDebitPoisha: 57500
+                totalCreditPoisha: 57500
+                lineCount: 2
+                reversesJournalId: null
+                autoReverseOn: null
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                checkerIds: []
+                createdAt: '2026-10-10T09:30:00.120Z'
+                postedAt: null
+                documentReference: BANKADV-20261010-17
+                lines:
+                - lineNo: 1
+                  glAccountCode: '5301'
+                  glAccountName: Bank charges
+                  side: DEBIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+                - lineNo: 2
+                  glAccountCode: '1201'
+                  glAccountName: Operating bank account (main)
+                  side: CREDIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {UNBALANCED, LEDGER_CONTROLLED_ACCOUNT, ACCOUNT_NOT_POSTABLE, ACCOUNT_INACTIVE, MANUAL_POSTING_NOT_ALLOWED,
+            NARRATION_TOO_SHORT, TOO_MANY_LINES}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - UNBALANCED
+                      - LEDGER_CONTROLLED_ACCOUNT
+                      - ACCOUNT_NOT_POSTABLE
+                      - ACCOUNT_INACTIVE
+                      - MANUAL_POSTING_NOT_ALLOWED
+                      - NARRATION_TOO_SHORT
+                      - TOO_MANY_LINES
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {PERIOD_CLOSED, FUTURE_DATE, BEFORE_GL_START}; IDEMPOTENCY_CONFLICT when
+            the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PERIOD_CLOSED
+                      - FUTURE_DATE
+                      - BEFORE_GL_START
+                      - null
+        '422':
+          description: MAKER_CHECKER_VIOLATION
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: createManualJournal
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/journals/{journalId}:
+    get:
+      summary: Get a journal with its lines
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: journalId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+              example:
+                journalId: 0192f700-0000-7000-8000-000000000001
+                journalRef: GLJ-20261010-M-000001
+                source: MANUAL
+                businessDate: '2026-10-10'
+                revision: null
+                status: POSTED
+                narration: Monthly account maintenance charge debited by the operating bank
+                totalDebitPoisha: 57500
+                totalCreditPoisha: 57500
+                lineCount: 2
+                reversesJournalId: null
+                autoReverseOn: null
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                checkerIds:
+                - 0192f0a1-0000-7000-8000-0000000000f2
+                createdAt: '2026-10-10T09:30:00.120Z'
+                postedAt: '2026-10-10T09:41:05.100Z'
+                documentReference: BANKADV-20261010-17
+                lines:
+                - lineNo: 1
+                  glAccountCode: '5301'
+                  glAccountName: Bank charges
+                  side: DEBIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+                - lineNo: 2
+                  glAccountCode: '1201'
+                  glAccountName: Operating bank account (main)
+                  side: CREDIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getJournal
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/journals/{journalId}:reverse:
+    post:
+      summary: Reverse a POSTED non-ledger journal (maker-checker GlJournalReversal)
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: journalId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReverseJournalRequest'
+            example:
+              businessDate: '2026-10-12'
+              reason: Bank charge refunded by the bank; advice BANKADV-20261012-03
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+              example:
+                journalId: 0192f702-0000-7000-8000-000000000001
+                journalRef: GLJ-20261012-R-000001
+                source: REVERSAL
+                businessDate: '2026-10-12'
+                revision: null
+                status: PENDING_APPROVAL
+                narration: 'Reversal: bank charge refunded by the bank'
+                totalDebitPoisha: 57500
+                totalCreditPoisha: 57500
+                lineCount: 2
+                reversesJournalId: 0192f700-0000-7000-8000-000000000001
+                autoReverseOn: null
+                approvalId: 0192f703-0000-7000-8000-000000000001
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                checkerIds: []
+                createdAt: '2026-10-10T09:30:00.120Z'
+                postedAt: null
+                documentReference: null
+                lines:
+                - lineNo: 1
+                  glAccountCode: '1201'
+                  glAccountName: Operating bank account (main)
+                  side: DEBIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+                - lineNo: 2
+                  glAccountCode: '5301'
+                  glAccountName: Bank charges
+                  side: CREDIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {ALREADY_REVERSED, PERIOD_CLOSED, FUTURE_DATE}; IDEMPOTENCY_CONFLICT when
+            the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - ALREADY_REVERSED
+                      - PERIOD_CLOSED
+                      - FUTURE_DATE
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: reverseJournal
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/journals/{journalId}:cancel:
+    post:
+      summary: Maker withdraws a PENDING_APPROVAL journal
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: journalId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+              example:
+                journalId: 0192f700-0000-7000-8000-000000000001
+                journalRef: GLJ-20261010-M-000001
+                source: MANUAL
+                businessDate: '2026-10-10'
+                revision: null
+                status: CANCELLED
+                narration: Monthly account maintenance charge debited by the operating bank
+                totalDebitPoisha: 57500
+                totalCreditPoisha: 57500
+                lineCount: 2
+                reversesJournalId: null
+                autoReverseOn: null
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                checkerIds: []
+                createdAt: '2026-10-10T09:30:00.120Z'
+                postedAt: null
+                documentReference: BANKADV-20261010-17
+                lines:
+                - lineNo: 1
+                  glAccountCode: '5301'
+                  glAccountName: Bank charges
+                  side: DEBIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+                - lineNo: 2
+                  glAccountCode: '1201'
+                  glAccountName: Operating bank account (main)
+                  side: CREDIT
+                  amountPoisha: 57500
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: cancelJournal
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/opening-balances:
+    post:
+      summary: Load opening balances of GL-only accounts (maker-checker GlOpeningBalance)
+      tags:
+      - Journals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpeningBalanceRequest'
+            example:
+              asOfDate: '2026-09-30'
+              narration: Opening share capital paid into the operating bank account
+              lines:
+              - glAccountCode: '1201'
+                side: DEBIT
+                amountPoisha: 5000000000
+              - glAccountCode: '3101'
+                side: CREDIT
+                amountPoisha: 5000000000
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Journal'
+              example:
+                journalId: 0192f5e0-0000-7000-8000-000000000001
+                journalRef: GLJ-20261001-O-000001
+                source: OPENING_BALANCE
+                businessDate: '2026-10-01'
+                revision: null
+                status: PENDING_APPROVAL
+                narration: Opening share capital paid into the operating bank account
+                totalDebitPoisha: 5000000000
+                totalCreditPoisha: 5000000000
+                lineCount: 2
+                reversesJournalId: null
+                autoReverseOn: null
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                checkerIds: []
+                createdAt: '2026-10-10T09:30:00.120Z'
+                postedAt: null
+                documentReference: null
+                lines:
+                - lineNo: 1
+                  glAccountCode: '1201'
+                  glAccountName: Operating bank account (main)
+                  side: DEBIT
+                  amountPoisha: 5000000000
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+                - lineNo: 2
+                  glAccountCode: '3101'
+                  glAccountName: Share capital
+                  side: CREDIT
+                  amountPoisha: 5000000000
+                  valueDate: null
+                  product: null
+                  transferCode: null
+                  sourceBucket: null
+                  trustIndex: null
+                  reasonCode: null
+                  ruleId: null
+                  legCount: null
+                  narration: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {UNBALANCED, LEDGER_CONTROLLED_ACCOUNT, ACCOUNT_NOT_POSTABLE, ACCOUNT_INACTIVE, MANUAL_POSTING_NOT_ALLOWED,
+            NARRATION_TOO_SHORT, TOO_MANY_LINES}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - UNBALANCED
+                      - LEDGER_CONTROLLED_ACCOUNT
+                      - ACCOUNT_NOT_POSTABLE
+                      - ACCOUNT_INACTIVE
+                      - MANUAL_POSTING_NOT_ALLOWED
+                      - NARRATION_TOO_SHORT
+                      - TOO_MANY_LINES
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {GL_ALREADY_STARTED}; IDEMPOTENCY_CONFLICT when the key was used with
+            another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - GL_ALREADY_STARTED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: createOpeningBalances
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/days:
+    get:
+      summary: List GL days
+      tags:
+      - Days
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: fromDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlDayPage'
+              example:
+                items:
+                - businessDate: '2026-10-09'
+                  periodId: 2026-10
+                  status: CLOSED
+                  revision: 1
+                  dirty: false
+                  forced: false
+                  certification: CERTIFIED
+                  certifiedRunId: 0192f500-0a1b-7c2d-8e3f-4a5b6c7d8e01
+                  ruleSetVersion: 1
+                  ledgerJournalId: 0192f600-0000-7000-8000-00000000a001
+                  checks:
+                    journalBalanced: PASS
+                    trialBalanceZero: PASS
+                    ledgerControlTrust: PASS
+                    ledgerControlSystem: PASS
+                    summaryComplete: PASS
+                    mustBeZero: PASS
+                    ledgerControlledIntegrity: PASS
+                    normalBalance: PASS
+                  readiness: null
+                  openExceptionCount: 0
+                  closedAt: '2026-10-09T18:16:02.300Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR, RANGE_TOO_LARGE}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - RANGE_TOO_LARGE
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listGlDays
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/days/{businessDate}:
+    get:
+      summary: Get one GL day (status, checks, readiness, certification)
+      tags:
+      - Days
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlDay'
+              example:
+                businessDate: '2026-10-09'
+                periodId: 2026-10
+                status: CLOSED
+                revision: 1
+                dirty: false
+                forced: false
+                certification: CERTIFIED
+                certifiedRunId: 0192f500-0a1b-7c2d-8e3f-4a5b6c7d8e01
+                ruleSetVersion: 1
+                ledgerJournalId: 0192f600-0000-7000-8000-00000000a001
+                checks:
+                  journalBalanced: PASS
+                  trialBalanceZero: PASS
+                  ledgerControlTrust: PASS
+                  ledgerControlSystem: PASS
+                  summaryComplete: PASS
+                  mustBeZero: PASS
+                  ledgerControlledIntegrity: PASS
+                  normalBalance: PASS
+                readiness: null
+                openExceptionCount: 0
+                closedAt: '2026-10-09T18:16:02.300Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getGlDay
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/days/{businessDate}/control-totals:
+    get:
+      summary: Control totals per ledger bucket for a closed day (reconciliation GL_TIEOUT)
+      tags:
+      - Days
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      - name: revision
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: absent → latest
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlTotals'
+              example:
+                businessDate: '2026-10-09'
+                revision: 1
+                dayStatus: CLOSED
+                ruleSetVersion: 1
+                cutoffAt: '2026-10-09T18:00:00.000Z'
+                items:
+                - bucket: SYS:AIT_PAYABLE
+                  trustIndex: null
+                  ledgerAccountId: 00000000-0000-0000-0000-000000000230
+                  debitsPostedPoisha: 0
+                  creditsPostedPoisha: 64
+                  dayDebitPoisha: 0
+                  dayCreditPoisha: 64
+                  legCount: 2
+                - bucket: SYS:COMMISSION_PAYABLE
+                  trustIndex: null
+                  ledgerAccountId: 00000000-0000-0000-0000-000000000220
+                  debitsPostedPoisha: 400
+                  creditsPostedPoisha: 0
+                  dayDebitPoisha: 400
+                  dayCreditPoisha: 0
+                  legCount: 2
+                - bucket: SYS:FEE_INCOME
+                  trustIndex: null
+                  ledgerAccountId: 00000000-0000-0000-0000-000000000200
+                  debitsPostedPoisha: 240
+                  creditsPostedPoisha: 1625
+                  dayDebitPoisha: 240
+                  dayCreditPoisha: 1625
+                  legCount: 5
+                - bucket: SYS:VAT_PAYABLE
+                  trustIndex: null
+                  ledgerAccountId: 00000000-0000-0000-0000-000000000210
+                  debitsPostedPoisha: 0
+                  creditsPostedPoisha: 244
+                  dayDebitPoisha: 0
+                  dayCreditPoisha: 244
+                  legCount: 3
+                - bucket: TRUST
+                  trustIndex: 1
+                  ledgerAccountId: 00000000-0000-0000-0000-000000030001
+                  debitsPostedPoisha: 100000000
+                  creditsPostedPoisha: 0
+                  dayDebitPoisha: 100000000
+                  dayCreditPoisha: 0
+                  legCount: 1
+                - bucket: WALLET:A
+                  trustIndex: null
+                  ledgerAccountId: null
+                  debitsPostedPoisha: 100000
+                  creditsPostedPoisha: 10040576
+                  dayDebitPoisha: 100000
+                  dayCreditPoisha: 10040576
+                  legCount: 5
+                - bucket: WALLET:C
+                  trustIndex: null
+                  ledgerAccountId: null
+                  debitsPostedPoisha: 126265
+                  creditsPostedPoisha: 160000
+                  dayDebitPoisha: 126265
+                  dayCreditPoisha: 160000
+                  legCount: 10
+                - bucket: WALLET:D
+                  trustIndex: null
+                  ledgerAccountId: null
+                  debitsPostedPoisha: 10000000
+                  creditsPostedPoisha: 100000000
+                  dayDebitPoisha: 10000000
+                  dayCreditPoisha: 100000000
+                  legCount: 2
+                - bucket: WALLET:M
+                  trustIndex: null
+                  ledgerAccountId: null
+                  debitsPostedPoisha: 10604
+                  creditsPostedPoisha: 35000
+                  dayDebitPoisha: 10604
+                  dayCreditPoisha: 35000
+                  legCount: 4
+                totals:
+                  debitsPostedPoisha: 110237509
+                  creditsPostedPoisha: 110237509
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAY_NOT_CLOSED}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAY_NOT_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getControlTotals
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/days/{businessDate}:force-close:
+    post:
+      summary: Force-close a day whose readiness is not met (maker-checker GlDayForceClose)
+      tags:
+      - Days
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+            example:
+              reason: Ledger CDC bridge paused; Finance accepts closing on the published legs
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlDayForceClose
+                entityId: '2026-10-09'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {PERIOD_CLOSED}; IDEMPOTENCY_CONFLICT when the key was used with another
+            payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PERIOD_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: forceCloseGlDay
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/days/{businessDate}:restate:
+    post:
+      summary: Restate a closed day of an OPEN period (maker-checker GlDayRestatement)
+      tags:
+      - Days
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+            example:
+              reason: Rule set 2 fixes an unmapped combination; restate the day
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlDayRestatement
+                entityId: '2026-10-09'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAY_NOT_CLOSED, PERIOD_CLOSED}; IDEMPOTENCY_CONFLICT when the key was
+            used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAY_NOT_CLOSED
+                      - PERIOD_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: restateGlDay
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/periods:
+    get:
+      summary: List accounting periods (months)
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: fiscalYear
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlPeriodPage'
+              example:
+                items:
+                - periodId: 2026-10
+                  fiscalYear: FY2026-27
+                  fromDate: '2026-10-01'
+                  toDate: '2026-10-31'
+                  status: OPEN
+                  daysClosed: 12
+                  daysCertified: 12
+                  pendingJournals: 0
+                  reopenCount: 0
+                  closedAt: null
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listPeriods
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/periods/{periodId}:
+    get:
+      summary: Get a period
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: periodId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-[0-9]{2}$
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlPeriod'
+              example:
+                periodId: 2026-10
+                fiscalYear: FY2026-27
+                fromDate: '2026-10-01'
+                toDate: '2026-10-31'
+                status: OPEN
+                daysClosed: 12
+                daysCertified: 12
+                pendingJournals: 0
+                reopenCount: 0
+                closedAt: null
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getPeriod
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/periods/{periodId}:close:
+    post:
+      summary: Close a month (maker-checker GlPeriodClose, 2 levels)
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: periodId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-[0-9]{2}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+            example:
+              comment: October books reviewed; all days certified
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlPeriodClose
+                entityId: 2026-10
+                status: PENDING
+                requiredLevels: 2
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAYS_NOT_CLOSED, DAYS_NOT_CERTIFIED, PENDING_JOURNALS, OPEN_EXCEPTIONS,
+            PREVIOUS_PERIOD_OPEN, PREVIOUS_FISCAL_YEAR_OPEN}; IDEMPOTENCY_CONFLICT when the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ProblemWithBlockingItems'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAYS_NOT_CLOSED
+                      - DAYS_NOT_CERTIFIED
+                      - PENDING_JOURNALS
+                      - OPEN_EXCEPTIONS
+                      - PREVIOUS_PERIOD_OPEN
+                      - PREVIOUS_FISCAL_YEAR_OPEN
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: closePeriod
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/periods/{periodId}:reopen:
+    post:
+      summary: Reopen the latest closed month of an OPEN fiscal year (maker-checker GlPeriodReopen, 2 levels)
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: periodId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}-[0-9]{2}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+            example:
+              reason: Audit adjustment for a bank charge booked to the wrong month
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlPeriodReopen
+                entityId: 2026-10
+                status: PENDING
+                requiredLevels: 2
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {NOT_LATEST_CLOSED_PERIOD, FISCAL_YEAR_CLOSED}; IDEMPOTENCY_CONFLICT when
+            the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - NOT_LATEST_CLOSED_PERIOD
+                      - FISCAL_YEAR_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: reopenPeriod
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/fiscal-years:
+    get:
+      summary: List fiscal years
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FiscalYearPage'
+              example:
+                items:
+                - fiscalYear: FY2026-27
+                  fromDate: '2026-07-01'
+                  toDate: '2027-06-30'
+                  status: OPEN
+                  closingJournalId: null
+                  closedAt: null
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listFiscalYears
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/fiscal-years/{fiscalYear}:close:
+    post:
+      summary: 'Close a fiscal year: P&L to retained earnings (maker-checker GlYearClose, 2 levels)'
+      tags:
+      - Periods
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: fiscalYear
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^FY[0-9]{4}-[0-9]{2}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+            example:
+              comment: FY2026-27 audited figures agreed
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlYearClose
+                entityId: FY2026-27
+                status: PENDING
+                requiredLevels: 2
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {PREVIOUS_PERIOD_OPEN, FISCAL_YEAR_CLOSED}; IDEMPOTENCY_CONFLICT when
+            the key was used with another payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ProblemWithBlockingItems'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - PREVIOUS_PERIOD_OPEN
+                      - FISCAL_YEAR_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: closeFiscalYear
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/reports/trial-balance:
+    get:
+      summary: Trial balance (day, date range or period)
+      tags:
+      - Reports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: asOf
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: fromDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: periodId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: level
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - POSTABLE
+          - ROLLUP
+      - name: includeZero
+        in: query
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrialBalance'
+              example:
+                fromDate: '2026-10-09'
+                toDate: '2026-10-09'
+                level: POSTABLE
+                provisional: false
+                lines:
+                - glAccountCode: 1101-01
+                  glAccountName: 'Trust bank account #01'
+                  accountClass: ASSET
+                  level: 4
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 100000000
+                  creditMovementPoisha: 0
+                  closingDebitPoisha: 100000000
+                  closingCreditPoisha: 0
+                - glAccountCode: '2101'
+                  glAccountName: E-money liability - customers
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 126265
+                  creditMovementPoisha: 160000
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 33735
+                - glAccountCode: '2102'
+                  glAccountName: E-money liability - agents
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 100000
+                  creditMovementPoisha: 10040576
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 9940576
+                - glAccountCode: '2103'
+                  glAccountName: E-money liability - distributors
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 10000000
+                  creditMovementPoisha: 100000000
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 90000000
+                - glAccountCode: '2104'
+                  glAccountName: E-money liability - merchants
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 10604
+                  creditMovementPoisha: 35000
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 24396
+                - glAccountCode: '2201'
+                  glAccountName: VAT payable
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 0
+                  creditMovementPoisha: 244
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 244
+                - glAccountCode: '2202'
+                  glAccountName: AIT payable (withheld on commission)
+                  accountClass: LIABILITY
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 0
+                  creditMovementPoisha: 64
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 64
+                - glAccountCode: '4101'
+                  glAccountName: Fee income - P2P
+                  accountClass: INCOME
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 0
+                  creditMovementPoisha: 500
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 500
+                - glAccountCode: '4103'
+                  glAccountName: Fee income - cash-out
+                  accountClass: INCOME
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 0
+                  creditMovementPoisha: 600
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 600
+                - glAccountCode: '4104'
+                  glAccountName: Merchant discount (MDR) income
+                  accountClass: INCOME
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 0
+                  creditMovementPoisha: 525
+                  closingDebitPoisha: 0
+                  closingCreditPoisha: 525
+                - glAccountCode: '5101'
+                  glAccountName: Agent commission expense (in-line)
+                  accountClass: EXPENSE
+                  level: 3
+                  postable: true
+                  openingDebitPoisha: 0
+                  openingCreditPoisha: 0
+                  debitMovementPoisha: 640
+                  creditMovementPoisha: 0
+                  closingDebitPoisha: 640
+                  closingCreditPoisha: 0
+                totals:
+                  debitMovementPoisha: 110237509
+                  creditMovementPoisha: 110237509
+                  closingDebitPoisha: 100000640
+                  closingCreditPoisha: 100000640
+            text/csv:
+              schema:
+                type: string
+              example: 'gl_account_code,gl_account_name,debit_poisha,credit_poisha
+
+                4101,Fee income - P2P,0,500
+
+                '
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {RANGE_TOO_LARGE}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - RANGE_TOO_LARGE
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getTrialBalance
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/reports/balance-sheet:
+    get:
+      summary: Balance sheet as of a date
+      tags:
+      - Reports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: asOf
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: level
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - POSTABLE
+          - ROLLUP
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceSheet'
+              example:
+                asOf: '2026-10-09'
+                provisional: false
+                currentYearResultPoisha: 985
+                balanced: true
+                sections:
+                - section: ASSETS
+                  lines:
+                  - glAccountCode: 1101-01
+                    glAccountName: 'Trust bank account #01'
+                    level: 4
+                    amountPoisha: 100000000
+                  totalPoisha: 100000000
+                - section: LIABILITIES
+                  lines:
+                  - glAccountCode: '2101'
+                    glAccountName: E-money liability - customers
+                    level: 3
+                    amountPoisha: 33735
+                  - glAccountCode: '2102'
+                    glAccountName: E-money liability - agents
+                    level: 3
+                    amountPoisha: 9940576
+                  - glAccountCode: '2103'
+                    glAccountName: E-money liability - distributors
+                    level: 3
+                    amountPoisha: 90000000
+                  - glAccountCode: '2104'
+                    glAccountName: E-money liability - merchants
+                    level: 3
+                    amountPoisha: 24396
+                  - glAccountCode: '2201'
+                    glAccountName: VAT payable
+                    level: 3
+                    amountPoisha: 244
+                  - glAccountCode: '2202'
+                    glAccountName: AIT payable (withheld on commission)
+                    level: 3
+                    amountPoisha: 64
+                  totalPoisha: 99999015
+                - section: EQUITY
+                  lines: []
+                  totalPoisha: 0
+            text/csv:
+              schema:
+                type: string
+              example: 'gl_account_code,gl_account_name,debit_poisha,credit_poisha
+
+                4101,Fee income - P2P,0,500
+
+                '
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getBalanceSheet
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/reports/profit-and-loss:
+    get:
+      summary: Profit and loss for a date range
+      tags:
+      - Reports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: fromDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: groupBy
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACCOUNT
+          - PRODUCT
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitAndLoss'
+              example:
+                fromDate: '2026-10-09'
+                toDate: '2026-10-09'
+                groupBy: ACCOUNT
+                provisional: false
+                netResultPoisha: 985
+                sections:
+                - section: INCOME
+                  lines:
+                  - glAccountCode: '4101'
+                    glAccountName: Fee income - P2P
+                    level: 3
+                    amountPoisha: 500
+                  - glAccountCode: '4103'
+                    glAccountName: Fee income - cash-out
+                    level: 3
+                    amountPoisha: 600
+                  - glAccountCode: '4104'
+                    glAccountName: Merchant discount (MDR) income
+                    level: 3
+                    amountPoisha: 525
+                  totalPoisha: 1625
+                - section: EXPENSES
+                  lines:
+                  - glAccountCode: '5101'
+                    glAccountName: Agent commission expense (in-line)
+                    level: 3
+                    amountPoisha: 640
+                  totalPoisha: 640
+            text/csv:
+              schema:
+                type: string
+              example: 'gl_account_code,gl_account_name,debit_poisha,credit_poisha
+
+                4101,Fee income - P2P,0,500
+
+                '
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {RANGE_TOO_LARGE}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - RANGE_TOO_LARGE
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getProfitAndLoss
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/reports/account-ledger/{code}:
+    get:
+      summary: GL account statement with running balance
+      tags:
+      - Reports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9]{4}(-[0-9]{2})?$
+      - name: fromDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLedger'
+              example:
+                glAccountCode: '4101'
+                fromDate: '2026-10-09'
+                toDate: '2026-10-10'
+                openingNetDebitPoisha: 0
+                nextCursor: null
+                items:
+                - businessDate: '2026-10-09'
+                  journalId: 0192f600-0000-7000-8000-00000000a001
+                  journalRef: GLJ-20261009-L-R1
+                  source: LEDGER_DAY
+                  lineNo: 14
+                  side: CREDIT
+                  amountPoisha: 500
+                  runningNetDebitPoisha: -500
+                  narration: P2P FEE
+                  product: P2P
+            text/csv:
+              schema:
+                type: string
+              example: 'gl_account_code,gl_account_name,debit_poisha,credit_poisha
+
+                4101,Fee income - P2P,0,500
+
+                '
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {RANGE_TOO_LARGE, INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - RANGE_TOO_LARGE
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getAccountLedger
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/exports:
+    get:
+      summary: List ERP exports
+      tags:
+      - Exports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: fromDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: toDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlExportPage'
+              example:
+                items:
+                - businessDate: '2026-10-09'
+                  exportVersion: 1
+                  glDayRevision: 1
+                  status: GENERATED
+                  format: GENERIC_CSV_V1
+                  fileName: GL_20261009_v1.csv
+                  sha256: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
+                  lineCount: 23
+                  totalDebitPoisha: 110237509
+                  totalCreditPoisha: 110237509
+                  failureReason: null
+                  generatedAt: '2026-10-09T18:16:04.010Z'
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR, RANGE_TOO_LARGE}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - RANGE_TOO_LARGE
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listExports
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/exports/{businessDate}:
+    get:
+      summary: Latest export of a day
+      tags:
+      - Exports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlExport'
+              example:
+                businessDate: '2026-10-09'
+                exportVersion: 1
+                glDayRevision: 1
+                status: GENERATED
+                format: GENERIC_CSV_V1
+                fileName: GL_20261009_v1.csv
+                sha256: a3f1c2d4e5b6978812ab34cd56ef7890a1b2c3d4e5f60718293a4b5c6d7e8f90
+                lineCount: 23
+                totalDebitPoisha: 110237509
+                totalCreditPoisha: 110237509
+                failureReason: null
+                generatedAt: '2026-10-09T18:16:04.010Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: getExport
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/exports/{businessDate}/versions/{n}/file:
+    get:
+      summary: Download an export file
+      tags:
+      - Exports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      - name: n
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+              example: 'journal_date,journal_ref,line_no,gl_account_code,gl_account_name,debit_amount,credit_amount,currency,narration,source_code,transfer_count
+
+                2026-10-09,GLJ-20261009-L-R1,1,4101,Fee income - P2P,,5.00,BDT,P2P FEE,2001,1
+
+                #TRAILER,lines=1,total_debit=0.00,total_credit=5.00,transfers=1,gl_revision=1,certification=CERTIFIED
+
+                '
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: downloadExportFile
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/exports/{businessDate}:regenerate:
+    post:
+      summary: Regenerate a day's export (maker-checker GlExport)
+      tags:
+      - Exports
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: businessDate
+        in: path
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Asia/Dhaka business date (CUTOFF.EOD)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+            example:
+              reason: ERP import rejected version 1; regenerate after the fix
+      responses:
+        '202':
+          description: Accepted — approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRef'
+              example:
+                approvalId: 0192f701-0000-7000-8000-000000000001
+                entityType: GlExport
+                entityId: '2026-10-09'
+                status: PENDING
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                expiresAt: '2026-10-13T09:30:00.120Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAY_NOT_CLOSED}; IDEMPOTENCY_CONFLICT when the key was used with another
+            payload
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAY_NOT_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: regenerateExport
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+      x-idempotency: Idempotency-Key required (kernel K3.3)
+  /v1/gl/exceptions:
+    get:
+      summary: List GL exceptions
+      tags:
+      - Exceptions
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: businessDate
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlExceptionPage'
+              example:
+                items:
+                - id: 0192f610-0000-7000-8000-0000000000e1
+                  category: UNMAPPED_POSTING
+                  severity: CRITICAL
+                  businessDate: '2026-10-10'
+                  detail:
+                    combination: tbAccountType=220 side=DEBIT transferCode=1010 commandType=11 counterparty=400
+                    amountPoisha: 100
+                  status: OPEN
+                  resolvedBy: null
+                  resolution: null
+                  createdAt: '2026-10-10T18:16:03.900Z'
+                  resolvedAt: null
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listExceptions
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/gl/exceptions/{id}:resolve:
+    post:
+      summary: Resolve an exception (FIN_MAKER or FIN_CHECKER)
+      tags:
+      - Exceptions
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveRequest'
+            example:
+              resolution: Rule set 2 maps the combination; day restated as revision 2
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlException'
+              example:
+                id: 0192f610-0000-7000-8000-0000000000e1
+                category: UNMAPPED_POSTING
+                severity: CRITICAL
+                businessDate: '2026-10-10'
+                detail:
+                  combination: tbAccountType=220 side=DEBIT transferCode=1010 commandType=11 counterparty=400
+                  amountPoisha: 100
+                status: RESOLVED
+                resolvedBy: 0192f0a1-0000-7000-8000-0000000000f2
+                resolution: Rule set 2 maps the combination; day restated as revision 2
+                createdAt: '2026-10-10T18:16:03.900Z'
+                resolvedAt: '2026-10-11T05:00:00.000Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: resolveException
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/approvals:
+    get:
+      summary: Pending approvals
+      tags:
+      - Approvals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: entityType
+        in: query
+        required: false
+        schema:
+          type: string
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalPage'
+              example:
+                items:
+                - id: 0192f701-0000-7000-8000-000000000001
+                  entityType: GlManualJournal
+                  entityId: 0192f700-0000-7000-8000-000000000001
+                  action: POST
+                  payload:
+                    journalRef: GLJ-20261010-M-000001
+                    totalDebitPoisha: 57500
+                  makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                  status: PENDING
+                  level: 1
+                  requiredLevels: 1
+                  checkerRoles:
+                  - FIN_CHECKER
+                  amountPoisha: 57500
+                  createdAt: '2026-10-10T09:30:00.120Z'
+                  expiresAt: '2026-10-13T09:30:00.120Z'
+                  decidedBy: []
+                  decidedAt: null
+                nextCursor: null
+        '400':
+          description: VALIDATION_FAILED; reason ∈ {INVALID_CURSOR}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - INVALID_CURSOR
+                      - null
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: listApprovals
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_MAKER
+        - FIN_CHECKER
+        - AUDITOR
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/approvals/{id}:approve:
+    post:
+      summary: Approve
+      tags:
+      - Approvals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+            example:
+              comment: Checked against the bank advice
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+              example:
+                id: 0192f701-0000-7000-8000-000000000001
+                entityType: GlManualJournal
+                entityId: 0192f700-0000-7000-8000-000000000001
+                action: POST
+                payload:
+                  journalRef: GLJ-20261010-M-000001
+                  totalDebitPoisha: 57500
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                status: APPROVED
+                level: 1
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                amountPoisha: 57500
+                createdAt: '2026-10-10T09:30:00.120Z'
+                expiresAt: '2026-10-13T09:30:00.120Z'
+                decidedBy:
+                - 0192f0a1-0000-7000-8000-0000000000f2
+                decidedAt: '2026-10-10T09:41:05.100Z'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAYS_NOT_CLOSED, DAYS_NOT_CERTIFIED, PENDING_JOURNALS, OPEN_EXCEPTIONS,
+            PREVIOUS_PERIOD_OPEN, PREVIOUS_FISCAL_YEAR_OPEN, PERIOD_CLOSED, ACCOUNT_IN_USE, GL_ALREADY_STARTED, ALREADY_REVERSED, NOT_LATEST_CLOSED_PERIOD,
+            FISCAL_YEAR_CLOSED, DAY_NOT_CLOSED}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/ProblemWithBlockingItems'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAYS_NOT_CLOSED
+                      - DAYS_NOT_CERTIFIED
+                      - PENDING_JOURNALS
+                      - OPEN_EXCEPTIONS
+                      - PREVIOUS_PERIOD_OPEN
+                      - PREVIOUS_FISCAL_YEAR_OPEN
+                      - PERIOD_CLOSED
+                      - ACCOUNT_IN_USE
+                      - GL_ALREADY_STARTED
+                      - ALREADY_REVERSED
+                      - NOT_LATEST_CLOSED_PERIOD
+                      - FISCAL_YEAR_CLOSED
+                      - DAY_NOT_CLOSED
+                      - null
+        '422':
+          description: MAKER_CHECKER_VIOLATION
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: approveApproval
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_CHECKER
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/approvals/{id}:reject:
+    post:
+      summary: Reject
+      tags:
+      - Approvals
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectRequest'
+            example:
+              comment: Document reference does not match the bank advice
+              reasonCode: null
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+              example:
+                id: 0192f701-0000-7000-8000-000000000001
+                entityType: GlManualJournal
+                entityId: 0192f700-0000-7000-8000-000000000001
+                action: POST
+                payload:
+                  journalRef: GLJ-20261010-M-000001
+                  totalDebitPoisha: 57500
+                makerId: 0192f0a1-0000-7000-8000-0000000000f1
+                status: REJECTED
+                level: 1
+                requiredLevels: 1
+                checkerRoles:
+                - FIN_CHECKER
+                amountPoisha: 57500
+                createdAt: '2026-10-10T09:30:00.120Z'
+                expiresAt: '2026-10-13T09:30:00.120Z'
+                decidedBy:
+                - 0192f0a1-0000-7000-8000-0000000000f2
+                decidedAt: '2026-10-10T09:41:05.100Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: MAKER_CHECKER_VIOLATION
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: rejectApproval
+      x-audience: staff
+      x-actors:
+      - type: STAFF
+        roles:
+        - FIN_CHECKER
+      x-idempotency: none (read-only or naturally idempotent)
+  /v1/internal/jobs/gl-day-close:run:
+    post:
+      summary: 'Test hook: run the day close now (profiles local/dev only; bean absent otherwise)'
+      tags:
+      - Internal
+      parameters:
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorUserId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DayCloseRunRequest'
+            example:
+              businessDate: '2026-10-09'
+              ignoreCutoff: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlDay'
+              example:
+                businessDate: '2026-10-09'
+                periodId: 2026-10
+                status: CLOSED
+                revision: 1
+                dirty: false
+                forced: false
+                certification: CERTIFIED
+                certifiedRunId: 0192f500-0a1b-7c2d-8e3f-4a5b6c7d8e01
+                ruleSetVersion: 1
+                ledgerJournalId: 0192f600-0000-7000-8000-00000000a001
+                checks:
+                  journalBalanced: PASS
+                  trialBalanceZero: PASS
+                  ledgerControlTrust: PASS
+                  ledgerControlSystem: PASS
+                  summaryComplete: PASS
+                  mustBeZero: PASS
+                  ledgerControlledIntegrity: PASS
+                  normalBalance: PASS
+                readiness: null
+                openExceptionCount: 0
+                closedAt: '2026-10-09T18:16:02.300Z'
+        '400':
+          description: VALIDATION_FAILED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: ACTOR_NOT_ALLOWED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: STATE_CONFLICT or IDEMPOTENCY_CONFLICT; reason ∈ {DAY_NOT_READY, PERIOD_CLOSED}
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type:
+                      - string
+                      - 'null'
+                      enum:
+                      - DAY_NOT_READY
+                      - PERIOD_CLOSED
+                      - null
+        '503':
+          description: DEPENDENCY_UNAVAILABLE
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      operationId: runGlDayCloseNow
+      x-audience: internal
+      x-actors:
+      - type: STAFF
+        roles:
+        - ADMIN
+      - type: SYSTEM
+        ids:
+        - '*'
+      x-idempotency: none (read-only or naturally idempotent)
+components:
+  schemas:
+    GlDayChecks:
+      type: object
+      properties:
+        journalBalanced:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-1 Σ debit = Σ credit in every journal of the day
+        trialBalanceZero:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-2 cumulative Σ closing net debit = 0
+        ledgerControlTrust:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-3a GL trust accounts = TB trust mirror (exact, history flag)
+        ledgerControlSystem:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-3b per TB system account (exact; NOT_VERIFIED only when bitspay.gl.control.system-accounts=NOT_VERIFIED)
+        summaryComplete:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-4 Σ debit-side = Σ credit-side summary amounts and leg counts for the day
+        mustBeZero:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-5 accounts flagged must_be_zero close at 0
+        ledgerControlledIntegrity:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-6 no non-ledger line on a ledger-controlled account
+        normalBalance:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - NOT_VERIFIED
+          description: GL-7 (informational) wrong-sign balances
+      required:
+      - journalBalanced
+      - trialBalanceZero
+      - ledgerControlTrust
+      - ledgerControlSystem
+      - summaryComplete
+      - mustBeZero
+      - ledgerControlledIntegrity
+      - normalBalance
+      additionalProperties: true
+    GlAccount:
+      type: object
+      properties:
+        code:
+          type: string
+          description: '`^[0-9]{4}(-[0-9]{2})?$`; = key'
+        nameEn:
+          type: string
+          description: 1..120
+        nameBn:
+          type:
+          - string
+          - 'null'
+          description: 1..120
+        accountClass:
+          type: string
+          enum:
+          - ASSET
+          - LIABILITY
+          - EQUITY
+          - INCOME
+          - EXPENSE
+        normalSide:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+        contra:
+          type: boolean
+        parentCode:
+          type:
+          - string
+          - 'null'
+          description: null for level-1 headers
+        level:
+          type: integer
+          format: int32
+          description: 1..6
+        postable:
+          type: boolean
+          description: headers are not postable
+        ledgerControlled:
+          type: boolean
+          description: must equal a TigerBeetle aggregate
+        manualPostingAllowed:
+          type: boolean
+          description: never true when ledgerControlled
+        mustBeZero:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+        provisional:
+          type: boolean
+          description: true until Finance confirms the chart of accounts
+        version:
+          type: integer
+          format: int64
+          description: strictly +1; consumers apply only if newer
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        templateCode:
+          type:
+          - string
+          - 'null'
+          description: e.g. `1101-{nn}`
+        description:
+          type:
+          - string
+          - 'null'
+          description: ≤ 500
+        effectiveFrom:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - code
+      - nameEn
+      - nameBn
+      - accountClass
+      - normalSide
+      - contra
+      - parentCode
+      - level
+      - postable
+      - ledgerControlled
+      - manualPostingAllowed
+      - mustBeZero
+      - status
+      - provisional
+      - version
+      - updatedAt
+      - templateCode
+      - description
+      - effectiveFrom
+      - createdAt
+      additionalProperties: true
+    GlAccountCreate:
+      type: object
+      properties:
+        code:
+          type: string
+          description: '`^[0-9]{4}(-[0-9]{2})?$`, unique'
+        nameEn:
+          type: string
+          description: 1..120
+        nameBn:
+          type:
+          - string
+          - 'null'
+          description: 1..120
+        accountClass:
+          type: string
+          enum:
+          - ASSET
+          - LIABILITY
+          - EQUITY
+          - INCOME
+          - EXPENSE
+        contra:
+          type: boolean
+          description: default false; normal side is derived from class and contra
+        parentCode:
+          type:
+          - string
+          - 'null'
+          description: existing, non-postable header of the same class
+        postable:
+          type: boolean
+        ledgerControlled:
+          type: boolean
+          description: default false; true only for accounts targeted by ledger rules
+        manualPostingAllowed:
+          type: boolean
+          description: default = !ledgerControlled
+        mustBeZero:
+          type: boolean
+          description: default false
+        description:
+          type:
+          - string
+          - 'null'
+          description: ≤ 500
+        effectiveFrom:
+          type: string
+          format: date
+          description: ≥ first OPEN period
+      required:
+      - code
+      - nameEn
+      - accountClass
+      - parentCode
+      - postable
+      - effectiveFrom
+      additionalProperties: false
+    GlAccountUpdate:
+      type: object
+      properties:
+        nameEn:
+          type: string
+          description: 1..120
+        nameBn:
+          type:
+          - string
+          - 'null'
+          description: 1..120
+        parentCode:
+          type: string
+          description: same class; no cycles
+        manualPostingAllowed:
+          type: boolean
+          description: false if ledgerControlled
+        description:
+          type:
+          - string
+          - 'null'
+          description: ≤ 500
+        expectedVersion:
+          type: integer
+          format: int64
+          description: optimistic lock
+      required:
+      - expectedVersion
+      additionalProperties: false
+    PostingRule:
+      type: object
+      properties:
+        id:
+          type: string
+          description: '`^[A-Z0-9-]{1,32}$`, unique in the set'
+        priority:
+          type: integer
+          format: int32
+          description: 1..999; lower wins a tie of equal specificity
+        tbAccountType:
+          type: integer
+          format: int32
+          description: ledger account type code (100..140 wallets, 200..240 and 400..420 system, 300 trust)
+        side:
+          type:
+          - string
+          - 'null'
+          enum:
+          - DEBIT
+          - CREDIT
+          - null
+        transferCode:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: ledger transfer code (1001..1016, 2001..2004)
+        commandType:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 1..17
+        legIndex:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 0..5
+        reasonCode:
+          type:
+          - string
+          - 'null'
+          description: 1..40 chars (as the ledger adjustment/redeem command body); commands 10/11 only
+        counterpartyAccountType:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: ledger account type code (100..140 wallets, 200..240 and 400..420 system, 300 trust)
+        glAccount:
+          type: string
+          description: postable code or template `1101-{nn}`
+        note:
+          type:
+          - string
+          - 'null'
+          description: ≤ 200
+      required:
+      - id
+      - priority
+      - tbAccountType
+      - glAccount
+      additionalProperties: false
+    RuleSetRequest:
+      type: object
+      properties:
+        effectiveFrom:
+          type: string
+          format: date
+          description: first business date of an OPEN period, ≥ today − 0 unless restating an open period
+        description:
+          type: string
+          description: 1..500
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostingRule'
+          description: 1..2000
+      required:
+      - effectiveFrom
+      - description
+      - rules
+      additionalProperties: false
+    RuleSetSummary:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PENDING_APPROVAL
+          - APPROVED
+          - SUPERSEDED
+          - REJECTED
+          - CANCELLED
+          description: SUPERSEDED = replaced by a newer set with the same effectiveFrom
+        effectiveFrom:
+          type: string
+          format: date
+        description:
+          type: string
+        checksum:
+          type: string
+          description: sha256 hex
+        ruleCount:
+          type: integer
+          format: int32
+        provisional:
+          type: boolean
+        approvalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        createdBy:
+          type: string
+        activatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - version
+      - status
+      - effectiveFrom
+      - description
+      - checksum
+      - ruleCount
+      - provisional
+      - approvalId
+      - createdBy
+      - activatedAt
+      additionalProperties: true
+    RuleSet:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - PENDING_APPROVAL
+          - APPROVED
+          - SUPERSEDED
+          - REJECTED
+          - CANCELLED
+          description: SUPERSEDED = replaced by a newer set with the same effectiveFrom
+        effectiveFrom:
+          type: string
+          format: date
+        description:
+          type: string
+        checksum:
+          type: string
+          description: sha256 hex
+        ruleCount:
+          type: integer
+          format: int32
+        provisional:
+          type: boolean
+        approvalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        createdBy:
+          type: string
+        activatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostingRule'
+      required:
+      - version
+      - status
+      - effectiveFrom
+      - description
+      - checksum
+      - ruleCount
+      - provisional
+      - approvalId
+      - createdBy
+      - activatedAt
+      - rules
+      additionalProperties: true
+    ValidationIssue:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum:
+          - ERROR
+          - WARNING
+        code:
+          type: string
+          enum:
+          - UNKNOWN_ACCOUNT
+          - NOT_POSTABLE
+          - INACTIVE_ACCOUNT
+          - DUPLICATE_RULE_ID
+          - AMBIGUOUS
+          - NOT_COVERED
+          - MAPS_TO_SUSPENSE
+          - LEDGER_CONTROL_MISMATCH
+        ruleIds:
+          type: array
+          items:
+            type: string
+        combination:
+          type:
+          - object
+          - 'null'
+          description: the posting-universe combination concerned
+        message:
+          type: string
+      required:
+      - severity
+      - code
+      - ruleIds
+      - combination
+      - message
+      additionalProperties: true
+    ValidationReport:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: true ⇔ no ERROR
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        coveredCombinations:
+          type: integer
+          format: int32
+          description: posting universe size
+      required:
+      - valid
+      - issues
+      - coveredCombinations
+      additionalProperties: true
+    SimulateRequest:
+      type: object
+      properties:
+        transfers:
+          type: array
+          items:
+            type: object
+          description: 1..100 ledger.changes `data` objects; reasonCode may be set
+        walletTypes:
+          type:
+          - object
+          - 'null'
+          description: walletId → C|A|D|M|I override for unknown wallets
+      required:
+      - transfers
+      additionalProperties: false
+    SimulatedLine:
+      type: object
+      properties:
+        transferId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        glAccountCode:
+          type: string
+        side:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+        amountPoisha:
+          type: integer
+          format: int64
+        ruleId:
+          type:
+          - string
+          - 'null'
+          description: null → 1999 (unmapped)
+        sourceBucket:
+          type: string
+        ignored:
+          type: boolean
+          description: pending/void transfers produce no lines
+      required:
+      - transferId
+      - glAccountCode
+      - side
+      - amountPoisha
+      - ruleId
+      - sourceBucket
+      - ignored
+      additionalProperties: true
+    SimulateResponse:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimulatedLine'
+      required:
+      - lines
+      additionalProperties: true
+    JournalLine:
+      type: object
+      properties:
+        lineNo:
+          type: integer
+          format: int32
+        glAccountCode:
+          type: string
+        glAccountName:
+          type: string
+        side:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+        amountPoisha:
+          type: integer
+          format: int64
+          description: '> 0'
+        valueDate:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: ledger lines
+        product:
+          type:
+          - string
+          - 'null'
+          description: P2P, CASH_IN, … (command type); ledger lines
+        transferCode:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: ledger lines
+        sourceBucket:
+          type:
+          - string
+          - 'null'
+          description: ledger lines
+        trustIndex:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        reasonCode:
+          type:
+          - string
+          - 'null'
+        ruleId:
+          type:
+          - string
+          - 'null'
+          description: ledger lines
+        legCount:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: 'ledger lines: TB legs aggregated'
+        narration:
+          type:
+          - string
+          - 'null'
+          description: ≤ 200
+      required:
+      - lineNo
+      - glAccountCode
+      - glAccountName
+      - side
+      - amountPoisha
+      - valueDate
+      - product
+      - transferCode
+      - sourceBucket
+      - trustIndex
+      - reasonCode
+      - ruleId
+      - legCount
+      - narration
+      additionalProperties: true
+    JournalSummary:
+      type: object
+      properties:
+        journalId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        journalRef:
+          type: string
+        source:
+          type: string
+          enum:
+          - LEDGER_DAY
+          - MANUAL
+          - ACCRUAL
+          - ACCRUAL_REVERSAL
+          - REVERSAL
+          - AUTO_INTEREST
+          - YEAR_END_CLOSE
+          - OPENING_BALANCE
+        businessDate:
+          type: string
+          format: date
+        revision:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: LEDGER_DAY
+        status:
+          type: string
+          enum:
+          - PENDING_APPROVAL
+          - POSTED
+          - SUPERSEDED
+          - REJECTED
+          - CANCELLED
+        narration:
+          type: string
+        totalDebitPoisha:
+          type: integer
+          format: int64
+        totalCreditPoisha:
+          type: integer
+          format: int64
+        lineCount:
+          type: integer
+          format: int32
+        reversesJournalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        autoReverseOn:
+          type:
+          - string
+          - 'null'
+          format: date
+        approvalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        makerId:
+          type:
+          - string
+          - 'null'
+        checkerIds:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        postedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - journalId
+      - journalRef
+      - source
+      - businessDate
+      - revision
+      - status
+      - narration
+      - totalDebitPoisha
+      - totalCreditPoisha
+      - lineCount
+      - reversesJournalId
+      - autoReverseOn
+      - approvalId
+      - makerId
+      - checkerIds
+      - createdAt
+      - postedAt
+      additionalProperties: true
+    Journal:
+      type: object
+      properties:
+        journalId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        journalRef:
+          type: string
+        source:
+          type: string
+          enum:
+          - LEDGER_DAY
+          - MANUAL
+          - ACCRUAL
+          - ACCRUAL_REVERSAL
+          - REVERSAL
+          - AUTO_INTEREST
+          - YEAR_END_CLOSE
+          - OPENING_BALANCE
+        businessDate:
+          type: string
+          format: date
+        revision:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: LEDGER_DAY
+        status:
+          type: string
+          enum:
+          - PENDING_APPROVAL
+          - POSTED
+          - SUPERSEDED
+          - REJECTED
+          - CANCELLED
+        narration:
+          type: string
+        totalDebitPoisha:
+          type: integer
+          format: int64
+        totalCreditPoisha:
+          type: integer
+          format: int64
+        lineCount:
+          type: integer
+          format: int32
+        reversesJournalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        autoReverseOn:
+          type:
+          - string
+          - 'null'
+          format: date
+        approvalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        makerId:
+          type:
+          - string
+          - 'null'
+        checkerIds:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        postedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        documentReference:
+          type:
+          - string
+          - 'null'
+          description: ≤ 64
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalLine'
+      required:
+      - journalId
+      - journalRef
+      - source
+      - businessDate
+      - revision
+      - status
+      - narration
+      - totalDebitPoisha
+      - totalCreditPoisha
+      - lineCount
+      - reversesJournalId
+      - autoReverseOn
+      - approvalId
+      - makerId
+      - checkerIds
+      - createdAt
+      - postedAt
+      - documentReference
+      - lines
+      additionalProperties: true
+    ManualJournalLine:
+      type: object
+      properties:
+        glAccountCode:
+          type: string
+          description: ACTIVE, postable, manualPostingAllowed, not ledgerControlled
+        side:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+        amountPoisha:
+          type: integer
+          format: int64
+          description: 1..10^13
+        narration:
+          type:
+          - string
+          - 'null'
+          description: ≤ 200
+      required:
+      - glAccountCode
+      - side
+      - amountPoisha
+      additionalProperties: false
+    ManualJournalRequest:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+          description: a day in an OPEN period, ≤ current business date; back-dating a CLOSED day restates it
+        narration:
+          type: string
+          description: 20..500 chars
+        documentReference:
+          type:
+          - string
+          - 'null'
+          description: ≤ 64 (voucher / evidence id)
+        kind:
+          type: string
+          enum:
+          - MANUAL
+          - ACCRUAL
+          description: default MANUAL
+        autoReverseOn:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: 'ACCRUAL only: > businessDate'
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManualJournalLine'
+          description: 2..200; Σ debit = Σ credit
+      required:
+      - businessDate
+      - narration
+      - lines
+      additionalProperties: false
+    ReverseJournalRequest:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+          description: OPEN period
+        reason:
+          type: string
+          description: 20..500 chars
+      required:
+      - businessDate
+      - reason
+      additionalProperties: false
+    OpeningBalanceRequest:
+      type: object
+      properties:
+        asOfDate:
+          type: string
+          format: date
+          description: = GL start date − 1 (no CLOSED day may exist)
+        narration:
+          type: string
+          description: 20..500
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManualJournalLine'
+          description: GL-only accounts; balanced
+      required:
+      - asOfDate
+      - narration
+      - lines
+      additionalProperties: false
+    GlDay:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+        periodId:
+          type: string
+        status:
+          type: string
+          enum:
+          - OPEN
+          - AWAITING_WATERMARK
+          - CLOSING
+          - CLOSED
+          - CLOSED_WITH_EXCEPTIONS
+          - FAILED
+          - RESTATING
+        revision:
+          type: integer
+          format: int32
+          description: 0 while never closed
+        dirty:
+          type: boolean
+          description: late event / back-dated journal waiting for restatement
+        forced:
+          type: boolean
+        certification:
+          type: string
+          enum:
+          - PENDING
+          - CERTIFIED
+          - FAILED
+          - NOT_REQUIRED
+        certifiedRunId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        ruleSetVersion:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        ledgerJournalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        checks:
+          oneOf:
+          - $ref: '#/components/schemas/GlDayChecks'
+          - type: 'null'
+          description: null until closed
+        readiness:
+          type:
+          - object
+          - 'null'
+          description: '`{cutoffAt, graceUntil, partitionsReady, partitionsTotal, deferredTransfers, previousDayClosed}`; while OPEN/AWAITING_WATERMARK'
+        openExceptionCount:
+          type: integer
+          format: int64
+        closedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - businessDate
+      - periodId
+      - status
+      - revision
+      - dirty
+      - forced
+      - certification
+      - certifiedRunId
+      - ruleSetVersion
+      - ledgerJournalId
+      - checks
+      - readiness
+      - openExceptionCount
+      - closedAt
+      additionalProperties: true
+    ControlTotalItem:
+      type: object
+      properties:
+        bucket:
+          type: string
+          description: '`WALLET:{C|A|D|M|I}` · `SYS:{FEE_INCOME|VAT_PAYABLE|COMMISSION_PAYABLE|AIT_PAYABLE|CAMPAIGN_FUNDING|SUSPENSE|ADJUSTMENT_CLEARING|HOLD_CONTROL}`
+            · `TRUST`; bucket names shared with reconciliation'
+        trustIndex:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 1..99; TRUST rows only (one row per trust account)
+        ledgerAccountId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: SYS and TRUST rows
+        debitsPostedPoisha:
+          type: integer
+          format: int64
+          description: ≥ 0; cumulative since GL start (+ opening baseline), posted legs only
+        creditsPostedPoisha:
+          type: integer
+          format: int64
+          description: ≥ 0; cumulative
+        dayDebitPoisha:
+          type: integer
+          format: int64
+          description: ≥ 0; movement of businessDate
+        dayCreditPoisha:
+          type: integer
+          format: int64
+          description: ≥ 0
+        legCount:
+          type: integer
+          format: int64
+          description: ≥ 0; posted leg SIDES in this bucket on businessDate (a leg between two accounts of the same bucket counts twice)
+      required:
+      - bucket
+      - trustIndex
+      - ledgerAccountId
+      - debitsPostedPoisha
+      - creditsPostedPoisha
+      - dayDebitPoisha
+      - dayCreditPoisha
+      - legCount
+      additionalProperties: true
+    ControlTotals:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+        revision:
+          type: integer
+          format: int32
+          description: ≥ 1
+        dayStatus:
+          type: string
+          enum:
+          - CLOSED
+          - CLOSED_WITH_EXCEPTIONS
+          description: only closed days are served (else 409)
+        ruleSetVersion:
+          type: integer
+          format: int32
+        cutoffAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+          description: end of businessDate per CUTOFF.EOD
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlTotalItem'
+        totals:
+          type: object
+          description: '`{debitsPostedPoisha, creditsPostedPoisha}` — equal'
+      required:
+      - businessDate
+      - revision
+      - dayStatus
+      - ruleSetVersion
+      - cutoffAt
+      - items
+      - totals
+      additionalProperties: true
+    GlPeriod:
+      type: object
+      properties:
+        periodId:
+          type: string
+        fiscalYear:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - OPEN
+          - CLOSING
+          - CLOSED
+        daysClosed:
+          type: integer
+          format: int32
+        daysCertified:
+          type: integer
+          format: int32
+        pendingJournals:
+          type: integer
+          format: int32
+          description: PENDING_APPROVAL journals dated in the period
+        reopenCount:
+          type: integer
+          format: int32
+        closedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - periodId
+      - fiscalYear
+      - fromDate
+      - toDate
+      - status
+      - daysClosed
+      - daysCertified
+      - pendingJournals
+      - reopenCount
+      - closedAt
+      additionalProperties: true
+    FiscalYear:
+      type: object
+      properties:
+        fiscalYear:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - OPEN
+          - CLOSING
+          - CLOSED
+        closingJournalId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        closedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - fiscalYear
+      - fromDate
+      - toDate
+      - status
+      - closingJournalId
+      - closedAt
+      additionalProperties: true
+    TrialBalanceLine:
+      type: object
+      properties:
+        glAccountCode:
+          type: string
+        glAccountName:
+          type: string
+        accountClass:
+          type: string
+        level:
+          type: integer
+          format: int32
+        postable:
+          type: boolean
+          description: false for ROLLUP header rows
+        openingDebitPoisha:
+          type: integer
+          format: int64
+          description: one of opening debit/credit is 0
+        openingCreditPoisha:
+          type: integer
+          format: int64
+        debitMovementPoisha:
+          type: integer
+          format: int64
+        creditMovementPoisha:
+          type: integer
+          format: int64
+        closingDebitPoisha:
+          type: integer
+          format: int64
+        closingCreditPoisha:
+          type: integer
+          format: int64
+      required:
+      - glAccountCode
+      - glAccountName
+      - accountClass
+      - level
+      - postable
+      - openingDebitPoisha
+      - openingCreditPoisha
+      - debitMovementPoisha
+      - creditMovementPoisha
+      - closingDebitPoisha
+      - closingCreditPoisha
+      additionalProperties: true
+    TrialBalance:
+      type: object
+      properties:
+        fromDate:
+          type: string
+          format: date
+          description: movement window start (asOf for a single day)
+        toDate:
+          type: string
+          format: date
+        level:
+          type: string
+          enum:
+          - POSTABLE
+          - ROLLUP
+        provisional:
+          type: boolean
+          description: true if any day in the window is not CLOSED (open-day overlay used)
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrialBalanceLine'
+        totals:
+          type: object
+          description: '`{debitMovementPoisha, creditMovementPoisha, closingDebitPoisha, closingCreditPoisha}` — pairs equal'
+      required:
+      - fromDate
+      - toDate
+      - level
+      - provisional
+      - lines
+      - totals
+      additionalProperties: true
+    StatementLine:
+      type: object
+      properties:
+        glAccountCode:
+          type: string
+        glAccountName:
+          type: string
+        level:
+          type: integer
+          format: int32
+        amountPoisha:
+          type: integer
+          format: int64
+          description: presented in the section's natural sign (assets/expenses debit-positive, others credit-positive)
+      required:
+      - glAccountCode
+      - glAccountName
+      - level
+      - amountPoisha
+      additionalProperties: true
+    StatementSection:
+      type: object
+      properties:
+        section:
+          type: string
+          enum:
+          - ASSETS
+          - LIABILITIES
+          - EQUITY
+          - INCOME
+          - EXPENSES
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementLine'
+        totalPoisha:
+          type: integer
+          format: int64
+      required:
+      - section
+      - lines
+      - totalPoisha
+      additionalProperties: true
+    BalanceSheet:
+      type: object
+      properties:
+        asOf:
+          type: string
+          format: date
+        provisional:
+          type: boolean
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementSection'
+          description: ASSETS, LIABILITIES, EQUITY
+        currentYearResultPoisha:
+          type: integer
+          format: int64
+          description: income − expense since fiscal-year start
+        balanced:
+          type: boolean
+          description: assets = liabilities + equity + currentYearResult
+      required:
+      - asOf
+      - provisional
+      - sections
+      - currentYearResultPoisha
+      - balanced
+      additionalProperties: true
+    ProfitAndLoss:
+      type: object
+      properties:
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        groupBy:
+          type: string
+          enum:
+          - ACCOUNT
+          - PRODUCT
+        provisional:
+          type: boolean
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementSection'
+          description: 'INCOME, EXPENSES; PRODUCT: one line per product × account'
+        netResultPoisha:
+          type: integer
+          format: int64
+      required:
+      - fromDate
+      - toDate
+      - groupBy
+      - provisional
+      - sections
+      - netResultPoisha
+      additionalProperties: true
+    AccountLedgerLine:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+        journalId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        journalRef:
+          type: string
+        source:
+          type: string
+        lineNo:
+          type: integer
+          format: int32
+        side:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+        amountPoisha:
+          type: integer
+          format: int64
+        runningNetDebitPoisha:
+          type: integer
+          format: int64
+        narration:
+          type:
+          - string
+          - 'null'
+        product:
+          type:
+          - string
+          - 'null'
+      required:
+      - businessDate
+      - journalId
+      - journalRef
+      - source
+      - lineNo
+      - side
+      - amountPoisha
+      - runningNetDebitPoisha
+      - narration
+      - product
+      additionalProperties: true
+    AccountLedger:
+      type: object
+      properties:
+        glAccountCode:
+          type: string
+        fromDate:
+          type: string
+          format: date
+        toDate:
+          type: string
+          format: date
+        openingNetDebitPoisha:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountLedgerLine'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - glAccountCode
+      - fromDate
+      - toDate
+      - openingNetDebitPoisha
+      - items
+      - nextCursor
+      additionalProperties: true
+    GlExport:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+        exportVersion:
+          type: integer
+          format: int32
+        glDayRevision:
+          type: integer
+          format: int32
+        status:
+          type: string
+          enum:
+          - GENERATING
+          - GENERATED
+          - FAILED
+          - SUPERSEDED
+        format:
+          type: string
+          description: '`GENERIC_CSV_V1` (ERP-specific formats are added behind the format SPI)'
+        fileName:
+          type:
+          - string
+          - 'null'
+          description: '`GL_{yyyyMMdd}_v{n}.csv`'
+        sha256:
+          type:
+          - string
+          - 'null'
+        lineCount:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        totalDebitPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        totalCreditPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        failureReason:
+          type:
+          - string
+          - 'null'
+        generatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - businessDate
+      - exportVersion
+      - glDayRevision
+      - status
+      - format
+      - fileName
+      - sha256
+      - lineCount
+      - totalDebitPoisha
+      - totalCreditPoisha
+      - failureReason
+      - generatedAt
+      additionalProperties: true
+    GlException:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        category:
+          type: string
+          description: exception category (codes.yaml exceptionCategory)
+        severity:
+          type: string
+          enum:
+          - CRITICAL
+          - HIGH
+          - INFO
+        businessDate:
+          type:
+          - string
+          - 'null'
+          format: date
+        detail:
+          type: object
+        status:
+          type: string
+          enum:
+          - OPEN
+          - RESOLVED
+        resolvedBy:
+          type:
+          - string
+          - 'null'
+        resolution:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        resolvedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - id
+      - category
+      - severity
+      - businessDate
+      - detail
+      - status
+      - resolvedBy
+      - resolution
+      - createdAt
+      - resolvedAt
+      additionalProperties: true
+    ApprovalRef:
+      type: object
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        entityType:
+          type: string
+        entityId:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING
+        requiredLevels:
+          type: integer
+          format: int32
+          description: 1..3
+        checkerRoles:
+          type: array
+          items:
+            type: string
+          description: kernel K7 staff role codes
+        expiresAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - approvalId
+      - entityType
+      - entityId
+      - status
+      - requiredLevels
+      - checkerRoles
+      - expiresAt
+      additionalProperties: true
+    Approval:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        entityType:
+          type: string
+        entityId:
+          type: string
+        action:
+          type: string
+        payload:
+          type: object
+        makerId:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING
+          - APPROVED
+          - REJECTED
+          - EXPIRED
+          - CANCELLED
+        level:
+          type: integer
+          format: int32
+        requiredLevels:
+          type: integer
+          format: int32
+        checkerRoles:
+          type: array
+          items:
+            type: string
+        amountPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        expiresAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+        decidedBy:
+          type: array
+          items:
+            type: string
+        decidedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$
+      required:
+      - id
+      - entityType
+      - entityId
+      - action
+      - payload
+      - makerId
+      - status
+      - level
+      - requiredLevels
+      - checkerRoles
+      - amountPoisha
+      - createdAt
+      - expiresAt
+      - decidedBy
+      - decidedAt
+      additionalProperties: true
+    CommentRequest:
+      type: object
+      properties:
+        comment:
+          type:
+          - string
+          - 'null'
+          description: 1..500
+      required: []
+      additionalProperties: false
+    RejectRequest:
+      type: object
+      properties:
+        comment:
+          type: string
+          description: 1..500
+        reasonCode:
+          type:
+          - string
+          - 'null'
+          description: '`^[A-Z_]{3,40}$`'
+      required:
+      - comment
+      additionalProperties: false
+    ReasonRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: 20..500 chars
+      required:
+      - reason
+      additionalProperties: false
+    ResolveRequest:
+      type: object
+      properties:
+        resolution:
+          type: string
+          description: 20..500 chars
+      required:
+      - resolution
+      additionalProperties: false
+    DayCloseRunRequest:
+      type: object
+      properties:
+        businessDate:
+          type: string
+          format: date
+        ignoreCutoff:
+          type: boolean
+          description: default false
+      required:
+      - businessDate
+      additionalProperties: false
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+          description: URI
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        code:
+          type: string
+          description: kernel K3.6 closed code list
+          enum:
+          - VALIDATION_FAILED
+          - ACTOR_NOT_ALLOWED
+          - NOT_FOUND
+          - IDEMPOTENCY_CONFLICT
+          - STATE_CONFLICT
+          - SOD_VIOLATION
+          - INSUFFICIENT_FUNDS
+          - LIMIT_EXCEEDED
+          - RISK_BLOCKED
+          - RISK_STEP_UP_REQUIRED
+          - RISK_HELD_FOR_REVIEW
+          - WALLET_NOT_TRANSACTABLE
+          - MAX_BALANCE_EXCEEDED
+          - REFUND_EXCEEDS_ORIGINAL
+          - SERVICE_DISABLED
+          - MAKER_CHECKER_VIOLATION
+          - DEPENDENCY_UNAVAILABLE
+        detail:
+          type:
+          - string
+          - 'null'
+          description: human text only
+        reason:
+          type:
+          - string
+          - 'null'
+          description: provider-owned sub-reason (codes.yaml problemReasons); declared per operation
+        correlationId:
+          type: string
+        errors:
+          type:
+          - array
+          - 'null'
+          items:
+            type: object
+          description: '`[{field, message}]`'
+        retryable:
+          type: boolean
+          description: present (true) with 503
+        instance:
+          type:
+          - string
+          - 'null'
+      required:
+      - type
+      - title
+      - status
+      - code
+      - correlationId
+      additionalProperties: true
+    GlAccountPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlAccount'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    RuleSetSummaryPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleSetSummary'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    JournalSummaryPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JournalSummary'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    GlDayPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlDay'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    GlPeriodPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlPeriod'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    FiscalYearPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FiscalYear'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    GlExportPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlExport'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    GlExceptionPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlException'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    ApprovalPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    ProblemWithBlockingItems:
+      allOf:
+      - $ref: '#/components/schemas/Problem'
+      - type: object
+        properties:
+          blockingItems:
+            type: array
+            items:
+              type: string
+            maxItems: 200
+            description: 'provider extension: what blocks the close (business dates, journal ids, exception ids, period ids), max 200'
+  parameters:
+    XActorType:
+      name: X-Actor-Type
+      in: header
+      required: true
+      description: Kernel K3.1. general-ledger-service accepts STAFF, SERVICE (catalogued reads) and SYSTEM (internal job hook).
+      schema:
+        type: string
+        enum:
+        - STAFF
+        - SERVICE
+        - SYSTEM
+    XActorId:
+      name: X-Actor-Id
+      in: header
+      required: true
+      description: 'Kernel K3.1: staffUserId (canonical UUID) for STAFF; bare spring.application.name for SERVICE/SYSTEM.'
+      schema:
+        type: string
+        maxLength: 64
+    XActorRoles:
+      name: X-Actor-Roles
+      in: header
+      required: false
+      description: 'Kernel K3.1/K7: STAFF role codes, comma-separated, no spaces. Required for STAFF.'
+      schema:
+        type: string
+    XChannel:
+      name: X-Channel
+      in: header
+      required: true
+      description: Kernel K3.1 closed list. BACKOFFICE for staff, SYSTEM for services and jobs.
+      schema:
+        type: string
+        enum:
+        - APP
+        - USSD
+        - PARTNER_APP
+        - PORTAL
+        - BACKOFFICE
+        - API
+        - SYSTEM
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Kernel K3.1; generated when absent.
+      schema:
+        type: string
+        maxLength: 64
+        pattern: ^[A-Za-z0-9._-]+$
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'Kernel K3.3: scope (X-Actor-Id, key), retention 7 days, same key + different payload → 409 IDEMPOTENCY_CONFLICT.'
+      schema:
+        type: string
+        maxLength: 64
+        pattern: ^[A-Za-z0-9_-]+$
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+      description: 'Kernel K3.4: 1..200, default 50.'
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: 'Kernel K3.4: opaque, 24 h, same endpoint/actor/filters; else 400 reason INVALID_CURSOR.'
+    XActorUserId:
+      name: X-Actor-User-Id
+      in: header
+      required: false
+      description: 'Kernel K3.1: individual user; compared for maker ≠ checker and audit only.'
+      schema:
+        type: string
+        maxLength: 64
+        pattern: ^[A-Za-z0-9_-]+$
+  responses:
+    E400:
+      description: VALIDATION_FAILED
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    E403:
+      description: ACTOR_NOT_ALLOWED
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    E404:
+      description: NOT_FOUND
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    E409:
+      description: STATE_CONFLICT / IDEMPOTENCY_CONFLICT (reason in `reason`)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    E422:
+      description: MAKER_CHECKER_VIOLATION
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    E503:
+      description: DEPENDENCY_UNAVAILABLE
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

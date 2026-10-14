@@ -1,0 +1,61 @@
+# Bits Pay chart of accounts v0 (PROVISIONAL — SRS Appendix B-08 open; Finance replaces it through the CoA API with maker-checker)
+# general-ledger-service SVC-16 §8.1. Codes: 4 digits; trust instance accounts 1101-nn (nn = trustIndex 01..99, created from template 1101-{nn}).
+# ledger_controlled = balance must equal a TigerBeetle aggregate (GL-3 / recon GL_TIEOUT); such accounts never take manual journal lines.
+# must_be_zero = cumulative balance must be 0 at every close (GL-5).
+code,parent_code,level,name_en,account_class,normal_side,contra,postable,ledger_controlled,manual_posting_allowed,must_be_zero,template_code,description
+1000,,1,Assets,ASSET,DEBIT,false,false,false,false,false,,Header
+1100,1000,2,Trust bank accounts (e-money backing),ASSET,DEBIT,false,false,false,false,false,,Header; one postable child per TRUST_SETTLEMENT ledger account
+1101-01,1100,3,Trust bank account #01,ASSET,DEBIT,false,true,true,false,false,1101-{nn},Mirror of TB TRUST_SETTLEMENT …030001; further instances are created from the template when first seen
+1150,1000,2,Trust account interest receivable,ASSET,DEBIT,false,true,false,true,false,,GL-only; auto-journal from TRUST_INTEREST_RECORDED when enabled
+1200,1000,2,Operating bank accounts,ASSET,DEBIT,false,false,false,false,false,,Header
+1201,1200,3,Operating bank account (main),ASSET,DEBIT,false,true,false,true,false,,Receives revenue and campaign-fund sweeps (ledger cmd 10) and pays operating costs (manual journals)
+1300,1000,2,Receivables,ASSET,DEBIT,false,false,false,false,false,,Header
+1301,1300,3,Other receivables,ASSET,DEBIT,false,true,false,true,false,,GL-only
+1900,1000,2,Suspense and clearing,ASSET,DEBIT,false,false,false,false,false,,Header
+1901,1900,3,Ledger suspense,ASSET,DEBIT,false,true,true,false,false,,Mirror of TB SUSPENSE (400); either sign
+1902,1900,3,Ledger adjustment clearing,ASSET,DEBIT,false,true,true,false,false,,Mirror of TB ADJUSTMENT_CLEARING (410); either sign
+1950,1900,3,Internal e-money pool transfers,ASSET,DEBIT,false,true,false,false,true,,Both sides of operator pool-to-pool ledger adjustments (cmd 11 COMMISSION_FUNDING / CAMPAIGN_FUNDING_TRANSFER); nets to zero
+1999,1900,3,GL suspense - unmapped postings,ASSET,DEBIT,false,true,false,false,true,,Catch-all for postings no rule matched; any movement raises a CRITICAL exception
+2000,,1,Liabilities,LIABILITY,CREDIT,false,false,false,false,false,,Header
+2100,2000,2,E-money liabilities,LIABILITY,CREDIT,false,false,false,false,false,,Header
+2101,2100,3,E-money liability - customers,LIABILITY,CREDIT,false,true,true,false,false,,All CUSTOMER_WALLET (100) accounts
+2102,2100,3,E-money liability - agents,LIABILITY,CREDIT,false,true,true,false,false,,All AGENT_WALLET (110) accounts
+2103,2100,3,E-money liability - distributors,LIABILITY,CREDIT,false,true,true,false,false,,All DISTRIBUTOR_WALLET (120) accounts
+2104,2100,3,E-money liability - merchants,LIABILITY,CREDIT,false,true,true,false,false,,All MERCHANT_WALLET (130) accounts
+2105,2100,3,E-money liability - institutions,LIABILITY,CREDIT,false,true,true,false,false,,All INSTITUTION_WALLET (140) accounts
+2200,2000,2,Taxes payable,LIABILITY,CREDIT,false,false,false,false,false,,Header
+2201,2200,3,VAT payable,LIABILITY,CREDIT,false,true,true,false,false,,Mirror of TB VAT_PAYABLE (210)
+2202,2200,3,AIT payable (withheld on commission),LIABILITY,CREDIT,false,true,true,false,false,,Mirror of TB AIT_PAYABLE (230)
+2300,2000,2,Commission payable,LIABILITY,CREDIT,false,false,false,false,false,,Header
+2301,2300,3,Commission payable - accrued,LIABILITY,CREDIT,false,true,false,true,false,,Accrued (not in-line) commission; settled by ledger cmd 13 (R2)
+2900,2000,2,Other liabilities,LIABILITY,CREDIT,false,false,false,false,false,,Header
+2901,2900,3,Liens held,LIABILITY,CREDIT,false,true,true,false,false,,Mirror of TB HOLD_CONTROL (420); only posted pending transfers land here (none in R1)
+2950,2900,3,Accrued expenses,LIABILITY,CREDIT,false,true,false,true,false,,GL-only accruals
+3000,,1,Equity,EQUITY,CREDIT,false,false,false,false,false,,Header
+3101,3000,2,Share capital,EQUITY,CREDIT,false,true,false,true,false,,GL-only; opening balance
+3201,3000,2,Retained earnings,EQUITY,CREDIT,false,true,false,true,false,,Target of the year-end close journal
+4000,,1,Income,INCOME,CREDIT,false,false,false,false,false,,Header
+4100,4000,2,Fee income,INCOME,CREDIT,false,false,false,false,false,,Header
+4101,4100,3,Fee income - P2P,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) credited to FEE_INCOME on command 1
+4102,4100,3,Fee income - cash-in,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 2
+4103,4100,3,Fee income - cash-out,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 3
+4104,4100,3,Merchant discount (MDR) income,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 4 (payee-borne MDR)
+4105,4100,3,Fee income - merchant refund,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 5
+4106,4100,3,Fee income - float transfer,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 6
+4107,4100,3,Fee income - disbursement,INCOME,CREDIT,false,true,false,true,false,,FEE (2001) on command 8
+4190,4100,3,Fee reversals and adjustments,INCOME,DEBIT,true,true,false,true,false,,Contra-income: reversed fees (cmd 7) and fee corrections (cmd 11)
+4199,4100,3,Fee income - other,INCOME,CREDIT,false,true,false,true,false,,FEE_INCOME credits not matched by a product rule
+4300,4000,2,Other income,INCOME,CREDIT,false,false,false,false,false,,Header
+4301,4300,3,Trust account interest income,INCOME,CREDIT,false,true,false,true,false,,Auto-journal from TRUST_INTEREST_RECORDED when enabled
+4399,4300,3,Miscellaneous income,INCOME,CREDIT,false,true,false,true,false,,GL-only
+5000,,1,Expenses,EXPENSE,DEBIT,false,false,false,false,false,,Header
+5100,5000,2,Commission expense,EXPENSE,DEBIT,false,false,false,false,false,,Header
+5101,5100,3,Agent commission expense (in-line),EXPENSE,DEBIT,false,true,false,true,false,,Gross in-line commission = net leg (2003) + AIT leg (2004)
+5102,5100,3,Distributor and hierarchical commission expense,EXPENSE,DEBIT,false,true,false,true,false,,R2: accrued shares (commission.events)
+5190,5100,3,Commission reversals,EXPENSE,CREDIT,true,true,false,true,false,,Contra-expense: reversed commission and AIT legs (cmd 7)
+5200,5000,2,Marketing,EXPENSE,DEBIT,false,false,false,false,false,,Header
+5201,5200,3,Campaign reward expense,EXPENSE,DEBIT,false,true,false,true,false,,CAMPAIGN_REWARD (1011) from CAMPAIGN_FUNDING (R2)
+5290,5200,3,Campaign reward clawbacks,EXPENSE,CREDIT,true,true,false,true,false,,Contra-expense (R2)
+5300,5000,2,Bank and operating expenses,EXPENSE,DEBIT,false,false,false,false,false,,Header
+5301,5300,3,Bank charges,EXPENSE,DEBIT,false,true,false,true,false,,SUSPENSE_CLEARING journals and manual entries
+5399,5300,3,Other operating expenses,EXPENSE,DEBIT,false,true,false,true,false,,GL-only

@@ -1,0 +1,23 @@
+{
+  "eventId": "0192f108-1000-7000-8000-000000000e01",
+  "eventType": "TRUST_INTEREST_RECORDED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-05T06:00:00.020Z",
+  "producer": "treasury-service",
+  "aggregateType": "TrustInterest",
+  "aggregateId": "0192f100-0000-7000-8000-000000000001",
+  "correlationId": "c-7e2a01",
+  "data": {
+    "interestId": "0192f108-0000-7000-8000-000000000001",
+    "trustAccountId": "0192f100-0000-7000-8000-000000000001",
+    "ledgerTrustAccountId": "00000000-0000-0000-0000-000000030001",
+    "bankCode": "BANK-020",
+    "month": "2026-09-01",
+    "interestPoisha": 412350,
+    "makerId": "0192f0a1-0000-7000-8000-0000000000f1",
+    "checkerIds": [
+      "0192f0a1-0000-7000-8000-0000000000f2"
+    ],
+    "recordedAt": "2026-10-05T06:00:00.000Z"
+  }
+}

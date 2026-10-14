@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/support-service/support.events/DISPUTE_RESOLVED.v1.schema.json",
+  "title": "support.events DISPUTE_RESOLVED v1 — envelope.data",
+  "description": "Dispute reached RESOLVED_UPHELD (after the reversal COMPLETED), RESOLVED_REJECTED or WITHDRAWN. Producer support-service; aggregateType Ticket; key = aggregateId = ticketId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "disputeId",
+    "ticketId",
+    "outcome",
+    "reasonCode",
+    "txnRef",
+    "reversalRequestId",
+    "walletIds",
+    "resolvedAt"
+  ],
+  "properties": {
+    "disputeId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ticketId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "UPHELD",
+        "REJECTED",
+        "WITHDRAWN"
+      ]
+    },
+    "reasonCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z][A-Z0-9_]{2,39}$",
+      "description": "outcome reason; null for WITHDRAWN"
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$"
+    },
+    "reversalRequestId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "non-null iff outcome = UPHELD"
+    },
+    "walletIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "description": "same set as DISPUTE_OPENED"
+    },
+    "resolvedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

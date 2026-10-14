@@ -1,0 +1,18 @@
+{
+  "eventId": "0192fc7b-0000-7000-8000-00000000007b",
+  "eventType": "PAYMENT_REQUEST_CREATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T09:00:00.020Z",
+  "producer": "disbursement-service",
+  "aggregateType": "PaymentRequest",
+  "aggregateId": "0192fc33-0000-7000-8000-000000000003",
+  "correlationId": "c-preq-0192fc33",
+  "data": {
+    "requestId": "0192fc33-0000-7000-8000-000000000003",
+    "requestRef": "RQ261009P3X8K2NM",
+    "requesterWalletId": "0192f2bb-0002-7000-8000-00000000b002",
+    "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001",
+    "amountPoisha": 30000,
+    "expiresAt": "2026-10-12T09:00:00.000Z"
+  }
+}

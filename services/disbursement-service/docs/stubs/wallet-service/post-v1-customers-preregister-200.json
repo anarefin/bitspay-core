@@ -1,0 +1,42 @@
+{
+  "name": "POST /v1/customers:preRegister → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/customers:preRegister(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "results": [
+        {
+          "rowRef": "17",
+          "result": "CREATED",
+          "reason": null,
+          "customerId": "0192f500-0000-7000-8000-000000000017",
+          "walletId": "0192f501-0000-7000-8000-000000000017",
+          "status": "D"
+        },
+        {
+          "rowRef": "18",
+          "result": "EXISTS",
+          "reason": null,
+          "customerId": "0192f2a0-5b1c-7d10-8e11-0a1b2c3d4e02",
+          "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+          "status": "A"
+        }
+      ],
+      "created": 1,
+      "existing": 1,
+      "rejected": 0
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

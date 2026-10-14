@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/post-closure-payout → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-closure\\-payout(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "2f9c4e1a-7b3d-5c8e-9f0a-1b2c3d4e5f60",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "6a81e2fe-f631-60bb-4de8-3d690d8f6a04"
+      ],
+      "postedAt": "2026-10-13T10:15:30.640Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

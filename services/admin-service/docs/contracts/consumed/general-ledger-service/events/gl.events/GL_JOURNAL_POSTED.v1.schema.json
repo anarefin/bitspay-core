@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/general-ledger-service/gl.events/GL_JOURNAL_POSTED.v1.schema.json",
+  "title": "gl.events GL_JOURNAL_POSTED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "journalId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= key"
+    },
+    "journalRef": {
+      "type": "string",
+      "description": "`GLJ-{yyyyMMdd}-{M|A|X|R|I|Y|O}-{6-digit seq}`; opaque to consumers"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "MANUAL",
+        "ACCRUAL",
+        "ACCRUAL_REVERSAL",
+        "REVERSAL",
+        "AUTO_INTEREST",
+        "YEAR_END_CLOSE",
+        "OPENING_BALANCE"
+      ]
+    },
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "description": "GL day posted into"
+    },
+    "totalDebitPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "description": "> 0"
+    },
+    "totalCreditPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "description": "= totalDebitPoisha"
+    },
+    "lineCount": {
+      "type": "integer",
+      "format": "int32",
+      "description": "2..2000"
+    },
+    "reversesJournalId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "REVERSAL / ACCRUAL_REVERSAL"
+    },
+    "autoReverseOn": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "description": "ACCRUAL only"
+    },
+    "makerId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "STAFF; null for system journals (AUTO_INTEREST, ACCRUAL_REVERSAL, YEAR_END_CLOSE is maker-approved)"
+    },
+    "checkerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "description": "0–3 items"
+    },
+    "postedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+    }
+  },
+  "required": [
+    "journalId",
+    "journalRef",
+    "source",
+    "businessDate",
+    "totalDebitPoisha",
+    "totalCreditPoisha",
+    "lineCount",
+    "reversesJournalId",
+    "autoReverseOn",
+    "makerId",
+    "checkerIds",
+    "postedAt"
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/ledger-service/ledger.changes/LEDGER_TRANSFER_POSTED.v1.schema.json",
+  "title": "ledger.changes LEDGER_TRANSFER_POSTED v1 — envelope.data",
+  "description": "One event per committed business TigerBeetle transfer (codes 1001-1016, 2001-2004, incl. pending creation, void and post of holds). Technical codes 9001-9099 are never published. Envelope: eventId = transferId, aggregateType = LedgerTransfer, aggregateId = debitAccountId (= Kafka key), correlationId = commandId, occurredAt = TB timestamp in ms, producer = ledger-service. Transport: direct (ledger-cdc-bridge role, idempotent Kafka producer), not the outbox.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["transferId", "commandId", "commandType", "legIndex", "code", "debitAccountId", "creditAccountId", "amountPoisha", "pendingId", "flags", "timestamp", "debitAccountBalanceAfter", "creditAccountBalanceAfter"],
+  "$defs": {
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "balanceAfter": {
+      "type": ["object", "null"],
+      "description": "Cumulative TB counters of the account immediately after this transfer, poisha (declared exception to the Poisha suffix rule). Never null for accounts with the TB history flag (all non-technical accounts); null is tolerated for compatibility only.",
+      "additionalProperties": true,
+      "required": ["debitsPosted", "creditsPosted", "debitsPending", "creditsPending"],
+      "properties": {
+        "debitsPosted": {"type": "integer", "minimum": 0},
+        "creditsPosted": {"type": "integer", "minimum": 0},
+        "debitsPending": {"type": "integer", "minimum": 0},
+        "creditsPending": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "properties": {
+    "transferId": {"$ref": "#/$defs/uuid", "description": "Canonical UUID text of the big-endian u128 transfer id; = envelope eventId"},
+    "commandId": {"$ref": "#/$defs/uuid", "description": "TB user_data_128; = envelope correlationId; disbursement: the row commandId"},
+    "commandType": {"type": "integer", "minimum": 1, "maximum": 17, "description": "TB user_data_64 (codes.yaml commandType)"},
+    "legIndex": {"type": "integer", "minimum": 0, "maximum": 5, "description": "TB user_data_32; business legs 0..5. Reversal: 0 = hold void, 1..5 = mirror legs"},
+    "code": {"type": "integer", "description": "Business transfer code 1001-1016, 2001-2004 (codes.yaml transferCode)"},
+    "debitAccountId": {"$ref": "#/$defs/uuid", "description": "= Kafka key / aggregateId"},
+    "creditAccountId": {"$ref": "#/$defs/uuid"},
+    "amountPoisha": {"type": "integer", "minimum": 0, "description": "Void legs carry the pending amount"},
+    "pendingId": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}], "description": "Set on post/void legs, else null"},
+    "flags": {"type": "array", "items": {"type": "string", "enum": ["linked", "pending", "post_pending_transfer", "void_pending_transfer", "balancing_debit", "balancing_credit", "closing_debit", "closing_credit"]}, "description": "TB snake_case flags; [] when none"},
+    "timestamp": {"type": "integer", "minimum": 0, "description": "TB timestamp, ns since epoch, JSON number; unique and increasing cluster-wide"},
+    "debitAccountBalanceAfter": {"$ref": "#/$defs/balanceAfter"},
+    "creditAccountBalanceAfter": {"$ref": "#/$defs/balanceAfter"},
+    "reasonCode": {"type": ["string", "null"], "minLength": 1, "maxLength": 40, "description": "Optional, additive (CCR-GL-03). commandType 10 or 11: the command body's reasonCode read from the committed command journal (null if absent); null for every other command type. May be absent."}
+  }
+}

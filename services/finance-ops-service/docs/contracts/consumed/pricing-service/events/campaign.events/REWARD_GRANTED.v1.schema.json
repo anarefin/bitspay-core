@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/pricing-service/campaign.events/REWARD_GRANTED.v1.schema.json",
+  "title": "RewardGranted",
+  "description": "Ledger post-campaign-reward returned OK/EXISTS (same DB transaction as GRANTED); key = walletId. All nine fields always emitted.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "campaignId",
+    "walletId",
+    "rewardPoisha",
+    "triggerTxnRef",
+    "commandId",
+    "rewardId",
+    "rewardType",
+    "beneficiaryRole",
+    "txnRef"
+  ],
+  "properties": {
+    "campaignId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "walletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "beneficiary; wallet type C, A or M; = key"
+    },
+    "rewardPoisha": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000000000000
+    },
+    "triggerTxnRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "qualifying txn; null for referral-by-KYC, draws, list bonuses, customer-event triggers"
+    },
+    "commandId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "post-campaign-reward commandId of the successful attempt"
+    },
+    "rewardId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "rewardType": {
+      "type": "string",
+      "enum": [
+        "CASHBACK",
+        "BONUS",
+        "REFERRAL",
+        "DRAW_PRIZE"
+      ]
+    },
+    "beneficiaryRole": {
+      "type": "string",
+      "enum": [
+        "SELF",
+        "REFERRER",
+        "REFEREE",
+        "WINNER"
+      ]
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^CR[0-9]{6}00[0-9A-HJKMNP-TV-Z]{8}$",
+      "description": "the reward's CR reference (18 chars)"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/v1/ledger/accounts/0192f2ff-0000-7000-8000-00000000f001/balance"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "accountId": "0192f2ff-0000-7000-8000-00000000f001",
+      "ledgerBalancePoisha": 24396,
+      "availableBalancePoisha": 24396,
+      "heldPoisha": 0,
+      "asOf": "2026-10-10T18:05:00.000Z",
+      "accountType": "MERCHANT_WALLET",
+      "closed": false
+    }
+  }
+}

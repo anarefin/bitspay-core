@@ -1,0 +1,37 @@
+{
+  "eventId": "0192fb60-0000-7000-8000-0000000000e0",
+  "eventType": "NOTIFICATION_REQUESTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T05:10:11.123Z",
+  "producer": "admin-service",
+  "aggregateType": "Notification",
+  "aggregateId": "0192f010-0000-7000-8000-000000000010",
+  "correlationId": "c-91aa",
+  "data": {
+    "requestId": "0192fb60-0000-7000-8000-000000000060",
+    "templateCode": "GOV_ACTIVITY_ALERT",
+    "recipient": {
+      "walletId": null,
+      "staffUserId": "0192f010-0000-7000-8000-000000000010",
+      "msisdn": "8801712345678",
+      "email": null,
+      "role": null
+    },
+    "channels": [
+      "IN_APP",
+      "SMS"
+    ],
+    "priority": "SECURITY",
+    "language": "en",
+    "variables": {
+      "ruleCode": "BULK_EXPORT",
+      "actorUsername": "nadia.k",
+      "observed": 7,
+      "window": "PT1H",
+      "severity": "HIGH",
+      "alertId": "0192f6ff-0000-7000-8000-0000000000ff"
+    },
+    "dedupeKey": "GOV_ACTIVITY_ALERT:0192f6ff-0000-7000-8000-0000000000ff:0192f010-0000-7000-8000-000000000010",
+    "reminder": null
+  }
+}

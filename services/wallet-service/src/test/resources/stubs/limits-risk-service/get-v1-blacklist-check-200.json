@@ -1,0 +1,32 @@
+{
+  "name": "GET /v1/blacklist/check → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/blacklist/check(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "listed": true,
+      "entries": [
+        {
+          "entryId": "0192f5aa-0000-7000-8000-0000000000e1",
+          "type": "NID",
+          "reasonCode": "FRAUD_CONFIRMED",
+          "valueMasked": "******1234",
+          "expiresAt": null,
+          "createdAt": "2026-09-01T10:00:00.000Z"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

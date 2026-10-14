@@ -1,0 +1,31 @@
+{
+  "name": "POST /v1/wallets/{walletId}/flags → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/wallets/[^/]+/flags(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+      "flags": 8,
+      "walletVersion": 8814,
+      "holders": [
+        {
+          "flag": 8,
+          "holder": "support-service",
+          "reasonCode": "WRONG_TRANSFER_HOLD"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

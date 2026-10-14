@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/pricing-service/commission.events/COMMISSION_ACCRUED.v1.schema.json",
+  "title": "CommissionAccrued",
+  "description": "One event per commission accrual row (INLINE, SHARE, CLAWBACK, ADJUSTMENT, BONUS); key = beneficiaryWalletId.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "accrualId",
+    "txnRef",
+    "beneficiaryWalletId",
+    "level",
+    "grossPoisha",
+    "aitPoisha",
+    "kind",
+    "txnType",
+    "businessDate",
+    "reversesAccrualId"
+  ],
+  "properties": {
+    "accrualId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "UUIDv7"
+    },
+    "txnRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "triggering transaction's txnRef; null for ADJUSTMENT without a related txn and for BONUS"
+    },
+    "beneficiaryWalletId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= key"
+    },
+    "level": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        8,
+        9
+      ],
+      "description": "0 in-line agent, 1..5 ancestor distance, 8 adjustment, 9 bonus"
+    },
+    "grossPoisha": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "negative for CLAWBACK and negative ADJUSTMENT"
+    },
+    "aitPoisha": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "same sign as gross; |ait| <= |gross|"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "INLINE",
+        "SHARE",
+        "CLAWBACK",
+        "ADJUSTMENT",
+        "BONUS"
+      ]
+    },
+    "txnType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "P2P",
+        "CASH_IN",
+        "CASH_OUT",
+        "MERCHANT_PAYMENT",
+        "MERCHANT_REFUND",
+        "FLOAT_TRANSFER",
+        "REVERSAL",
+        null
+      ],
+      "description": "null for ADJUSTMENT and BONUS"
+    },
+    "businessDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "localDate(ts @ Asia/Dhaka - CUTOFF.EOD)"
+    },
+    "reversesAccrualId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "non-null iff kind = CLAWBACK"
+    }
+  }
+}

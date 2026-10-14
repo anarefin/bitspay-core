@@ -1,0 +1,2 @@
+# Profile `hybrid`: this service runs in the IDE, everything else in the Compose stack.
+# Run `docker compose stop ledger-service` first. Defaults in application.yaml already use the stack's host ports.

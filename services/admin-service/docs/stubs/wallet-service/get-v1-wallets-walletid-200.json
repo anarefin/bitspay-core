@@ -1,0 +1,38 @@
+{
+  "name": "GET /v1/wallets/{walletId} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/wallets/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+      "ownerType": "CUSTOMER",
+      "ownerId": "0192f2a0-5b1c-7d10-8e11-0a1b2c3d4e02",
+      "msisdn": "8801711000000",
+      "displayName": "Karim Ahmed",
+      "language": "bn",
+      "status": "A",
+      "statusName": "ACTIVE",
+      "statusReasonCode": "KYC_APPROVED",
+      "kycTier": 1,
+      "walletType": "C",
+      "walletTypeName": "CUSTOMER",
+      "categoryCode": 0,
+      "flags": 0,
+      "version": 8812,
+      "createdAt": "2026-10-09T05:10:00.000Z",
+      "updatedAt": "2026-10-09T06:00:00.000Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

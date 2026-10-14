@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/general-ledger-service/gl.events/GL_ACCOUNT_UPSERTED.v1.schema.json",
+  "title": "gl.events GL_ACCOUNT_UPSERTED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "`^[0-9]{4}(-[0-9]{2})?$`; = key"
+    },
+    "nameEn": {
+      "type": "string",
+      "description": "1..120"
+    },
+    "nameBn": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "1..120"
+    },
+    "accountClass": {
+      "type": "string",
+      "enum": [
+        "ASSET",
+        "LIABILITY",
+        "EQUITY",
+        "INCOME",
+        "EXPENSE"
+      ]
+    },
+    "normalSide": {
+      "type": "string",
+      "enum": [
+        "DEBIT",
+        "CREDIT"
+      ]
+    },
+    "contra": {
+      "type": "boolean"
+    },
+    "parentCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "null for level-1 headers"
+    },
+    "level": {
+      "type": "integer",
+      "format": "int32",
+      "description": "1..6"
+    },
+    "postable": {
+      "type": "boolean",
+      "description": "headers are not postable"
+    },
+    "ledgerControlled": {
+      "type": "boolean",
+      "description": "must equal a TigerBeetle aggregate"
+    },
+    "manualPostingAllowed": {
+      "type": "boolean",
+      "description": "never true when ledgerControlled"
+    },
+    "mustBeZero": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "provisional": {
+      "type": "boolean",
+      "description": "true until Finance confirms the chart of accounts"
+    },
+    "version": {
+      "type": "integer",
+      "format": "int64",
+      "description": "strictly +1; consumers apply only if newer"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+    }
+  },
+  "required": [
+    "code",
+    "nameEn",
+    "nameBn",
+    "accountClass",
+    "normalSide",
+    "contra",
+    "parentCode",
+    "level",
+    "postable",
+    "ledgerControlled",
+    "manualPostingAllowed",
+    "mustBeZero",
+    "status",
+    "provisional",
+    "version",
+    "updatedAt"
+  ],
+  "additionalProperties": true
+}

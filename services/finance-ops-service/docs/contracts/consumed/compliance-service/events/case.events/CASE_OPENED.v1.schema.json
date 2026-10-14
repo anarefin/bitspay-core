@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/CASE_OPENED.v1.schema.json",
+  "title": "case.events CASE_OPENED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "caseNo": {
+      "type": "string",
+      "pattern": "^CASE-[0-9]{4}-[0-9]{6}$",
+      "description": "`CASE-YYYY-NNNNNN`"
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "FRAUD",
+        "AML"
+      ]
+    },
+    "caseType": {
+      "type": "string",
+      "enum": [
+        "FRAUD",
+        "AML_MONITORING",
+        "SCREENING",
+        "EDD",
+        "REGULATORY_INSTRUCTION",
+        "PERIODIC_REVIEW",
+        "CUSTOMER_REPORT"
+      ]
+    },
+    "subjectType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "CUSTOMER",
+        "PARTNER",
+        null
+      ],
+      "description": "null only if the subject is unresolved (manual/external alert)"
+    },
+    "subjectId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "walletId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "primary wallet null for a pending partner / walletless subject"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ]
+    },
+    "alertIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "may be `[]` (screening, instruction)"
+    },
+    "openedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "slaDueAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "caseId",
+    "caseNo",
+    "domain",
+    "caseType",
+    "subjectType",
+    "subjectId",
+    "walletId",
+    "priority",
+    "alertIds",
+    "openedAt",
+    "slaDueAt"
+  ],
+  "additionalProperties": true
+}

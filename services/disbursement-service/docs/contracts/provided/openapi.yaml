@@ -1,0 +1,1665 @@
+openapi: 3.1.0
+info:
+  title: disbursement-service API
+  version: 1.0.0
+  description: |
+    Bulk disbursement batches, local maker-checker, scheduled transfers and request money (SVC-08).
+    Kernel 1.0: headers K3.1, idempotency K3.3, pagination K3.4, problem+json K3.6, product switches K3.7.
+    Product switch per path group: `/v1/disbursement/**` and `/v1/approvals/**` = DISBURSEMENT,
+    `/v1/scheduled-transfers/**` = SCHEDULED_TRANSFER, `/v1/payment-requests/**` = REQUEST_MONEY.
+    A disabled product returns 422 SERVICE_DISABLED before any side effect (state-changing operations only; reads stay available).
+    Money is int64 poisha. IDs are canonical lower-case UUIDs. Timestamps ISO-8601 UTC with milliseconds.
+    `Idempotency-Key` retention: 7 days (OPEN D-01); same key + same body replays the stored response; different body -> 409 IDEMPOTENCY_CONFLICT.
+servers:
+  - url: http://localhost:8108
+tags:
+  - name: batches
+  - name: approvals
+  - name: scheduled-transfers
+  - name: payment-requests
+  - name: internal-admin
+
+paths:
+  /v1/disbursement/batches:
+    post:
+      tags: [batches]
+      operationId: createBatch
+      summary: Create a disbursement batch (JSON rows or CSV upload)
+      description: |
+        Stores the batch (DRAFT), streams the file to the FileStore, parses rows and moves the batch to VALIDATING.
+        Row-level problems (bad MSISDN, bad amount) never fail the request: they make rows INVALID.
+        Payer checks: `GET /v1/wallets/{payerWalletId}` must return walletType I and ownerType INSTITUTION
+        (institutionId = ownerId; for an INSTITUTION actor ownerId must equal X-Actor-Id, else 403), and the payer status must be debit-capable (A or C).
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: "X-Actor-Wallet-Id = payerWalletId and payer wallet ownerId = X-Actor-Id; X-Actor-User-Id recommended (required for institution maker-checker)"}
+        - {type: STAFF, roles: [OPS_MAKER], rule: "on behalf of an institution; payerWalletId required"}
+      x-product: DISBURSEMENT
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BatchCreateRequest'}
+            example:
+              payerWalletId: 0192f2ff-0006-7000-8000-00000000f006
+              title: October 2026 salary
+              clientReference: PAYROLL-2026-10
+              preRegisterUnknown: false
+              scheduledStartAt: null
+              rows:
+                - {msisdn: "01711000002", amountPoisha: 1250000, reference: EMP-0042, name: Karim Ahmed}
+                - {msisdn: "8801811000077", amountPoisha: 1310000, reference: EMP-0043, name: Shila Akter}
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/BatchCreateMultipart'}
+            encoding:
+              file: {contentType: text/csv}
+      responses:
+        '202':
+          description: Accepted; validation runs asynchronously
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BatchCreateResponse'}
+              example: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, status: VALIDATING, totalRows: 2}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '409':
+          description: "STATE_CONFLICT reason DUPLICATE_FILE (same payer + SHA-256 with a live batch) or IDEMPOTENCY_CONFLICT"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {STATE_CONFLICT: [DUPLICATE_FILE]}
+        '422':
+          description: "WALLET_NOT_TRANSACTABLE (payer not type I / not INSTITUTION-owned / not debit-capable; extensions walletId, walletStatus) or SERVICE_DISABLED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWalletNotTransactable'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    get:
+      tags: [batches]
+      operationId: listBatches
+      summary: List batches (newest first)
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: "only batches whose institutionId = X-Actor-Id"}
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER, FIN_MAKER, FIN_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only"}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - {name: payerWalletId, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/BatchStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of batches ordered createdAt desc, batchId desc
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BatchPage'}
+              example:
+                items: [{batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: VALIDATED, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: null, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: null, approvedAt: null, startedAt: null, completedAt: null}]
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+  /v1/disbursement/batches/{batchId}:
+    get:
+      tags: [batches]
+      operationId: getBatch
+      summary: Batch detail with counters
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: "owner (institutionId = X-Actor-Id)"}
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER, FIN_MAKER, FIN_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only"}
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      responses:
+        '200':
+          description: Batch
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "PARTIALLY_FAILED", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 4990, "failedRows": 2, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 6237500000, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": "2026-10-09T09:30:01.000Z", "completedAt": "2026-10-09T09:41:12.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/disbursement/batches/{batchId}/rows:
+    get:
+      tags: [batches]
+      operationId: listBatchRows
+      summary: Rows of a batch (typed validation report / per-record status)
+      description: "MSISDN is clear only for STAFF OPS_* roles; everyone else sees 8801711****00. Ordered by rowNo asc."
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner}
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER, FIN_MAKER, FIN_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only, masked MSISDN"}
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/RowStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of rows
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BatchRowPage'}
+              example:
+                items:
+                  - {rowNo: 42, rowRef: BD261009K7Q2M4ZD-42, msisdn: "8801711****02", nameInFile: Karim Ahmed, displayNameMasked: "Karim A***", reference: EMP-0042, amountPoisha: 1250000, status: PAID, failureCode: null, failureDetail: null, walletId: 0192f2bb-0002-7000-8000-00000000b002, attempt: 1, commandId: b767a223-29e4-5c21-a222-74e75e9ca80e, paidAt: "2026-10-09T10:04:11.102Z"}
+                  - {rowNo: 43, rowRef: BD261009K7Q2M4ZD-43, msisdn: "8801711****03", nameInFile: Shila Akter, displayNameMasked: "Shila A***", reference: EMP-0043, amountPoisha: 900000, status: FAILED, failureCode: LIMIT_EXCEEDED, failureDetail: DISBURSEMENT_RECEIVE_MONTHLY_AMOUNT, walletId: 0192f2bb-0003-7000-8000-00000000b003, attempt: 1, commandId: 13bc123c-e9c8-51ad-8d29-6df1718faa15, paidAt: null}
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/disbursement/batches/{batchId}/report.csv:
+    get:
+      tags: [batches]
+      operationId: getBatchReport
+      summary: Validation report (up to VALIDATED) or final per-record report (after submit)
+      description: |
+        UTF-8 CSV with header `rowNo,rowRef,msisdnMasked,nameInFile,displayNameMasked,reference,amount,status,failureCode,failureDetail,walletId,commandId,paidAt`.
+        `amount` is Taka with exactly 2 decimals (presentation only). MSISDN always masked. The validation report ends with the line
+        `# limits re-checked at payment time`. Streams; no pagination.
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner}
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER, FIN_MAKER, FIN_CHECKER, AUDITOR, READ_ONLY]}
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      responses:
+        '200':
+          description: CSV report
+          content:
+            text/csv:
+              schema: {type: string}
+              example: |
+                rowNo,rowRef,msisdnMasked,nameInFile,displayNameMasked,reference,amount,status,failureCode,failureDetail,walletId,commandId,paidAt
+                42,BD261009K7Q2M4ZD-42,8801711****02,Karim Ahmed,Karim A***,EMP-0042,12500.00,PAID,,,0192f2bb-0002-7000-8000-00000000b002,b767a223-29e4-5c21-a222-74e75e9ca80e,2026-10-09T10:04:11.102Z
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/disbursement/batches/{batchId}:submit:
+    post:
+      tags: [batches]
+      operationId: submitBatch
+      summary: Submit a VALIDATED batch for approval (VALIDATED -> PENDING_APPROVAL)
+      description: "Creates approval_request (DisbursementBatch / EXECUTE, amountPoisha = validAmountPoisha), emits APPROVAL_REQUESTED + BATCH_SUBMITTED + audit. Funding is checked as a warning only."
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner (maker side)}
+        - {type: STAFF, roles: [OPS_MAKER]}
+      x-product: DISBURSEMENT
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SubmitRequest'}
+            example: {excludeInvalidRows: true}
+      responses:
+        '200':
+          description: Batch (status PENDING_APPROVAL)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "PENDING_APPROVAL", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": null, "startedAt": null, "completedAt": null}
+        '400':
+          description: "VALIDATION_FAILED, reason NO_VALID_ROWS or INVALID_ROWS_PRESENT"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {VALIDATION_FAILED: [NO_VALID_ROWS, INVALID_ROWS_PRESENT]}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+        '422': {$ref: '#/components/responses/ServiceDisabled'}
+
+  /v1/disbursement/batches/{batchId}:cancel:
+    post:
+      tags: [batches]
+      operationId: cancelBatch
+      summary: Cancel a batch (DRAFT..APPROVED or PAUSED -> CANCELLED)
+      description: "VALID rows -> SKIPPED (reservations released explicitly; no row event). Pending approval -> CANCELLED (APPROVAL_DECIDED status CANCELLED). BATCH_COMPLETED (status CANCELLED) if any row was attempted. 409 ROWS_IN_FLIGHT while rows are PROCESSING."
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner (maker side)}
+        - {type: STAFF, roles: [OPS_MAKER, OPS_CHECKER]}
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CancelRequest'}
+            example: {reason: Wrong salary month uploaded}
+      responses:
+        '200':
+          description: Batch (status CANCELLED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "CANCELLED", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 4992, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": null, "startedAt": null, "completedAt": "2026-10-09T09:20:00.000Z"}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: "STATE_CONFLICT reason INVALID_TRANSITION or ROWS_IN_FLIGHT; IDEMPOTENCY_CONFLICT"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {STATE_CONFLICT: [INVALID_TRANSITION, ROWS_IN_FLIGHT]}
+
+  /v1/disbursement/batches/{batchId}:pause:
+    post:
+      tags: [batches]
+      operationId: pauseBatch
+      summary: Pause a RUNNING batch (pauseReason OPERATOR)
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner}
+        - {type: STAFF, roles: [OPS_CHECKER]}
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmptyBody'}
+            example: {}
+      responses:
+        '200':
+          description: Batch (status PAUSED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "PAUSED", "pauseReason": "OPERATOR", "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 2000, "failedRows": 1, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 2500000000, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": "2026-10-09T09:30:01.000Z", "completedAt": null}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/disbursement/batches/{batchId}:resume:
+    post:
+      tags: [batches]
+      operationId: resumeBatch
+      summary: Resume a PAUSED batch after a funding check (PAUSED -> RUNNING)
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner}
+        - {type: STAFF, roles: [OPS_CHECKER]}
+      x-product: DISBURSEMENT
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmptyBody'}
+            example: {}
+      responses:
+        '200':
+          description: Batch (status RUNNING)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "RUNNING", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": "2026-10-09T09:30:01.000Z", "completedAt": null}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+        '422':
+          description: "INSUFFICIENT_FUNDS (problem member `batch`, batch stays PAUSED INSUFFICIENT_FUNDING), WALLET_NOT_TRANSACTABLE (payer account closed / unknown), SERVICE_DISABLED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWithBatch'}
+              example:
+                type: about:blank
+                title: Insufficient funds
+                status: 422
+                code: INSUFFICIENT_FUNDS
+                instance: /v1/disbursement/batches/0192fa10-0000-7000-8000-000000000001:resume
+                correlationId: c-7d21aa
+                batch: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "PAUSED", "pauseReason": "INSUFFICIENT_FUNDING", "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": null, "completedAt": null}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+
+  /v1/disbursement/batches/{batchId}:retry-failed:
+    post:
+      tags: [batches]
+      operationId: retryFailedRows
+      summary: Retry FAILED rows with a retryable failureCode (PARTIALLY_FAILED -> RUNNING)
+      description: "Rows -> VALID with attempt + 1 (new commandId). Retryable codes: WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, MAX_BALANCE_EXCEEDED, RISK_HELD_FOR_REVIEW. No new approval while the retried amount <= validAmountPoisha - paidAmountPoisha."
+      x-audience: partner
+      x-actors:
+        - {type: INSTITUTION, rule: owner}
+        - {type: STAFF, roles: [OPS_MAKER]}
+      x-product: DISBURSEMENT
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetryFailedRequest'}
+            example: {rowNos: [43]}
+      responses:
+        '200':
+          description: Batch (status RUNNING)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+              example: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "RUNNING", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": "2026-10-09T09:30:01.000Z", "completedAt": null}
+        '400':
+          description: "VALIDATION_FAILED, reason ROW_NOT_RETRYABLE (a listed rowNo is not FAILED with a retryable code)"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {VALIDATION_FAILED: [ROW_NOT_RETRYABLE]}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+        '422': {$ref: '#/components/responses/ServiceDisabled'}
+
+  /v1/approvals:
+    get:
+      tags: [approvals]
+      operationId: listApprovals
+      summary: Pending (or other status) approvals of this service (kernel K5)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: INSTITUTION, rule: "only approvals of its own batches (institution checker)"}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/ApprovalStatus'}}
+        - {name: entityType, in: query, required: false, schema: {type: string, enum: [DisbursementBatch]}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of approvals ordered createdAt desc
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalPage'}
+              example:
+                items: [{"approvalId": "0192fa22-0000-7000-8000-000000000002", "entityType": "DisbursementBatch", "entityId": "0192fa10-0000-7000-8000-000000000001", "action": "EXECUTE", "status": "PENDING", "level": 1, "requiredLevels": 1, "checkerRoles": ["OPS_CHECKER"], "amountPoisha": 6240000000, "makerActorType": "INSTITUTION", "makerId": "0192f2e0-0006-7000-8000-00000000f000", "makerUserId": "hr-maker-01", "summary": "Disbursement BD261009K7Q2M4ZD: 4992 rows", "requestedAt": "2026-10-09T09:05:00.000Z", "expiresAt": "2026-10-12T09:05:00.000Z", "decidedAt": null}]
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+  /v1/approvals/{id}:approve:
+    post:
+      tags: [approvals]
+      operationId: approveApproval
+      summary: Approve the current level; the final level runs the funding check and starts the batch
+      description: |
+        Level 1: STAFF OPS_CHECKER or the institution checker; level 2 (validAmountPoisha >= secondLevelThresholdPoisha): STAFF FIN_CHECKER.
+        Checker != maker (actorType + actorId, and X-Actor-User-Id when both carry it); a level-2 checker differs from the level-1 checker.
+        Final level: funding check -> APPROVED -> RUNNING (or scheduled), or PAUSED INSUFFICIENT_FUNDING with 422 INSUFFICIENT_FUNDS (approval stays APPROVED).
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER], rule: "role must be in the current level's checkerRoles"}
+        - {type: INSTITUTION, rule: "level 1 only; X-Actor-Id = batch institutionId; X-Actor-User-Id present and != maker's; disabled when institutionSelfApproval = false"}
+      x-product: DISBURSEMENT
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApproveRequest'}
+            example: {comment: Checked against payroll register}
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalDecisionResponse'}
+              example:
+                approvalId: 0192fa22-0000-7000-8000-000000000002
+                status: APPROVED
+                level: 1
+                requiredLevels: 1
+                batch: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "RUNNING", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": "2026-10-09T09:30:01.000Z", "completedAt": null}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: "STATE_CONFLICT reason INVALID_TRANSITION (not PENDING) or APPROVAL_EXPIRED; IDEMPOTENCY_CONFLICT"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {STATE_CONFLICT: [INVALID_TRANSITION, APPROVAL_EXPIRED]}
+        '422':
+          description: "MAKER_CHECKER_VIOLATION; INSUFFICIENT_FUNDS at the final level (problem member `batch`); SERVICE_DISABLED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWithBatch'}
+              example:
+                type: about:blank
+                title: Insufficient funds
+                status: 422
+                code: INSUFFICIENT_FUNDS
+                instance: /v1/approvals/0192fa22-0000-7000-8000-000000000002:approve
+                correlationId: c-7d21ab
+                batch: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "PAUSED", "pauseReason": "INSUFFICIENT_FUNDING", "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": "2026-10-09T09:30:00.000Z", "startedAt": null, "completedAt": null}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+
+  /v1/approvals/{id}:reject:
+    post:
+      tags: [approvals]
+      operationId: rejectApproval
+      summary: Reject the approval (batch -> REJECTED)
+      x-audience: staff
+      x-actors:
+        - {type: STAFF, roles: [OPS_CHECKER, FIN_CHECKER], rule: "role must be in the current level's checkerRoles"}
+        - {type: INSTITUTION, rule: "as approve"}
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XActorUserId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RejectRequest'}
+            example: {comment: Amounts do not match the payroll register, reasonCode: AMOUNT_MISMATCH}
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalDecisionResponse'}
+              example:
+                approvalId: 0192fa22-0000-7000-8000-000000000002
+                status: REJECTED
+                level: 1
+                requiredLevels: 1
+                batch: {"batchId": "0192fa10-0000-7000-8000-000000000001", "batchRef": "BD261009K7Q2M4ZD", "institutionId": "0192f2e0-0006-7000-8000-00000000f000", "payerWalletId": "0192f2ff-0006-7000-8000-00000000f006", "title": "October 2026 salary", "clientReference": "PAYROLL-2026-10", "source": "CSV", "status": "REJECTED", "pauseReason": null, "failureDetail": null, "totalRows": 5000, "validRows": 4992, "invalidRows": 8, "paidRows": 0, "failedRows": 0, "skippedRows": 0, "validAmountPoisha": 6240000000, "paidAmountPoisha": 0, "approvalId": "0192fa22-0000-7000-8000-000000000002", "scheduledStartAt": null, "createdAt": "2026-10-09T09:00:00.000Z", "submittedAt": "2026-10-09T09:05:00.000Z", "approvedAt": null, "startedAt": null, "completedAt": null}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: "STATE_CONFLICT reason INVALID_TRANSITION or APPROVAL_EXPIRED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {STATE_CONFLICT: [INVALID_TRANSITION, APPROVAL_EXPIRED]}
+        '422':
+          description: MAKER_CHECKER_VIOLATION
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+
+  /v1/scheduled-transfers:
+    post:
+      tags: [scheduled-transfers]
+      operationId: createScheduledTransfer
+      summary: Create a scheduled / recurring P2P transfer (PAY-010)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = fromWalletId; X-Actor-Id = payer customerId (stored, used for delegated P2P)"}
+      x-product: SCHEDULED_TRANSFER
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XDeviceId'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScheduleCreateRequest'}
+            example: {fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: null, toMsisdn: "01911000055", amountPoisha: 200000, purposeCode: FAMILY_SUPPORT, note: Ma, frequency: MONTHLY, dayOfWeek: null, dayOfMonth: 1, localTime: "10:00", startDate: "2026-11-01", endDate: null, maxOccurrences: 12}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScheduleCreateResponse'}
+              example: {scheduleId: 0192fb01-0000-7000-8000-000000000001, status: ACTIVE, nextOccurrenceDate: "2026-11-01", nextDueAt: "2026-11-01T04:00:00.000Z", toWalletId: 0192f2c9-0000-7000-8000-00000000c009, toDisplayNameMasked: "Rahima B***"}
+        '400':
+          description: "VALIDATION_FAILED (schema, payee = payer, startDate in the past); reason SCHEDULE_CAP_EXCEEDED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {VALIDATION_FAILED: [SCHEDULE_CAP_EXCEEDED]}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/IdempotencyConflict'}
+        '422':
+          description: "WALLET_NOT_TRANSACTABLE (payee not type C / not credit-allowed, payer not type C / not debit-allowed; extensions walletId, walletStatus) or SERVICE_DISABLED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWalletNotTransactable'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    get:
+      tags: [scheduled-transfers]
+      operationId: listScheduledTransfers
+      summary: List schedules of a payer wallet
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "walletId = X-Actor-Wallet-Id"}
+        - {type: STAFF, roles: [SUP_AGENT, SUP_MAKER, SUP_CHECKER, OPS_MAKER, OPS_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only"}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - {name: walletId, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/ScheduleStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of schedules ordered createdAt desc
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SchedulePage'}
+              example:
+                items: [{"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "ACTIVE", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 0, "consecutiveFailures": 0, "nextOccurrenceDate": "2026-11-01", "nextDueAt": "2026-11-01T04:00:00.000Z", "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-10-09T08:00:00.000Z"}]
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+  /v1/scheduled-transfers/{scheduleId}:
+    get:
+      tags: [scheduled-transfers]
+      operationId: getScheduledTransfer
+      summary: Schedule detail
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "owner (payer wallet)"}
+        - {type: STAFF, roles: [SUP_AGENT, SUP_MAKER, SUP_CHECKER, OPS_MAKER, OPS_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only"}
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      responses:
+        '200':
+          description: Schedule
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+              example: {"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "ACTIVE", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 0, "consecutiveFailures": 0, "nextOccurrenceDate": "2026-11-01", "nextDueAt": "2026-11-01T04:00:00.000Z", "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-10-09T08:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [scheduled-transfers]
+      operationId: updateScheduledTransfer
+      summary: Change amount, end date, note or local time of future occurrences (not yet EXECUTING)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+      x-product: SCHEDULED_TRANSFER
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SchedulePatchRequest'}
+            example: {amountPoisha: 250000, endDate: "2027-10-31", note: Ma, localTime: "09:00"}
+      responses:
+        '200':
+          description: Updated schedule
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+              example: {"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "ACTIVE", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 0, "consecutiveFailures": 0, "nextOccurrenceDate": "2026-11-01", "nextDueAt": "2026-11-01T04:00:00.000Z", "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-10-09T08:00:00.000Z"}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+        '422': {$ref: '#/components/responses/ServiceDisabled'}
+
+  /v1/scheduled-transfers/{scheduleId}:pause:
+    post:
+      tags: [scheduled-transfers]
+      operationId: pauseScheduledTransfer
+      summary: Pause (ACTIVE -> PAUSED); future PENDING occurrence -> SKIPPED
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+        - {type: STAFF, roles: [SUP_AGENT]}
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: Schedule (PAUSED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+              example: {"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "PAUSED", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 1, "consecutiveFailures": 0, "nextOccurrenceDate": null, "nextDueAt": null, "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-11-10T08:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/scheduled-transfers/{scheduleId}:resume:
+    post:
+      tags: [scheduled-transfers]
+      operationId: resumeScheduledTransfer
+      summary: Resume (PAUSED or SUSPENDED -> ACTIVE); materialises the next occurrence
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+        - {type: STAFF, roles: [SUP_AGENT]}
+      x-product: SCHEDULED_TRANSFER
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: Schedule (ACTIVE)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+              example: {"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "ACTIVE", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 0, "consecutiveFailures": 0, "nextOccurrenceDate": "2026-11-01", "nextDueAt": "2026-11-01T04:00:00.000Z", "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-10-09T08:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+        '422': {$ref: '#/components/responses/ServiceDisabled'}
+
+  /v1/scheduled-transfers/{scheduleId}:cancel:
+    post:
+      tags: [scheduled-transfers]
+      operationId: cancelScheduledTransfer
+      summary: Cancel (-> CANCELLED, terminal); future PENDING occurrence -> SKIPPED
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+        - {type: STAFF, roles: [SUP_AGENT]}
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: Schedule (CANCELLED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+              example: {"scheduleId": "0192fb01-0000-7000-8000-000000000001", "status": "CANCELLED", "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2c9-0000-7000-8000-00000000c009", "toDisplayNameMasked": "Rahima B***", "amountPoisha": 200000, "purposeCode": "FAMILY_SUPPORT", "note": "Ma", "frequency": "MONTHLY", "dayOfWeek": null, "dayOfMonth": 1, "localTime": "10:00", "startDate": "2026-11-01", "endDate": null, "maxOccurrences": 12, "occurrencesDone": 1, "consecutiveFailures": 0, "nextOccurrenceDate": null, "nextDueAt": null, "createdAt": "2026-10-09T08:00:00.000Z", "updatedAt": "2026-11-10T08:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/scheduled-transfers/{scheduleId}/occurrences:
+    get:
+      tags: [scheduled-transfers]
+      operationId: listOccurrences
+      summary: Occurrences of a schedule (occurrenceDate desc)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+        - {type: STAFF, roles: [SUP_AGENT, SUP_MAKER, SUP_CHECKER, OPS_MAKER, OPS_CHECKER, AUDITOR, READ_ONLY]}
+        - {type: SERVICE, actorIds: ["*"], rule: "read-only"}
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of occurrences
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OccurrencePage'}
+              example:
+                items:
+                  - {occurrenceDate: "2026-12-01", dueAt: "2026-12-01T04:00:00.000Z", status: PENDING, txnRef: null, failureCode: null, executedAt: null}
+                  - {occurrenceDate: "2026-11-01", dueAt: "2026-11-01T04:00:00.000Z", status: COMPLETED, txnRef: PP26110100M4K7Q2XB, failureCode: null, executedAt: "2026-11-01T04:00:01.180Z"}
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/scheduled-transfers/{scheduleId}/occurrences/{occurrenceDate}:skip:
+    post:
+      tags: [scheduled-transfers]
+      operationId: skipOccurrence
+      summary: Skip one PENDING occurrence (-> SKIPPED; next occurrence materialised)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: owner}
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - {name: occurrenceDate, in: path, required: true, schema: {type: string, format: date}, example: "2026-12-01"}
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: The skipped occurrence
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Occurrence'}
+              example: {occurrenceDate: "2026-12-01", dueAt: "2026-12-01T04:00:00.000Z", status: SKIPPED, txnRef: null, failureCode: null, executedAt: null}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/payment-requests:
+    post:
+      tags: [payment-requests]
+      operationId: createPaymentRequest
+      summary: Ask another customer for money (PAY-008)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = requesterWalletId"}
+      x-product: REQUEST_MONEY
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XDeviceId'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaymentRequestCreate'}
+            example: {requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: null, payerMsisdn: "01711000001", amountPoisha: 30000, note: lunch, expiresInHours: 72}
+      responses:
+        '201':
+          description: Created (PENDING)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentRequest'}
+              example: {"requestId": "0192fc33-0000-7000-8000-000000000003", "requestRef": "RQ261009P3X8K2NM", "status": "PENDING", "requesterWalletId": "0192f2bb-0002-7000-8000-00000000b002", "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "amountPoisha": 30000, "note": "lunch", "expiresAt": "2026-10-12T09:00:00.000Z", "txnRef": null, "lastFailureCode": null, "createdAt": "2026-10-09T09:00:00.000Z"}
+        '400':
+          description: "VALIDATION_FAILED (schema, payer = requester); reason REQUEST_CAP_EXCEEDED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+              x-reasons: {VALIDATION_FAILED: [REQUEST_CAP_EXCEEDED]}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/IdempotencyConflict'}
+        '422':
+          description: "WALLET_NOT_TRANSACTABLE (payer not type C / not debit-capable A or C) or SERVICE_DISABLED"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemWalletNotTransactable'}
+        '503': {$ref: '#/components/responses/DependencyUnavailable'}
+    get:
+      tags: [payment-requests]
+      operationId: listPaymentRequests
+      summary: Requests where the wallet is requester or payer (createdAt desc)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "walletId = X-Actor-Wallet-Id"}
+        - {type: STAFF, roles: [SUP_AGENT, SUP_MAKER, SUP_CHECKER, OPS_MAKER, OPS_CHECKER, AUDITOR, READ_ONLY]}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+        - {name: walletId, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: role, in: query, required: false, schema: {type: string, enum: [REQUESTER, PAYER]}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/PaymentRequestStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Page of requests
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentRequestPage'}
+              example:
+                items: [{"requestId": "0192fc33-0000-7000-8000-000000000003", "requestRef": "RQ261009P3X8K2NM", "status": "PENDING", "requesterWalletId": "0192f2bb-0002-7000-8000-00000000b002", "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "amountPoisha": 30000, "note": "lunch", "expiresAt": "2026-10-12T09:00:00.000Z", "txnRef": null, "lastFailureCode": null, "createdAt": "2026-10-09T09:00:00.000Z"}]
+                nextCursor: null
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+  /v1/payment-requests/{requestId}:
+    get:
+      tags: [payment-requests]
+      operationId: getPaymentRequest
+      summary: Payment request detail
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "requester or payer"}
+        - {type: STAFF, roles: [SUP_AGENT, SUP_MAKER, SUP_CHECKER, OPS_MAKER, OPS_CHECKER, AUDITOR, READ_ONLY]}
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      responses:
+        '200':
+          description: PaymentRequest
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentRequest'}
+              example: {"requestId": "0192fc33-0000-7000-8000-000000000003", "requestRef": "RQ261009P3X8K2NM", "status": "PAID", "requesterWalletId": "0192f2bb-0002-7000-8000-00000000b002", "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "amountPoisha": 30000, "note": "lunch", "expiresAt": "2026-10-12T09:00:00.000Z", "txnRef": "PP26100900T5Z9C1HQ", "lastFailureCode": null, "createdAt": "2026-10-09T09:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /v1/payment-requests/{requestId}:accept:
+    post:
+      tags: [payment-requests]
+      operationId: acceptPaymentRequest
+      summary: Payer accepts and pays (PENDING -> ACCEPTING -> PAID) through transaction-service P2P
+      description: |
+        PIN is verified upstream. The payer's own headers (X-Actor-*, X-Channel, X-Device-Id, X-Correlation-Id) are forwarded to
+        `POST /v1/payments/p2p` with Idempotency-Key `preq-{requestId}-{attempt}` (delegated P2P, OPEN D-33).
+        A transaction-service refusal is relayed unchanged (problem `code`, `reason`, its extension members including `transaction`)
+        with the extra member `paymentRequest`. 422/409 from the P2P: request back to PENDING (attempt + 1).
+        503/timeout from the P2P: the 503 is relayed and the request stays ACCEPTING until resolved; a retry of this call with the same
+        Idempotency-Key re-drives the same P2P key.
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = payerWalletId"}
+      x-product: REQUEST_MONEY
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/XDeviceId'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmptyBody'}
+            example: {}
+      responses:
+        '200':
+          description: Paid
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AcceptResponse'}
+              example:
+                request: {"requestId": "0192fc33-0000-7000-8000-000000000003", "requestRef": "RQ261009P3X8K2NM", "status": "PAID", "requesterWalletId": "0192f2bb-0002-7000-8000-00000000b002", "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001", "amountPoisha": 30000, "note": "lunch", "expiresAt": "2026-10-12T09:00:00.000Z", "txnRef": "PP26100900T5Z9C1HQ", "lastFailureCode": null, "createdAt": "2026-10-09T09:00:00.000Z"}
+                transaction: {txnRef: PP26100900T5Z9C1HQ, txnId: 0192fc34-0000-7000-8000-000000000004, txnType: P2P, status: COMPLETED, failureCode: null, amountPoisha: 30000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 30575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: "2026-10-09T10:00:00.020Z", completedAt: "2026-10-09T10:00:00.120Z"}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: "Own STATE_CONFLICT (reason INVALID_TRANSITION: request not PENDING / concurrent accept, no `paymentRequest`), IDEMPOTENCY_CONFLICT, or a relayed transaction-service 409 STATE_CONFLICT with `transaction` + `paymentRequest`"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemRelayedAccept'}
+              x-reasons: {STATE_CONFLICT: [INVALID_TRANSITION]}
+        '422':
+          description: "Relayed transaction-service refusal (WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_*, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED, SERVICE_DISABLED) with `paymentRequest` (status PENDING) and, when the intent was persisted, `transaction`; or own SERVICE_DISABLED (REQUEST_MONEY switch) without `paymentRequest`"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemRelayedAccept'}
+              example:
+                type: about:blank
+                title: Limit exceeded
+                status: 422
+                code: LIMIT_EXCEEDED
+                limitCode: P2P_SEND_DAILY_AMOUNT
+                limitParty: FROM
+                remainingPoisha: 12000
+                remainingCount: null
+                resetsAt: "2026-10-09T18:00:00.000Z"
+                instance: /v1/payment-requests/0192fc33-0000-7000-8000-000000000003:accept
+                correlationId: c-preq-0192fc33
+                transaction: {txnRef: PP26100900K3M9QX2A, txnId: 0192fc35-0000-7000-8000-000000000005, txnType: P2P, status: FAILED, failureCode: LIMIT_EXCEEDED, amountPoisha: 30000, feePoisha: 500, vatPoisha: 75, totalDebitPoisha: 30575, feeBearer: PAYER, currency: BDT, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2bb-0002-7000-8000-00000000b002, createdAt: "2026-10-09T10:00:00.020Z", completedAt: "2026-10-09T10:00:00.040Z"}
+                paymentRequest: {requestId: 0192fc33-0000-7000-8000-000000000003, requestRef: RQ261009P3X8K2NM, status: PENDING, requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 30000, note: lunch, expiresAt: "2026-10-12T09:00:00.000Z", txnRef: null, lastFailureCode: LIMIT_EXCEEDED, createdAt: "2026-10-09T09:00:00.000Z"}
+        '503':
+          description: "Relayed 503 (request stays ACCEPTING; `transaction` with status INITIATED when the intent was persisted; `paymentRequest` present) or own 503 before the P2P call"
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/ProblemRelayedAccept'}
+
+  /v1/payment-requests/{requestId}:decline:
+    post:
+      tags: [payment-requests]
+      operationId: declinePaymentRequest
+      summary: Payer declines (PENDING -> DECLINED)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = payerWalletId"}
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeclineRequest'}
+            example: {reason: Already paid in cash}
+      responses:
+        '200':
+          description: PaymentRequest (DECLINED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentRequest'}
+              example: {requestId: 0192fc33-0000-7000-8000-000000000003, requestRef: RQ261009P3X8K2NM, status: DECLINED, requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 30000, note: lunch, expiresAt: "2026-10-12T09:00:00.000Z", txnRef: null, lastFailureCode: null, createdAt: "2026-10-09T09:00:00.000Z"}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/payment-requests/{requestId}:cancel:
+    post:
+      tags: [payment-requests]
+      operationId: cancelPaymentRequest
+      summary: Requester cancels (PENDING -> CANCELLED)
+      x-audience: customer
+      x-actors:
+        - {type: CUSTOMER, rule: "X-Actor-Wallet-Id = requesterWalletId"}
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorWalletId'
+        - $ref: '#/components/parameters/XChannel'
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      responses:
+        '200':
+          description: PaymentRequest (CANCELLED)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentRequest'}
+              example: {requestId: 0192fc33-0000-7000-8000-000000000003, requestRef: RQ261009P3X8K2NM, status: CANCELLED, requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 30000, note: lunch, expiresAt: "2026-10-12T09:00:00.000Z", txnRef: null, lastFailureCode: null, createdAt: "2026-10-09T09:00:00.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/StateConflict'}
+
+  /v1/internal/admin/workers:
+    get:
+      tags: [internal-admin]
+      operationId: getWorkers
+      summary: Claimed chunks, leases, throughput and current throttle rate
+      x-audience: internal
+      x-actors:
+        - {type: STAFF, roles: [ADMIN]}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      responses:
+        '200':
+          description: Worker snapshot (bounded by the number of claimed chunks; not paged)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WorkersResponse'}
+              example:
+                asOf: "2026-10-09T09:35:00.000Z"
+                rateLimit: {name: ledger-disbursement, ratePerSec: 500, effectiveRatePerSec: 500, backoffActive: false}
+                rowsPerSecond: 478
+                claimedChunks:
+                  - {batchId: 0192fa10-0000-7000-8000-000000000001, kind: EXECUTE, chunkNo: 3, attempt: 1, claimedBy: disbursement-service-7c9f-1, leaseUntil: "2026-10-09T09:36:40.000Z"}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+  /v1/internal/admin/rate-limits/ledger-disbursement:
+    put:
+      tags: [internal-admin]
+      operationId: setLedgerDisbursementRate
+      summary: Change the global ledger throttle live (audited, RATE_LIMIT_CHANGED)
+      x-audience: internal
+      x-actors:
+        - {type: STAFF, roles: [ADMIN, OPS_CHECKER]}
+      parameters:
+        - $ref: '#/components/parameters/XCorrelationId'
+        - $ref: '#/components/parameters/XActorType'
+        - $ref: '#/components/parameters/XActorId'
+        - $ref: '#/components/parameters/XActorRoles'
+        - $ref: '#/components/parameters/XChannel'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RateLimitRequest'}
+            example: {ratePerSec: 250}
+      responses:
+        '200':
+          description: New rate
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RateLimitResponse'}
+              example: {name: ledger-disbursement, ratePerSec: 250, updatedAt: "2026-10-09T09:40:00.000Z"}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '403': {$ref: '#/components/responses/ActorNotAllowed'}
+
+components:
+  parameters:
+    XCorrelationId: {name: X-Correlation-Id, in: header, required: false, description: "generated if absent (K3.1)", schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9._-]+$'}}
+    XActorType: {name: X-Actor-Type, in: header, required: true, schema: {type: string, enum: [CUSTOMER, AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION, STAFF, SYSTEM, SERVICE]}}
+    XActorId: {name: X-Actor-Id, in: header, required: true, schema: {type: string, maxLength: 64}}
+    XActorWalletId: {name: X-Actor-Wallet-Id, in: header, required: false, description: "required for wallet holders (CUSTOMER, INSTITUTION)", schema: {type: string, format: uuid}}
+    XActorRoles: {name: X-Actor-Roles, in: header, required: false, description: "required for STAFF; comma-separated K7 codes", schema: {type: string}}
+    XActorUserId: {name: X-Actor-User-Id, in: header, required: false, description: "institution sub-user; required for institution maker-checker (maker != checker)", schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$'}}
+    XChannel: {name: X-Channel, in: header, required: true, schema: {type: string, enum: [APP, USSD, PARTNER_APP, PORTAL, BACKOFFICE, API, SYSTEM]}}
+    XDeviceId: {name: X-Device-Id, in: header, required: false, schema: {type: string, maxLength: 128}}
+    IdempotencyKeyRequired: {name: Idempotency-Key, in: header, required: true, schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$'}}
+    IdempotencyKeyOptional: {name: Idempotency-Key, in: header, required: false, description: "honoured when present", schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$'}}
+    Limit: {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+    Cursor: {name: cursor, in: query, required: false, schema: {type: string}}
+    BatchId: {name: batchId, in: path, required: true, schema: {type: string, format: uuid}, example: 0192fa10-0000-7000-8000-000000000001}
+    ScheduleId: {name: scheduleId, in: path, required: true, schema: {type: string, format: uuid}, example: 0192fb01-0000-7000-8000-000000000001}
+    RequestId: {name: requestId, in: path, required: true, schema: {type: string, format: uuid}, example: 0192fc33-0000-7000-8000-000000000003}
+    ApprovalId: {name: id, in: path, required: true, schema: {type: string, format: uuid}, example: 0192fa22-0000-7000-8000-000000000002}
+
+  responses:
+    ValidationFailed:
+      description: VALIDATION_FAILED (schema, header, limit, cursor reason INVALID_CURSOR)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: about:blank, title: Validation failed, status: 400, code: VALIDATION_FAILED, correlationId: c-0f3e9a, errors: [{field: limit, message: must be between 1 and 200}]}
+    ActorNotAllowed:
+      description: ACTOR_NOT_ALLOWED
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: NOT_FOUND
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    StateConflict:
+      description: "STATE_CONFLICT reason INVALID_TRANSITION; IDEMPOTENCY_CONFLICT"
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          x-reasons: {STATE_CONFLICT: [INVALID_TRANSITION]}
+    IdempotencyConflict:
+      description: IDEMPOTENCY_CONFLICT
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ServiceDisabled:
+      description: SERVICE_DISABLED (product switch, kernel K3.7)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    DependencyUnavailable:
+      description: DEPENDENCY_UNAVAILABLE (retryable true)
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          example: {type: about:blank, title: Try again, status: 503, code: DEPENDENCY_UNAVAILABLE, correlationId: c-0f3e9c, retryable: true}
+
+  examples:
+    BatchPartiallyFailed:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: PARTIALLY_FAILED, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 4990, failedRows: 2, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 6237500000, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: "2026-10-09T09:30:00.000Z", startedAt: "2026-10-09T09:30:01.000Z", completedAt: "2026-10-09T09:41:12.000Z"}
+    BatchPendingApproval:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: PENDING_APPROVAL, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: null, startedAt: null, completedAt: null}
+    BatchRunning:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: RUNNING, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: "2026-10-09T09:30:00.000Z", startedAt: "2026-10-09T09:30:01.000Z", completedAt: null}
+    BatchPaused:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: PAUSED, pauseReason: OPERATOR, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 2000, failedRows: 1, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 2500000000, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: "2026-10-09T09:30:00.000Z", startedAt: "2026-10-09T09:30:01.000Z", completedAt: null}
+    BatchPausedFunding:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: PAUSED, pauseReason: INSUFFICIENT_FUNDING, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: "2026-10-09T09:30:00.000Z", startedAt: null, completedAt: null}
+    BatchCancelled:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: CANCELLED, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 4992, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: null, startedAt: null, completedAt: "2026-10-09T09:20:00.000Z"}
+    BatchRejected:
+      value: {batchId: 0192fa10-0000-7000-8000-000000000001, batchRef: BD261009K7Q2M4ZD, institutionId: 0192f2e0-0006-7000-8000-00000000f000, payerWalletId: 0192f2ff-0006-7000-8000-00000000f006, title: October 2026 salary, clientReference: PAYROLL-2026-10, source: CSV, status: REJECTED, pauseReason: null, failureDetail: null, totalRows: 5000, validRows: 4992, invalidRows: 8, paidRows: 0, failedRows: 0, skippedRows: 0, validAmountPoisha: 6240000000, paidAmountPoisha: 0, approvalId: 0192fa22-0000-7000-8000-000000000002, scheduledStartAt: null, createdAt: "2026-10-09T09:00:00.000Z", submittedAt: "2026-10-09T09:05:00.000Z", approvedAt: null, startedAt: null, completedAt: null}
+    ApprovalPending:
+      value: {approvalId: 0192fa22-0000-7000-8000-000000000002, entityType: DisbursementBatch, entityId: 0192fa10-0000-7000-8000-000000000001, action: EXECUTE, status: PENDING, level: 1, requiredLevels: 1, checkerRoles: [OPS_CHECKER], amountPoisha: 6240000000, makerActorType: INSTITUTION, makerId: 0192f2e0-0006-7000-8000-00000000f000, makerUserId: hr-maker-01, summary: "Disbursement BD261009K7Q2M4ZD: 4992 rows", requestedAt: "2026-10-09T09:05:00.000Z", expiresAt: "2026-10-12T09:05:00.000Z", decidedAt: null}
+    ScheduleActive:
+      value: {scheduleId: 0192fb01-0000-7000-8000-000000000001, status: ACTIVE, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2c9-0000-7000-8000-00000000c009, toDisplayNameMasked: "Rahima B***", amountPoisha: 200000, purposeCode: FAMILY_SUPPORT, note: Ma, frequency: MONTHLY, dayOfWeek: null, dayOfMonth: 1, localTime: "10:00", startDate: "2026-11-01", endDate: null, maxOccurrences: 12, occurrencesDone: 0, consecutiveFailures: 0, nextOccurrenceDate: "2026-11-01", nextDueAt: "2026-11-01T04:00:00.000Z", createdAt: "2026-10-09T08:00:00.000Z", updatedAt: "2026-10-09T08:00:00.000Z"}
+    SchedulePaused:
+      value: {scheduleId: 0192fb01-0000-7000-8000-000000000001, status: PAUSED, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2c9-0000-7000-8000-00000000c009, toDisplayNameMasked: "Rahima B***", amountPoisha: 200000, purposeCode: FAMILY_SUPPORT, note: Ma, frequency: MONTHLY, dayOfWeek: null, dayOfMonth: 1, localTime: "10:00", startDate: "2026-11-01", endDate: null, maxOccurrences: 12, occurrencesDone: 1, consecutiveFailures: 0, nextOccurrenceDate: null, nextDueAt: null, createdAt: "2026-10-09T08:00:00.000Z", updatedAt: "2026-11-10T08:00:00.000Z"}
+    ScheduleCancelled:
+      value: {scheduleId: 0192fb01-0000-7000-8000-000000000001, status: CANCELLED, fromWalletId: 0192f2aa-0001-7000-8000-00000000a001, toWalletId: 0192f2c9-0000-7000-8000-00000000c009, toDisplayNameMasked: "Rahima B***", amountPoisha: 200000, purposeCode: FAMILY_SUPPORT, note: Ma, frequency: MONTHLY, dayOfWeek: null, dayOfMonth: 1, localTime: "10:00", startDate: "2026-11-01", endDate: null, maxOccurrences: 12, occurrencesDone: 1, consecutiveFailures: 0, nextOccurrenceDate: null, nextDueAt: null, createdAt: "2026-10-09T08:00:00.000Z", updatedAt: "2026-11-10T08:00:00.000Z"}
+    PaymentRequestPending:
+      value: {requestId: 0192fc33-0000-7000-8000-000000000003, requestRef: RQ261009P3X8K2NM, status: PENDING, requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 30000, note: lunch, expiresAt: "2026-10-12T09:00:00.000Z", txnRef: null, lastFailureCode: null, createdAt: "2026-10-09T09:00:00.000Z"}
+    PaymentRequestPaid:
+      value: {requestId: 0192fc33-0000-7000-8000-000000000003, requestRef: RQ261009P3X8K2NM, status: PAID, requesterWalletId: 0192f2bb-0002-7000-8000-00000000b002, payerWalletId: 0192f2aa-0001-7000-8000-00000000a001, amountPoisha: 30000, note: lunch, expiresAt: "2026-10-12T09:00:00.000Z", txnRef: PP26100900T5Z9C1HQ, lastFailureCode: null, createdAt: "2026-10-09T09:00:00.000Z"}
+
+  schemas:
+    Uuid: {type: string, pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'}
+    Timestamp: {type: string, format: date-time, description: "ISO-8601 UTC with 3 ms digits and Z"}
+    MoneyPoisha: {type: integer, format: int64, minimum: 1, maximum: 10000000000000}
+    BatchStatus: {type: string, enum: [DRAFT, VALIDATING, VALIDATION_FAILED, VALIDATED, PENDING_APPROVAL, APPROVED, RUNNING, PAUSED, COMPLETED, PARTIALLY_FAILED, CANCELLED, REJECTED]}
+    PauseReason: {type: string, enum: [INSUFFICIENT_FUNDING, OPERATOR, DEPENDENCY_UNAVAILABLE, PRODUCT_DISABLED]}
+    RowStatus: {type: string, enum: [PARSED, VALID, INVALID, PROCESSING, PAID, FAILED, SKIPPED]}
+    ApprovalStatus: {type: string, enum: [PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED]}
+    ScheduleStatus: {type: string, enum: [ACTIVE, PAUSED, SUSPENDED, COMPLETED, CANCELLED]}
+    OccurrenceStatus: {type: string, enum: [PENDING, REMINDED, EXECUTING, COMPLETED, FAILED, SKIPPED]}
+    PaymentRequestStatus: {type: string, enum: [PENDING, ACCEPTING, PAID, DECLINED, CANCELLED, EXPIRED]}
+    Frequency: {type: string, enum: [ONCE, DAILY, WEEKLY, MONTHLY]}
+
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, code, correlationId]
+      properties:
+        type: {type: string}
+        title: {type: string, maxLength: 200}
+        status: {type: integer}
+        code: {type: string, enum: [VALIDATION_FAILED, ACTOR_NOT_ALLOWED, NOT_FOUND, IDEMPOTENCY_CONFLICT, STATE_CONFLICT, SOD_VIOLATION, INSUFFICIENT_FUNDS, LIMIT_EXCEEDED, RISK_BLOCKED, RISK_STEP_UP_REQUIRED, RISK_HELD_FOR_REVIEW, WALLET_NOT_TRANSACTABLE, MAX_BALANCE_EXCEEDED, REFUND_EXCEEDS_ORIGINAL, SERVICE_DISABLED, MAKER_CHECKER_VIOLATION, DEPENDENCY_UNAVAILABLE]}
+        detail: {type: [string, 'null'], maxLength: 1000}
+        instance: {type: [string, 'null']}
+        correlationId: {type: string}
+        reason: {type: [string, 'null'], enum: [INVALID_CURSOR, FILE_INVALID, NO_VALID_ROWS, INVALID_ROWS_PRESENT, ROW_NOT_RETRYABLE, SCHEDULE_CAP_EXCEEDED, REQUEST_CAP_EXCEEDED, DUPLICATE_FILE, INVALID_TRANSITION, ROWS_IN_FLIGHT, APPROVAL_EXPIRED, null]}
+        errors:
+          type: array
+          minItems: 1
+          items: {type: object, required: [field, message], properties: {field: {type: string}, message: {type: string}}}
+        retryable: {type: boolean, const: true}
+    ProblemWalletNotTransactable:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            walletId: {$ref: '#/components/schemas/Uuid'}
+            walletStatus: {type: string, description: "status name, e.g. DEBIT_BLOCKED"}
+    ProblemWithBatch:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            batch: {$ref: '#/components/schemas/Batch'}
+    ProblemRelayedAccept:
+      description: |
+        Problem of POST /v1/payment-requests/{requestId}:accept. For a relayed transaction-service refusal: every member of the
+        consumed problem is kept unchanged (code, reason, limit extensions, walletId/walletStatus, and `transaction`, a pass-through of
+        the consumed PaymentResult), plus `paymentRequest` (this service's PaymentRequest after the outcome was applied).
+        `reason` values on relayed problems are transaction-service's own and are not enumerated here.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            reason: {type: [string, 'null'], pattern: '^[A-Z][A-Z0-9_]*$'}
+            paymentRequest: {$ref: '#/components/schemas/PaymentRequest'}
+            transaction: {$ref: '#/components/schemas/PaymentResult'}
+            limitCode: {type: string}
+            limitParty: {type: string, enum: [FROM, TO]}
+            remainingPoisha: {type: [integer, 'null'], format: int64}
+            remainingCount: {type: [integer, 'null'], format: int32}
+            resetsAt: {type: [string, 'null'], format: date-time}
+            walletId: {$ref: '#/components/schemas/Uuid'}
+            walletStatus: {type: string}
+
+    BatchRowInput:
+      type: object
+      additionalProperties: false
+      required: [msisdn, amountPoisha]
+      properties:
+        msisdn: {type: string, maxLength: 20, description: "01XXXXXXXXX or 8801XXXXXXXXX; invalid -> row INVALID_MSISDN (not 400)"}
+        amountPoisha: {type: integer, format: int64, description: "> 0 and <= maxRowAmountPoisha else row INVALID_AMOUNT (not 400)"}
+        reference: {type: [string, 'null'], maxLength: 64}
+        name: {type: [string, 'null'], maxLength: 140}
+    BatchCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [payerWalletId, title, rows]
+      properties:
+        payerWalletId: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string, minLength: 1, maxLength: 120}
+        clientReference: {type: [string, 'null'], maxLength: 64}
+        preRegisterUnknown: {type: boolean, default: false}
+        scheduledStartAt: {type: [string, 'null'], format: date-time, description: "now < x <= now + 30 d"}
+        rows: {type: array, minItems: 1, maxItems: 10000, items: {$ref: '#/components/schemas/BatchRowInput'}}
+    BatchCreateMultipart:
+      type: object
+      required: [file, payerWalletId, title]
+      properties:
+        file: {type: string, contentMediaType: text/csv, description: "UTF-8, comma, header required (case-insensitive): msisdn, amount (Taka, <= 2 decimals) or amount_poisha (integer), optional reference, name; <= 1,000,000 rows, <= 100 MB"}
+        payerWalletId: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string, minLength: 1, maxLength: 120}
+        clientReference: {type: string, maxLength: 64}
+        preRegisterUnknown: {type: boolean, default: false}
+        scheduledStartAt: {type: string, format: date-time}
+    BatchCreateResponse:
+      type: object
+      required: [batchId, batchRef, status, totalRows]
+      properties:
+        batchId: {$ref: '#/components/schemas/Uuid'}
+        batchRef: {type: string, pattern: '^BD\d{6}[0-9A-HJKMNP-TV-Z]{8}$'}
+        status: {type: string, enum: [DRAFT, VALIDATING, VALIDATION_FAILED]}
+        totalRows: {type: integer, format: int32, minimum: 0}
+    Batch:
+      type: object
+      required: [batchId, batchRef, institutionId, payerWalletId, title, clientReference, source, status, pauseReason, failureDetail, totalRows, validRows, invalidRows, paidRows, failedRows, skippedRows, validAmountPoisha, paidAmountPoisha, approvalId, scheduledStartAt, createdAt, submittedAt, approvedAt, startedAt, completedAt]
+      properties:
+        batchId: {$ref: '#/components/schemas/Uuid'}
+        batchRef: {type: string, pattern: '^BD\d{6}[0-9A-HJKMNP-TV-Z]{8}$'}
+        institutionId: {$ref: '#/components/schemas/Uuid'}
+        payerWalletId: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string, maxLength: 120}
+        clientReference: {type: [string, 'null'], maxLength: 64}
+        source: {type: string, enum: [CSV, API]}
+        status: {$ref: '#/components/schemas/BatchStatus'}
+        pauseReason: {anyOf: [{$ref: '#/components/schemas/PauseReason'}, {type: 'null'}], description: "non-null only when PAUSED"}
+        failureDetail: {type: [string, 'null'], description: "VALIDATION_FAILED reason text"}
+        totalRows: {type: integer, format: int32, minimum: 0}
+        validRows: {type: integer, format: int32, minimum: 0}
+        invalidRows: {type: integer, format: int32, minimum: 0}
+        paidRows: {type: integer, format: int32, minimum: 0}
+        failedRows: {type: integer, format: int32, minimum: 0}
+        skippedRows: {type: integer, format: int32, minimum: 0}
+        validAmountPoisha: {type: integer, format: int64, minimum: 0}
+        paidAmountPoisha: {type: integer, format: int64, minimum: 0, description: "<= validAmountPoisha"}
+        approvalId: {type: [string, 'null'], format: uuid}
+        scheduledStartAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+        submittedAt: {type: [string, 'null'], format: date-time}
+        approvedAt: {type: [string, 'null'], format: date-time}
+        startedAt: {type: [string, 'null'], format: date-time}
+        completedAt: {type: [string, 'null'], format: date-time}
+    BatchPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Batch'}}
+        nextCursor: {type: [string, 'null']}
+    BatchRow:
+      type: object
+      required: [rowNo, rowRef, msisdn, nameInFile, displayNameMasked, reference, amountPoisha, status, failureCode, failureDetail, walletId, attempt, commandId, paidAt]
+      properties:
+        rowNo: {type: integer, format: int32, minimum: 1}
+        rowRef: {type: string, maxLength: 24, description: "{batchRef}-{rowNo}; human-readable credit ID (OPEN D-13)"}
+        msisdn: {type: string, description: "clear 8801XXXXXXXXX for STAFF OPS_*, else masked 8801711****00"}
+        nameInFile: {type: [string, 'null']}
+        displayNameMasked: {type: [string, 'null'], description: "from wallet lookup; shown next to nameInFile (no automated name match)"}
+        reference: {type: [string, 'null'], maxLength: 64}
+        amountPoisha: {type: integer, format: int64, minimum: 1}
+        status: {$ref: '#/components/schemas/RowStatus'}
+        failureCode: {type: [string, 'null'], description: "INVALID: rowInvalidCode; FAILED: rowFailureCode (codes.yaml)"}
+        failureDetail: {type: [string, 'null'], description: "e.g. violated limitCode, PRE_REGISTRATION_PENDING, preRegister reason"}
+        walletId: {type: [string, 'null'], format: uuid}
+        attempt: {type: integer, format: int32, minimum: 1}
+        commandId: {type: [string, 'null'], format: uuid, description: "current attempt"}
+        paidAt: {type: [string, 'null'], format: date-time}
+    BatchRowPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/BatchRow'}}
+        nextCursor: {type: [string, 'null']}
+    SubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [excludeInvalidRows]
+      properties:
+        excludeInvalidRows: {type: boolean}
+    CancelRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 140}
+    EmptyBody: {type: object, additionalProperties: false}
+    RetryFailedRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        rowNos: {type: [array, 'null'], items: {type: integer, format: int32, minimum: 1}, maxItems: 10000, description: "null or absent = all FAILED rows with a retryable code"}
+
+    Approval:
+      type: object
+      required: [approvalId, entityType, entityId, action, status, level, requiredLevels, checkerRoles, amountPoisha, makerActorType, makerId, makerUserId, summary, requestedAt, expiresAt, decidedAt]
+      properties:
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        entityType: {type: string, enum: [DisbursementBatch]}
+        entityId: {type: string, description: batchId}
+        action: {type: string, enum: [EXECUTE]}
+        status: {$ref: '#/components/schemas/ApprovalStatus'}
+        level: {type: integer, format: int32, minimum: 1}
+        requiredLevels: {type: integer, format: int32, minimum: 1, maximum: 2}
+        checkerRoles: {type: array, items: {type: string}, minItems: 1}
+        amountPoisha: {type: integer, format: int64, minimum: 0}
+        makerActorType: {type: string, enum: [INSTITUTION, STAFF]}
+        makerId: {type: string}
+        makerUserId: {type: [string, 'null']}
+        summary: {type: string, maxLength: 200}
+        requestedAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        decidedAt: {type: [string, 'null'], format: date-time}
+    ApprovalPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Approval'}}
+        nextCursor: {type: [string, 'null']}
+    ApproveRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        comment: {type: string, minLength: 1, maxLength: 500}
+    RejectRequest:
+      type: object
+      additionalProperties: false
+      required: [comment]
+      properties:
+        comment: {type: string, minLength: 1, maxLength: 500}
+        reasonCode: {type: string, pattern: '^[A-Z_]{3,40}$'}
+    ApprovalDecisionResponse:
+      type: object
+      required: [approvalId, status, level, requiredLevels, batch]
+      properties:
+        approvalId: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/ApprovalStatus'}
+        level: {type: integer, format: int32, minimum: 1}
+        requiredLevels: {type: integer, format: int32, minimum: 1}
+        batch: {$ref: '#/components/schemas/Batch'}
+
+    ScheduleCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [fromWalletId, amountPoisha, frequency, startDate]
+      properties:
+        fromWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {type: [string, 'null'], format: uuid, description: "one of toWalletId / toMsisdn"}
+        toMsisdn: {type: [string, 'null'], maxLength: 20}
+        amountPoisha: {$ref: '#/components/schemas/MoneyPoisha'}
+        purposeCode: {type: [string, 'null'], maxLength: 32}
+        note: {type: [string, 'null'], maxLength: 140}
+        frequency: {$ref: '#/components/schemas/Frequency'}
+        dayOfWeek: {type: [integer, 'null'], minimum: 1, maximum: 7, description: "ISO weekday; WEEKLY only (required)"}
+        dayOfMonth: {type: [integer, 'null'], minimum: 1, maximum: 31, description: "MONTHLY only (required); 31 on a shorter month = last day"}
+        localTime: {type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$', default: "10:00", description: "Asia/Dhaka"}
+        startDate: {type: string, format: date}
+        endDate: {type: [string, 'null'], format: date}
+        maxOccurrences: {type: [integer, 'null'], minimum: 1}
+    ScheduleCreateResponse:
+      type: object
+      required: [scheduleId, status, nextOccurrenceDate, nextDueAt, toWalletId, toDisplayNameMasked]
+      properties:
+        scheduleId: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/ScheduleStatus'}
+        nextOccurrenceDate: {type: [string, 'null'], format: date}
+        nextDueAt: {type: [string, 'null'], format: date-time}
+        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        toDisplayNameMasked: {type: [string, 'null']}
+    Schedule:
+      type: object
+      required: [scheduleId, status, fromWalletId, toWalletId, toDisplayNameMasked, amountPoisha, purposeCode, note, frequency, dayOfWeek, dayOfMonth, localTime, startDate, endDate, maxOccurrences, occurrencesDone, consecutiveFailures, nextOccurrenceDate, nextDueAt, createdAt, updatedAt]
+      properties:
+        scheduleId: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/ScheduleStatus'}
+        fromWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        toDisplayNameMasked: {type: [string, 'null']}
+        amountPoisha: {$ref: '#/components/schemas/MoneyPoisha'}
+        purposeCode: {type: [string, 'null']}
+        note: {type: [string, 'null']}
+        frequency: {$ref: '#/components/schemas/Frequency'}
+        dayOfWeek: {type: [integer, 'null']}
+        dayOfMonth: {type: [integer, 'null']}
+        localTime: {type: string}
+        startDate: {type: string, format: date}
+        endDate: {type: [string, 'null'], format: date}
+        maxOccurrences: {type: [integer, 'null']}
+        occurrencesDone: {type: integer, format: int32, minimum: 0}
+        consecutiveFailures: {type: integer, format: int32, minimum: 0}
+        nextOccurrenceDate: {type: [string, 'null'], format: date}
+        nextDueAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    SchedulePage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Schedule'}}
+        nextCursor: {type: [string, 'null']}
+    SchedulePatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        amountPoisha: {$ref: '#/components/schemas/MoneyPoisha'}
+        endDate: {type: [string, 'null'], format: date}
+        note: {type: [string, 'null'], maxLength: 140}
+        localTime: {type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$'}
+    Occurrence:
+      type: object
+      required: [occurrenceDate, dueAt, status, txnRef, failureCode, executedAt]
+      properties:
+        occurrenceDate: {type: string, format: date}
+        dueAt: {type: string, format: date-time}
+        status: {$ref: '#/components/schemas/OccurrenceStatus'}
+        txnRef: {type: [string, 'null'], maxLength: 32}
+        failureCode: {type: [string, 'null']}
+        executedAt: {type: [string, 'null'], format: date-time}
+    OccurrencePage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Occurrence'}}
+        nextCursor: {type: [string, 'null']}
+
+    PaymentRequestCreate:
+      type: object
+      additionalProperties: false
+      required: [requesterWalletId, amountPoisha]
+      properties:
+        requesterWalletId: {$ref: '#/components/schemas/Uuid'}
+        payerWalletId: {type: [string, 'null'], format: uuid, description: "one of payerWalletId / payerMsisdn"}
+        payerMsisdn: {type: [string, 'null'], maxLength: 20}
+        amountPoisha: {type: integer, format: int64, minimum: 1, description: "<= bitspay.requests.max-amount-poisha (2,500,000)"}
+        note: {type: [string, 'null'], maxLength: 140}
+        expiresInHours: {type: [integer, 'null'], minimum: 1, maximum: 168, default: 72}
+    PaymentRequest:
+      type: object
+      required: [requestId, requestRef, status, requesterWalletId, payerWalletId, amountPoisha, note, expiresAt, txnRef, lastFailureCode, createdAt]
+      properties:
+        requestId: {$ref: '#/components/schemas/Uuid'}
+        requestRef: {type: string, pattern: '^RQ\d{6}[0-9A-HJKMNP-TV-Z]{8}$'}
+        status: {$ref: '#/components/schemas/PaymentRequestStatus'}
+        requesterWalletId: {$ref: '#/components/schemas/Uuid'}
+        payerWalletId: {$ref: '#/components/schemas/Uuid'}
+        amountPoisha: {$ref: '#/components/schemas/MoneyPoisha'}
+        note: {type: [string, 'null'], maxLength: 140}
+        expiresAt: {type: string, format: date-time}
+        txnRef: {type: [string, 'null'], maxLength: 32, description: "opaque P2P txnRef"}
+        lastFailureCode: {type: [string, 'null'], description: "problem code of the last refused accept attempt"}
+        createdAt: {type: string, format: date-time}
+    PaymentRequestPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/PaymentRequest'}}
+        nextCursor: {type: [string, 'null']}
+    DeclineRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: {type: [string, 'null'], maxLength: 140}
+    PaymentResult:
+      description: "Pass-through of transaction-service PaymentResult as consumed from POST /v1/payments/p2p (200 body or problem member `transaction`). Relayed unchanged; this service never builds or alters it."
+      type: object
+      additionalProperties: true
+      required: [txnRef, txnId, txnType, status, failureCode, amountPoisha, feePoisha, vatPoisha, totalDebitPoisha, feeBearer, currency, fromWalletId, toWalletId, createdAt, completedAt]
+      properties:
+        txnRef: {type: string, maxLength: 32}
+        txnId: {$ref: '#/components/schemas/Uuid'}
+        txnType: {type: string}
+        status: {type: string, description: "COMPLETED | FAILED | INITIATED (INITIATED only inside a 503)"}
+        failureCode: {type: [string, 'null']}
+        amountPoisha: {type: integer, format: int64}
+        feePoisha: {type: integer, format: int64}
+        vatPoisha: {type: integer, format: int64}
+        totalDebitPoisha: {type: integer, format: int64}
+        feeBearer: {type: string}
+        currency: {type: string}
+        fromWalletId: {$ref: '#/components/schemas/Uuid'}
+        toWalletId: {$ref: '#/components/schemas/Uuid'}
+        createdAt: {type: string, format: date-time}
+        completedAt: {type: [string, 'null'], format: date-time}
+    AcceptResponse:
+      type: object
+      required: [request, transaction]
+      properties:
+        request: {$ref: '#/components/schemas/PaymentRequest'}
+        transaction: {$ref: '#/components/schemas/PaymentResult'}
+
+    WorkersResponse:
+      type: object
+      required: [asOf, rateLimit, rowsPerSecond, claimedChunks]
+      properties:
+        asOf: {type: string, format: date-time}
+        rateLimit:
+          type: object
+          required: [name, ratePerSec, effectiveRatePerSec, backoffActive]
+          properties:
+            name: {type: string}
+            ratePerSec: {type: integer, format: int32}
+            effectiveRatePerSec: {type: integer, format: int32}
+            backoffActive: {type: boolean}
+        rowsPerSecond: {type: integer, format: int32}
+        claimedChunks:
+          type: array
+          items:
+            type: object
+            required: [batchId, kind, chunkNo, attempt, claimedBy, leaseUntil]
+            properties:
+              batchId: {$ref: '#/components/schemas/Uuid'}
+              kind: {type: string, enum: [VALIDATE, EXECUTE]}
+              chunkNo: {type: integer, format: int32}
+              attempt: {type: integer, format: int32}
+              claimedBy: {type: string}
+              leaseUntil: {type: string, format: date-time}
+    RateLimitRequest:
+      type: object
+      additionalProperties: false
+      required: [ratePerSec]
+      properties:
+        ratePerSec: {type: integer, format: int32, minimum: 1, maximum: 10000}
+    RateLimitResponse:
+      type: object
+      required: [name, ratePerSec, updatedAt]
+      properties:
+        name: {type: string}
+        ratePerSec: {type: integer, format: int32}
+        updatedAt: {type: string, format: date-time}

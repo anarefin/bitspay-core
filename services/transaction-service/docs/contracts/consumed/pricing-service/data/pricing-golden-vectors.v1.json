@@ -1,0 +1,1642 @@
+{
+  "schemaVersion": 1,
+  "catalogueVersion": "1.4",
+  "rounding": "HALF_EVEN",
+  "outputFields": [
+    "planId",
+    "planVersion",
+    "feePoisha",
+    "vatPoisha",
+    "feeBearer",
+    "commissionPoisha",
+    "aitPoisha",
+    "commissionSource",
+    "commissionBeneficiary"
+  ],
+  "vectors": [
+    {
+      "id": "G1",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "P2P FIXED 500, vat 1500",
+      "plans": [
+        {
+          "planId": "PLN-GV-G1",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 1,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G1",
+        "planVersion": 1,
+        "feePoisha": 500,
+        "vatPoisha": 75,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G2",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "CASH_OUT PERCENT 150 bps, vat 1500, comm PERCENT_OF_FEE 4000, ait 1000 (VAT 112.5 -> 112)",
+      "plans": [
+        {
+          "planId": "PLN-GV-G2",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_OUT",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 150,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "PERCENT_OF_FEE",
+            "valueBps": 4000,
+            "fixedPoisha": 0,
+            "source": "FEE_INCOME",
+            "beneficiary": "PAYEE",
+            "aitBps": 1000,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_OUT",
+        "channel": "USSD",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 1,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G2",
+        "planVersion": 1,
+        "feePoisha": 750,
+        "vatPoisha": 112,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 300,
+        "aitPoisha": 30,
+        "commissionSource": "FEE_INCOME",
+        "commissionBeneficiary": "PAYEE"
+      }
+    },
+    {
+      "id": "G3",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "CASH_IN NONE, comm PERCENT_OF_AMOUNT 40 bps from COMMISSION_PAYABLE, ait 1000",
+      "plans": [
+        {
+          "planId": "PLN-GV-G3",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_IN",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "NONE",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "PERCENT_OF_AMOUNT",
+            "valueBps": 40,
+            "fixedPoisha": 0,
+            "source": "COMMISSION_PAYABLE",
+            "beneficiary": "PAYER",
+            "aitBps": 1000,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_IN",
+        "channel": "PARTNER_APP",
+        "amountPoisha": 100000,
+        "payer": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G3",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 400,
+        "aitPoisha": 40,
+        "commissionSource": "COMMISSION_PAYABLE",
+        "commissionBeneficiary": "PAYER"
+      }
+    },
+    {
+      "id": "G4",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "MERCHANT_PAYMENT PERCENT 150 bps (MDR), bearer PAYEE, vat 1500 (78.75 -> 79)",
+      "plans": [
+        {
+          "planId": "PLN-GV-G4",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "MERCHANT_PAYMENT",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 150,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYEE",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "MERCHANT_PAYMENT",
+        "channel": "APP",
+        "amountPoisha": 35000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "M",
+          "kycTier": 2,
+          "categoryCode": 3101
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G4",
+        "planVersion": 1,
+        "feePoisha": 525,
+        "vatPoisha": 79,
+        "feeBearer": "PAYEE",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G5",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "P2P SLAB, max 2500; 100001 x 50 bps = 500.005 -> 500",
+      "plans": [
+        {
+          "planId": "PLN-GV-SLAB",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": "C",
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "SLAB",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [
+              {
+                "fromPoisha": 1,
+                "toPoisha": 100000,
+                "fixedPoisha": 500,
+                "percentBps": 0
+              },
+              {
+                "fromPoisha": 100001,
+                "toPoisha": null,
+                "fixedPoisha": 0,
+                "percentBps": 50
+              }
+            ],
+            "minPoisha": 0,
+            "maxPoisha": 2500
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 100001,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-SLAB",
+        "planVersion": 1,
+        "feePoisha": 500,
+        "vatPoisha": 75,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G6",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "same plan as G5; 1000000 x 50 bps = 5000 capped to 2500; VAT on capped fee",
+      "plans": "SAME_AS:G5",
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 1000000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-SLAB",
+        "planVersion": 1,
+        "feePoisha": 2500,
+        "vatPoisha": 375,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G7",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "P2P FIXED 500, freeMonthlyCount 5, usage 4 -> free",
+      "plans": [
+        {
+          "planId": "PLN-GV-FREE",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 5,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 4
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-FREE",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G8",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "same plan as G7, usage 5 -> charged",
+      "plans": "SAME_AS:G7",
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 5
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-FREE",
+        "planVersion": 1,
+        "feePoisha": 500,
+        "vatPoisha": 75,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G9",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "PERCENT 125 bps half-even: 12.5 -> 12, VAT 1.8 -> 2",
+      "plans": [
+        {
+          "planId": "PLN-GV-G9",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 125,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 1000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G9",
+        "planVersion": 1,
+        "feePoisha": 12,
+        "vatPoisha": 2,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G10",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "PERCENT 175 bps: 17.5 -> 18, VAT 2.7 -> 3",
+      "plans": [
+        {
+          "planId": "PLN-GV-G10",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 175,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 1000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G10",
+        "planVersion": 1,
+        "feePoisha": 18,
+        "vatPoisha": 3,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G11",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "two plans match, priority 100 vs 200 -> 200 wins",
+      "plans": [
+        {
+          "planId": "PLN-GV-G11-LOW",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        },
+        {
+          "planId": "PLN-GV-G11-HIGH",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 200,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 300,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G11-HIGH",
+        "planVersion": 1,
+        "feePoisha": 300,
+        "vatPoisha": 45,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "G12",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "same priority; plan with payerKycTier=2 (2 non-null match fields) beats generic (1)",
+      "plans": [
+        {
+          "planId": "PLN-GV-G12-GENERIC",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": "C",
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        },
+        {
+          "planId": "PLN-GV-G12-TIER2",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": "C",
+            "payeeWalletType": null,
+            "payerKycTier": 2,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 400,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 1,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-G12-TIER2",
+        "planVersion": 1,
+        "feePoisha": 400,
+        "vatPoisha": 60,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X1",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "FLOAT_TRANSFER, no plan matches (payer D cat 202, payee A cat 101) -> zero result with nulls",
+      "plans": [],
+      "input": {
+        "txnType": "FLOAT_TRANSFER",
+        "channel": "PARTNER_APP",
+        "amountPoisha": 5000000,
+        "payer": {
+          "walletType": "D",
+          "kycTier": 2,
+          "categoryCode": 202
+        },
+        "payee": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": null,
+        "planVersion": null,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": null,
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X2",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "MERCHANT_PAYMENT; categoryCode resolved from payee merchant 3101; 350, VAT 52.5 -> 52",
+      "plans": [
+        {
+          "planId": "PLN-GV-X2-GROCERY",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "MERCHANT_PAYMENT",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": 3101
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 100,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYEE",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        },
+        {
+          "planId": "PLN-GV-X2-DEFAULT",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "MERCHANT_PAYMENT",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 150,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYEE",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "MERCHANT_PAYMENT",
+        "channel": "APP",
+        "amountPoisha": 35000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "M",
+          "kycTier": 2,
+          "categoryCode": 3101
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X2-GROCERY",
+        "planVersion": 1,
+        "feePoisha": 350,
+        "vatPoisha": 52,
+        "feeBearer": "PAYEE",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X6",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "CASH_IN fee NONE with minPoisha 1000 (pre-validation plan) -> no clamp for NONE, fee 0",
+      "plans": [
+        {
+          "planId": "PLN-GV-X6",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_IN",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "NONE",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 1000,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_IN",
+        "channel": "PARTNER_APP",
+        "amountPoisha": 100000,
+        "payer": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X6",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X7",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "P2P FIXED 500 with feeBearer OPERATOR (pre-validation plan) -> step 7 forces fee = vat = 0",
+      "plans": [
+        {
+          "planId": "PLN-GV-X7",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "OPERATOR",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X7",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "OPERATOR",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X8",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "CASH_IN NONE, comm PERCENT_OF_AMOUNT 40 bps, commission.maxPoisha 2000: 4000 capped to 2000, ait 200 (OPEN D-27)",
+      "plans": [
+        {
+          "planId": "PLN-GV-X8",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_IN",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "NONE",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "PERCENT_OF_AMOUNT",
+            "valueBps": 40,
+            "fixedPoisha": 0,
+            "source": "COMMISSION_PAYABLE",
+            "beneficiary": "PAYER",
+            "aitBps": 1000,
+            "minPoisha": 0,
+            "maxPoisha": 2000
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_IN",
+        "channel": "PARTNER_APP",
+        "amountPoisha": 1000000,
+        "payer": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X8",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 2000,
+        "aitPoisha": 200,
+        "commissionSource": "COMMISSION_PAYABLE",
+        "commissionBeneficiary": "PAYER"
+      }
+    },
+    {
+      "id": "X9",
+      "tier": "CATALOGUE",
+      "provisional": false,
+      "description": "as X8 with commission.minPoisha 500, maxPoisha 0: 200 raised to 500, ait 50 (OPEN D-27)",
+      "plans": [
+        {
+          "planId": "PLN-GV-X9",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_IN",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "NONE",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "PERCENT_OF_AMOUNT",
+            "valueBps": 40,
+            "fixedPoisha": 0,
+            "source": "COMMISSION_PAYABLE",
+            "beneficiary": "PAYER",
+            "aitBps": 1000,
+            "minPoisha": 500,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_IN",
+        "channel": "PARTNER_APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X9",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 500,
+        "aitPoisha": 50,
+        "commissionSource": "COMMISSION_PAYABLE",
+        "commissionBeneficiary": "PAYER"
+      }
+    }
+  ],
+  "extensionVectors": [
+    {
+      "id": "X3",
+      "tier": "EXTENSION",
+      "provisional": false,
+      "description": "effectiveTo is exclusive: at == effectiveTo excludes the higher-priority plan",
+      "plans": [
+        {
+          "planId": "PLN-GV-X3-PROMO",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 200,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": "2026-10-09T08:00:00.000Z",
+          "fee": {
+            "type": "NONE",
+            "fixedPoisha": 0,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "OPERATOR",
+          "vatBps": 0,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        },
+        {
+          "planId": "PLN-GV-X3-STD",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 500,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X3-STD",
+        "planVersion": 1,
+        "feePoisha": 500,
+        "vatPoisha": 75,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X4",
+      "tier": "EXTENSION",
+      "provisional": false,
+      "description": "min clamp: 10000 x 50 bps = 50 -> min 1000; VAT 150",
+      "plans": [
+        {
+          "planId": "PLN-GV-X4",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "P2P",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "PERCENT",
+            "fixedPoisha": 0,
+            "percentBps": 50,
+            "slabs": [],
+            "minPoisha": 1000,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 0,
+          "commission": {
+            "type": "NONE",
+            "valueBps": 0,
+            "fixedPoisha": 0,
+            "source": null,
+            "beneficiary": null,
+            "aitBps": 0,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "P2P",
+        "channel": "APP",
+        "amountPoisha": 10000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 0
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X4",
+        "planVersion": 1,
+        "feePoisha": 1000,
+        "vatPoisha": 150,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": null,
+        "commissionBeneficiary": null
+      }
+    },
+    {
+      "id": "X5",
+      "tier": "EXTENSION",
+      "provisional": false,
+      "description": "free allowance zeroes fee -> PERCENT_OF_FEE commission 0; source and beneficiary still echoed",
+      "plans": [
+        {
+          "planId": "PLN-GV-X5",
+          "version": 1,
+          "status": "ACTIVE",
+          "txnType": "CASH_OUT",
+          "match": {
+            "channel": null,
+            "payerWalletType": null,
+            "payeeWalletType": null,
+            "payerKycTier": null,
+            "categoryCode": null
+          },
+          "priority": 100,
+          "effectiveFrom": "2026-10-01T00:00:00.000Z",
+          "effectiveTo": null,
+          "fee": {
+            "type": "FIXED",
+            "fixedPoisha": 1000,
+            "percentBps": 0,
+            "slabs": [],
+            "minPoisha": 0,
+            "maxPoisha": 0
+          },
+          "feeBearer": "PAYER",
+          "vatBps": 1500,
+          "freeMonthlyCount": 3,
+          "commission": {
+            "type": "PERCENT_OF_FEE",
+            "valueBps": 4000,
+            "fixedPoisha": 0,
+            "source": "FEE_INCOME",
+            "beneficiary": "PAYEE",
+            "aitBps": 1000,
+            "minPoisha": 0,
+            "maxPoisha": 0
+          }
+        }
+      ],
+      "input": {
+        "txnType": "CASH_OUT",
+        "channel": "APP",
+        "amountPoisha": 50000,
+        "payer": {
+          "walletType": "C",
+          "kycTier": 2,
+          "categoryCode": 0
+        },
+        "payee": {
+          "walletType": "A",
+          "kycTier": 2,
+          "categoryCode": 101
+        },
+        "usage": {
+          "senderMonthlyCountForTxnType": 1
+        },
+        "at": "2026-10-09T08:00:00.000Z"
+      },
+      "expected": {
+        "planId": "PLN-GV-X5",
+        "planVersion": 1,
+        "feePoisha": 0,
+        "vatPoisha": 0,
+        "feeBearer": "PAYER",
+        "commissionPoisha": 0,
+        "aitPoisha": 0,
+        "commissionSource": "FEE_INCOME",
+        "commissionBeneficiary": "PAYEE"
+      }
+    }
+  ]
+}

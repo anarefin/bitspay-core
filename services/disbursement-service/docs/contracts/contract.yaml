@@ -1,0 +1,198 @@
+service: disbursement-service
+number: "08"
+modules: []
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-2
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # every operation in the openapi is provided; audiences in x-audience (partner|customer|staff|service|internal)
+  events:
+    - topic: disbursement.events
+      key: "batchId (BATCH_*) · scheduleId (SCHEDULED_TRANSFER_EXECUTED) · requestId (PAYMENT_REQUEST_*)"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 12}
+      retention: 7d
+      transport: outbox
+      eventTypes:
+        - {type: BATCH_SUBMITTED, version: 1, aggregateType: DisbursementBatch, schema: provided/events/disbursement.events/BATCH_SUBMITTED.v1.schema.json}
+        - {type: BATCH_APPROVED, version: 1, aggregateType: DisbursementBatch, schema: provided/events/disbursement.events/BATCH_APPROVED.v1.schema.json}
+        - {type: BATCH_ROW_PAID, version: 1, aggregateType: DisbursementBatch, schema: provided/events/disbursement.events/BATCH_ROW_PAID.v1.schema.json}
+        - {type: BATCH_ROW_FAILED, version: 1, aggregateType: DisbursementBatch, schema: provided/events/disbursement.events/BATCH_ROW_FAILED.v1.schema.json}
+        - {type: BATCH_COMPLETED, version: 1, aggregateType: DisbursementBatch, schema: provided/events/disbursement.events/BATCH_COMPLETED.v1.schema.json}
+        - {type: SCHEDULED_TRANSFER_EXECUTED, version: 1, aggregateType: ScheduledTransfer, schema: provided/events/disbursement.events/SCHEDULED_TRANSFER_EXECUTED.v1.schema.json}
+        - {type: PAYMENT_REQUEST_CREATED, version: 1, aggregateType: PaymentRequest, schema: provided/events/disbursement.events/PAYMENT_REQUEST_CREATED.v1.schema.json}
+        - {type: PAYMENT_REQUEST_ACCEPTED, version: 1, aggregateType: PaymentRequest, schema: provided/events/disbursement.events/PAYMENT_REQUEST_ACCEPTED.v1.schema.json}
+        - {type: PAYMENT_REQUEST_DECLINED, version: 1, aggregateType: PaymentRequest, schema: provided/events/disbursement.events/PAYMENT_REQUEST_DECLINED.v1.schema.json}
+  inboundTopics: []
+  data: []
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    # ---------------- wallet-service ----------------
+    - producer: wallet-service
+      operation: "POST /v1/wallets/lookup:batch"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "batch validation: resolve up to 1,000 normalised MSISDNs per VALIDATE chunk to customer (C) wallets"
+      fieldsUsed: ["req.walletType", "req.msisdns", "res.items[].msisdn", "res.items[].walletId", "res.items[].walletType", "res.items[].status", "res.items[].displayNameMasked"]
+      codesUsed: [{set: walletStatus, values: "*"}, {set: walletType, values: [C]}]
+      resilience: {timeoutMs: 1000, retries: 2, circuitBreaker: wallet, onFailure: "VALIDATE step retried with back-off; batch stays VALIDATING"}
+    - producer: wallet-service
+      operation: "GET /v1/wallets/lookup"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "single MSISDN resolution at schedule / payment-request creation; masked display name of requester or payee"
+      fieldsUsed: ["query.msisdn", "query.walletType", "res.walletId", "res.displayNameMasked", "res.walletType", "res.status"]
+      codesUsed: [{set: walletStatus, values: "*"}, {set: walletType, values: [C]}]
+      resilience: {timeoutMs: 300, retries: 2, circuitBreaker: wallet, onFailure: "503 DEPENDENCY_UNAVAILABLE to the caller"}
+    - producer: wallet-service
+      operation: "POST /v1/wallets/status:batchGet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "credit/debit eligibility at validation, execution re-check per chunk, payer check, schedule/request creation; Party objects for evaluate:batch"
+      fieldsUsed: ["req.walletIds", "res.items[].walletId", "res.items[].version", "res.items[].status", "res.items[].kycTier", "res.items[].walletType", "res.items[].categoryCode", "res.items[].flags", "res.notFound"]
+      codesUsed: [{set: walletStatus, values: "*"}, {set: walletType, values: "*"}]
+      resilience: {timeoutMs: 1000, retries: 2, circuitBreaker: wallet, onFailure: "chunk retried later, rows untouched; API callers get 503"}
+    - producer: wallet-service
+      operation: "GET /v1/wallets/{walletId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "payer institution wallet at batch creation (walletType I, ownerType INSTITUTION, institutionId = ownerId); clear MSISDN of requester/payer for notification variables"
+      fieldsUsed: ["path.walletId", "res.walletType", "res.ownerType", "res.ownerId", "res.status", "res.msisdn"]
+      codesUsed: [{set: walletStatus, values: "*"}, {set: walletType, values: [I, C]}, {set: ownerType, values: [INSTITUTION, CUSTOMER]}]
+      resilience: {timeoutMs: 300, retries: 2, circuitBreaker: wallet, onFailure: "503 DEPENDENCY_UNAVAILABLE to the caller"}
+    - producer: wallet-service
+      operation: "POST /v1/customers:preRegister"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "optional bulk pre-registration of unknown recipients (ONB-020), groups of <= 1,000 rows"
+      fieldsUsed: ["header.Idempotency-Key", "req.institutionId", "req.rows[].rowRef", "req.rows[].msisdn", "req.rows[].nameEn", "res.results[].rowRef", "res.results[].result", "res.results[].reason", "res.results[].walletId", "res.results[].status"]
+      codesUsed: [{set: preRegisterResult, values: "*"}, {set: preRegisterRejectReason, values: "*"}]
+      resilience: {timeoutMs: 5000, retries: 1, circuitBreaker: wallet, onFailure: "rows INVALID WALLET_NOT_FOUND, detail PRE_REGISTRATION_FAILED"}
+    # ---------------- ledger-service ----------------
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "funding check of the payer institution wallet (submit warning, final approval, start, resume)"
+      fieldsUsed: ["path.id", "res.availableBalancePoisha", "res.closed"]
+      codesUsed: []
+      resilience: {timeoutMs: 500, retries: 2, circuitBreaker: ledger, onFailure: "503 DEPENDENCY_UNAVAILABLE to the caller; batch not started"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-disbursement-batch"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "ledger command 8: one call per EXECUTE chunk (<= 1,000 rows, one linked chain per row)"
+      fieldsUsed: ["header.Idempotency-Key", "req.batchId", "req.payerAccountId", "req.rows[].commandId", "req.rows[].toAccountId", "req.rows[].amountPoisha", "req.rows[].constraints.destinationMaxBalancePoisha", "res.batchId", "res.results[].commandId", "res.results[].result", "res.results[].rejectionCode", "res.results[].detail", "res.results[].transferIds", "res.results[].postedAt"]
+      codesUsed: [{set: commandResult, values: "*"}, {set: rejectionCode, values: "*"}, {set: rejectionDetailToken, values: [IDEMPOTENCY_CONFLICT, ACCOUNT_TYPE_MISMATCH]}]
+      resilience: {timeoutMs: 10000, retries: 0, circuitBreaker: ledger, onFailure: "no row change; lease expires; same commandIds and bodies re-posted; after 10 min batch PAUSED DEPENDENCY_UNAVAILABLE"}
+    # ---------------- limits-risk-service ----------------
+    - producer: limits-risk-service
+      operation: "POST /v1/risk/evaluate:batch"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "dry run at validation (headroom); reserving evaluation per EXECUTE chunk before the ledger call"
+      fieldsUsed: ["req.dryRun", "req.items[].txnId", "req.items[].txnType", "req.items[].channel", "req.items[].deviceId", "req.items[].amountPoisha", "req.items[].from", "req.items[].to", "req.items[].at", "res.items[].txnId", "res.items[].decision", "res.items[].reservationId", "res.items[].receiverMaxBalancePoisha", "res.items[].violatedLimit.limitCode", "res.items[].reasonCodes", "problem.txnIds"]
+      codesUsed: [{set: riskDecision, values: "*"}]
+      resilience: {timeoutMs: 2000, retries: 1, circuitBreaker: risk, onFailure: "chunk released and retried after back-off; never post without evaluation"}
+    - producer: limits-risk-service
+      operation: "POST /v1/limits/reservations/{txnId}:release"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "release every reserved row that will not be paid (FAILED, SKIPPED, reset to VALID, evaluated-but-unposted)"
+      fieldsUsed: ["path.txnId", "req.reasonCode", "res.state"]
+      codesUsed: [{set: releaseState, values: "*"}]
+      resilience: {timeoutMs: 1000, retries: 3, circuitBreaker: risk, onFailure: "persisted release job; swept every 5 min until a final state"}
+    # ---------------- transaction-service ----------------
+    - producer: transaction-service
+      operation: "POST /v1/payments/p2p"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "delegated P2P on behalf of the payer (OPEN D-33): scheduled occurrence (payer CUSTOMER headers, X-Channel SYSTEM) and payment-request accept (payer's own forwarded headers). PaymentResult and problem member `transaction` are relayed unchanged on :accept."
+      fieldsUsed: ["header.Idempotency-Key", "req.fromWalletId", "req.toWalletId", "req.amountPoisha", "req.purposeCode", "req.note", "res.txnRef", "res.txnId", "res.txnType", "res.status", "res.failureCode", "res.amountPoisha", "res.feePoisha", "res.vatPoisha", "res.totalDebitPoisha", "res.feeBearer", "res.currency", "res.fromWalletId", "res.toWalletId", "res.createdAt", "res.completedAt", "problem.transaction", "problem.limitCode", "problem.limitParty", "problem.remainingPoisha", "problem.remainingCount", "problem.resetsAt", "problem.walletId", "problem.walletStatus"]
+      codesUsed: [{set: paymentResultStatus, values: "*"}, {set: failureCode, values: "*"}]
+      forwardedActorContext: true
+      resilience: {timeoutMs: 2000, retries: 0, circuitBreaker: transaction, onFailure: "4xx final for the key; 503/timeout -> outcome unknown, retry with the SAME key for <= 20 h, then resolve by GET only"}
+    - producer: transaction-service
+      operation: "GET /v1/transactions/{txnRef}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "resolver for unknown P2P outcomes when the txnRef is known"
+      fieldsUsed: ["path.txnRef", "res.txnRef", "res.status", "res.failureCode"]
+      codesUsed: [{set: transactionStatus, values: "*"}, {set: failureCode, values: "*"}]
+      resilience: {timeoutMs: 500, retries: 0, circuitBreaker: transaction, onFailure: "retry later"}
+    - producer: transaction-service
+      operation: "GET /v1/transactions"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "resolver when the txnRef is unknown: lookup by (walletId = payer wallet, clientReference = Idempotency-Key), 0..1 items"
+      fieldsUsed: ["query.walletId", "query.clientReference", "res.items[].txnRef", "res.items[].status", "res.items[].failureCode"]
+      codesUsed: [{set: transactionStatus, values: "*"}]
+      resilience: {timeoutMs: 500, retries: 0, circuitBreaker: transaction, onFailure: "retry later"}
+  events:
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: disbursement-service.refdata
+      purpose: "product switches FEATURE.DISBURSEMENT / SCHEDULED_TRANSFER / REQUEST_MONEY and WALLET.ALLOW_INBOUND_BEFORE_KYC (credit rule for status P)"
+      filter: "type = SYSTEM_PARAM and code in (FEATURE.DISBURSEMENT, FEATURE.SCHEDULED_TRANSFER, FEATURE.REQUEST_MONEY, WALLET.ALLOW_INBOUND_BEFORE_KYC); others ignored (FILTERED)"
+      fieldsUsed: ["type", "code", "version", "active", "attributes.valueType", "attributes.enabled", "attributes.channels", "attributes.value"]
+      codesUsed: [{set: refdataType, values: [SYSTEM_PARAM]}]
+  inboundTopics:
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: [SCHEDULED_TRANSFER_FAILED, SCHEDULED_TRANSFER_SUSPENDED, PAYMENT_REQUEST_RECEIVED, PAYMENT_REQUEST_DECLINED, PAYMENT_REQUEST_EXPIRED, DISBURSEMENT_BATCH_COMPLETED, DISBURSEMENT_BATCH_PAUSED]
+      reminderRegistrations:   # reminder{} subjects registered with the admin-owned reminder engine (templates owned by admin-service, group B)
+        - {policyCode: SCHEDULED_TRANSFER_PRE, subjectType: SCHEDULED_TRANSFER, templateCode: SCHEDULED_TRANSFER_REMINDER, variables: [amountPoisha, payeeNameMasked, scheduleId]}
+        - {policyCode: PAYMENT_REQUEST_DUE, subjectType: PAYMENT_REQUEST, templateCode: PAYREQ_REMINDER_DUE, variables: [amountPoisha, requesterMsisdn, requestRef, requestId, expiresAt]}
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REMINDER_CANCELLED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: []
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      entityTypes: [DisbursementBatch]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      entityTypes: [DisbursementBatch]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_EXPIRED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      entityTypes: [DisbursementBatch]
+    - owner: admin-service
+      topic: audit.events
+      eventType: AUDIT_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+  data: []
+  codes:
+    - {producer: admin-service, set: refdataType, values: [SYSTEM_PARAM]}
+  refdata:
+    - {type: SYSTEM_PARAM, codes: ["FEATURE.DISBURSEMENT", "FEATURE.SCHEDULED_TRANSFER", "FEATURE.REQUEST_MONEY", "WALLET.ALLOW_INBOUND_BEFORE_KYC"]}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/general-ledger-service/gl.events/GL_EXCEPTION_RAISED.v1.schema.json",
+  "title": "gl.events GL_EXCEPTION_RAISED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "exceptionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= key"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "UNMAPPED_POSTING",
+        "UNKNOWN_LEDGER_ACCOUNT",
+        "INVALID_LEDGER_EVENT",
+        "CLOSE_CHECK_FAILED",
+        "ENRICHMENT_TIMEOUT",
+        "CONTROL_BREAK",
+        "MUST_BE_ZERO_BREAK",
+        "PRIOR_PERIOD_LATE_EVENT",
+        "CERTIFICATION_FAILED",
+        "DAY_CLOSE_BLOCKED"
+      ],
+      "description": "closed enum"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "CRITICAL",
+        "HIGH"
+      ]
+    },
+    "businessDate": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "summary": {
+      "type": "string",
+      "description": "1..200, no PII"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+    }
+  },
+  "required": [
+    "exceptionId",
+    "category",
+    "severity",
+    "businessDate",
+    "summary",
+    "createdAt"
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,55 @@
+{
+  "name": "GET /v1/notifications/{notificationId} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/notifications/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "notificationId": "8f1c2d3e-4b5a-5c6d-8e7f-0a1b2c3d4e5f",
+      "createdAt": "2026-10-09T08:03:22.123Z",
+      "templateCode": "P2P_RECEIVED",
+      "templateVersion": 3,
+      "category": "TRANSACTIONAL",
+      "recipient": {
+        "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+        "staffUserId": null,
+        "role": null,
+        "msisdnMasked": "8801711****00"
+      },
+      "language": "bn",
+      "txnRef": "PP26100900K3M9QX2A",
+      "sourceEventType": "TRANSACTION_COMPLETED",
+      "deliveries": [
+        {
+          "channel": "IN_APP",
+          "status": "READ",
+          "at": "2026-10-09T08:05:00.000Z"
+        },
+        {
+          "channel": "SMS",
+          "status": "DELIVERED",
+          "statusReason": null,
+          "provider": "LOG_SMS_A",
+          "senderId": "BitsPay",
+          "segments": 2,
+          "attempts": 1,
+          "sentAt": "2026-10-09T08:03:22.900Z",
+          "finalAt": "2026-10-09T08:03:25.100Z",
+          "contentSha256": "4e1d7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b7a1b",
+          "content": "আপনি 01711****00 থেকে ৳৫০০.০০ পেয়েছেন। TxnID: PP26100900K3M9QX2A। সময়: ০৯/১০/২০২৬ ১৪:০৩। - Bits Pay"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "admin-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

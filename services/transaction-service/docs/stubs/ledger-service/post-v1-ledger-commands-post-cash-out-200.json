@@ -1,0 +1,33 @@
+{
+  "name": "POST /v1/ledger/commands/post-cash-out → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-cash\\-out(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3d0-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "c5b496e8-1aa9-093d-930a-e107848107c2",
+        "aa8c5943-a9ea-25bf-1e15-2fbe19752f1f",
+        "08f54db5-44b8-87b7-f16f-965f75f64b01",
+        "127ae35f-10e2-5ac5-89f9-16c567ae0950",
+        "dc466b2d-ca31-7df9-d5b5-01f5ec55fbe4"
+      ],
+      "postedAt": "2026-10-09T08:10:05.481Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

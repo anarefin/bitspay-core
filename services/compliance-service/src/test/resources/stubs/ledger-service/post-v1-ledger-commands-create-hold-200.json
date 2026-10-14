@@ -1,0 +1,29 @@
+{
+  "name": "POST /v1/ledger/commands/create-hold → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/create\\-hold(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "5d0f2c6e-8f6a-5b2e-9a77-0c3e1d2f4a10",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "c0d62a83-e445-e31e-98ac-bd45d19b763f"
+      ],
+      "postedAt": "2026-10-09T11:02:17.555Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

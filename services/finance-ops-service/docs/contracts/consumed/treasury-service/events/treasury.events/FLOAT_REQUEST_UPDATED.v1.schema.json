@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/FLOAT_REQUEST_UPDATED.v1.schema.json",
+  "title": "treasury.events FLOAT_REQUEST_UPDATED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType FloatRequest; Kafka key = aggregateId = data.requesterWalletId. Trigger: every status change of a float request, including creation.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "requestId",
+    "requesterWalletId",
+    "requesterPartnerId",
+    "direction",
+    "counterparty",
+    "counterpartyWalletId",
+    "amountPoisha",
+    "status",
+    "previousStatus",
+    "txnRef",
+    "issuanceId",
+    "redemptionId",
+    "failureCode",
+    "updatedAt"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "requesterWalletId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "requesterPartnerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "TOP_UP",
+        "RETURN"
+      ]
+    },
+    "counterparty": {
+      "type": "string",
+      "enum": [
+        "PARENT",
+        "OPERATOR",
+        "BANK",
+        "LIQUIDITY_POINT"
+      ],
+      "description": "LIQUIDITY_POINT reserved (R2, OPEN D-28)"
+    },
+    "counterpartyWalletId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "null for OPERATOR / BANK"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "1 … 10^13"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "REQUESTED",
+        "APPROVED",
+        "EXECUTING",
+        "AWAITING_ISSUANCE",
+        "AWAITING_REDEMPTION",
+        "COMPLETED",
+        "FAILED",
+        "REJECTED",
+        "CANCELLED",
+        "EXPIRED",
+        "STUCK"
+      ]
+    },
+    "previousStatus": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "REQUESTED",
+        "APPROVED",
+        "EXECUTING",
+        "AWAITING_ISSUANCE",
+        "AWAITING_REDEMPTION",
+        "COMPLETED",
+        "FAILED",
+        "REJECTED",
+        "CANCELLED",
+        "EXPIRED",
+        "STUCK",
+        null
+      ],
+      "description": "null on creation"
+    },
+    "txnRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "FT… (float transfer), EI… / ER… (OPERATOR / BANK); null until a movement exists"
+    },
+    "issuanceId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "redemptionId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "failureCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "non-null iff status ∈ {FAILED, STUCK} or a linked issuance/redemption failed: float-transfer problem code · ISSUANCE_<status> · REDEMPTION_<status> · EXECUTION_STUCK; open vocabulary ^[A-Z][A-Z0-9_]*$"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

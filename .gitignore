@@ -1,0 +1,11 @@
+.env
+build/
+.gradle/
+out/
+bin/
+build-each.log
+.contracts-view/
+.idea/
+*.iml
+.vscode/
+.DS_Store

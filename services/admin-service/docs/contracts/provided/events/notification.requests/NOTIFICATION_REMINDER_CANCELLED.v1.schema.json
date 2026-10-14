@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/admin-service/notification.requests/NOTIFICATION_REMINDER_CANCELLED.v1.schema.json",
+  "title": "notification.requests NOTIFICATION_REMINDER_CANCELLED data (inbound topic owned by admin-service)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "requestId",
+    "subjectType",
+    "subjectRef",
+    "reason"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "subjectType": {
+      "type": "string",
+      "enum": [
+        "PAYMENT_REQUEST",
+        "SCHEDULED_TRANSFER",
+        "KYC_EXPIRY",
+        "BILL_DUE",
+        "SERVICE_EXPIRY",
+        "AGREEMENT_EXPIRY"
+      ]
+    },
+    "subjectRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    }
+  }
+}

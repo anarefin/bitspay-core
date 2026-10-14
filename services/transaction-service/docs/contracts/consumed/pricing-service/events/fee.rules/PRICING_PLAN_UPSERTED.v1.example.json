@@ -1,0 +1,60 @@
+{
+  "eventId": "0192f3d2-0000-7000-8000-000000000001",
+  "eventType": "PRICING_PLAN_UPSERTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-01T00:00:00.412Z",
+  "producer": "pricing-service",
+  "aggregateType": "PricingPlan",
+  "aggregateId": "PLN-P2P-STD",
+  "correlationId": "c-act-PLN-P2P-STD-3",
+  "data": {
+    "planId": "PLN-P2P-STD",
+    "version": 3,
+    "status": "ACTIVE",
+    "txnType": "P2P",
+    "match": {
+      "channel": null,
+      "payerWalletType": "C",
+      "payeeWalletType": null,
+      "payerKycTier": null,
+      "categoryCode": null
+    },
+    "priority": 100,
+    "effectiveFrom": "2026-10-01T00:00:00.000Z",
+    "effectiveTo": null,
+    "fee": {
+      "type": "SLAB",
+      "fixedPoisha": 0,
+      "percentBps": 0,
+      "slabs": [
+        {
+          "fromPoisha": 1,
+          "toPoisha": 100000,
+          "fixedPoisha": 500,
+          "percentBps": 0
+        },
+        {
+          "fromPoisha": 100001,
+          "toPoisha": null,
+          "fixedPoisha": 0,
+          "percentBps": 50
+        }
+      ],
+      "minPoisha": 0,
+      "maxPoisha": 2500
+    },
+    "feeBearer": "PAYER",
+    "vatBps": 1500,
+    "freeMonthlyCount": 0,
+    "commission": {
+      "type": "NONE",
+      "valueBps": 0,
+      "fixedPoisha": 0,
+      "source": null,
+      "beneficiary": null,
+      "aitBps": 0,
+      "minPoisha": 0,
+      "maxPoisha": 0
+    }
+  }
+}

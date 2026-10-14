@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/kernel/page.schema.json",
+  "title": "Cursor page (kernel K3.4) — items schema is provider-owned",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["items", "nextCursor"],
+  "properties": {
+    "items": {"type": "array"},
+    "nextCursor": {"type": ["string", "null"]}
+  }
+}

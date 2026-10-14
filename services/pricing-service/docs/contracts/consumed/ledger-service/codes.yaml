@@ -1,0 +1,211 @@
+# ledger-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# Every value here is owned by ledger-service. Consumers that switch on a set declare it in their codesUsed.
+# Adding a value is additive (minor); removing or renaming one is breaking.
+
+codeSets:
+
+  accountType:
+    description: >-
+      TigerBeetle account.code and its name. All accounts use ledger = 1 (BDT). Account user_data_32 = ownerTypeCode.
+      Balance formula: normalSide CREDIT or EITHER -> ledgerBalance = credits_posted - debits_posted, held = debits_pending;
+      normalSide DEBIT (TRUST_SETTLEMENT) -> ledgerBalance = debits_posted - credits_posted (the mirror), held = credits_pending;
+      available = ledgerBalance - held. Consumers computing balances from raw TB counters must apply the DEBIT formula to trust rows.
+      Codes are provisional until Finance confirms the chart of accounts (SRS Appendix B-08); consumers treat them as config.
+      Every non-technical account carries the TB `history` flag (CCR-GL-02 applied).
+    values:
+      - {code: 100, name: CUSTOMER_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: customer wallet, creatableViaApi: true, ownerType: CUSTOMER}
+      - {code: 110, name: AGENT_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: agent, creatableViaApi: true, ownerType: AGENT}
+      - {code: 120, name: DISTRIBUTOR_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: distributor, creatableViaApi: true, ownerType: DISTRIBUTOR}
+      - {code: 130, name: MERCHANT_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: merchant, creatableViaApi: true, ownerType: MERCHANT}
+      - {code: 140, name: INSTITUTION_WALLET, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: "institutional payer (salary/G2P)", creatableViaApi: true, ownerType: INSTITUTION}
+      - {code: 200, name: FEE_INCOME, normalSide: CREDIT, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000200}
+      - {code: 210, name: VAT_PAYABLE, normalSide: CREDIT, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000210}
+      - {code: 220, name: COMMISSION_PAYABLE, normalSide: CREDIT, tbFlags: [history], onePer: "system (operator-funded commission); debit balance allowed", fixedAccountId: 00000000-0000-0000-0000-000000000220}
+      - {code: 230, name: AIT_PAYABLE, normalSide: CREDIT, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000230}
+      - {code: 240, name: CAMPAIGN_FUNDING, normalSide: CREDIT, tbFlags: [debits_must_not_exceed_credits, history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000240}
+      - {code: 300, name: TRUST_SETTLEMENT, normalSide: DEBIT, tbFlags: [credits_must_not_exceed_debits, history], onePer: "trust bank account; id 00000000-0000-0000-0000-0000000300nn, nn 01..99", creatableViaApi: true, ownerType: SYSTEM}
+      - {code: 310, name: NETWORK_SETTLEMENT, normalSide: null, tbFlags: [], onePer: "reserved (interop, later); never created in this phase"}
+      - {code: 400, name: SUSPENSE, normalSide: EITHER, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000400}
+      - {code: 410, name: ADJUSTMENT_CLEARING, normalSide: EITHER, tbFlags: [history], onePer: system, fixedAccountId: 00000000-0000-0000-0000-000000000410}
+      - {code: 420, name: HOLD_CONTROL, normalSide: CREDIT, tbFlags: [history], onePer: "system (destination of liens)", fixedAccountId: 00000000-0000-0000-0000-000000000420}
+      - {code: 900, name: BOUNDS_CONTROL, normalSide: EITHER, tbFlags: [credits_must_not_exceed_debits], onePer: "system; technical, ledger-internal, net 0, never a parameter, never reported", fixedAccountId: 00000000-0000-0000-0000-000000000900, technical: true}
+      - {code: 910, name: BOUNDS_OPERATOR, normalSide: EITHER, tbFlags: [], onePer: "system; technical, ledger-internal, net 0, never a parameter, never reported", fixedAccountId: 00000000-0000-0000-0000-000000000910, technical: true}
+
+  ownerType:
+    description: "Account owner type (POST /v1/ledger/accounts ownerType) and its TB account user_data_32 code. Must match the account type."
+    values:
+      - {code: 1, name: CUSTOMER, accountTypes: [100]}
+      - {code: 2, name: AGENT, accountTypes: [110]}
+      - {code: 3, name: DISTRIBUTOR, accountTypes: [120]}
+      - {code: 4, name: MERCHANT, accountTypes: [130]}
+      - {code: 5, name: INSTITUTION, accountTypes: [140]}
+      - {code: 9, name: SYSTEM, accountTypes: [200, 210, 220, 230, 240, 300, 400, 410, 420, 900, 910]}
+
+  transferCode:
+    description: >-
+      TigerBeetle transfer.code. 1001-1016 and 2001-2004 are business codes. 9001-9099 is reserved for technical, net-zero
+      transfers: never on ledger.changes, never in transferIds, GET .../transfers or GET /v1/ledger/commands/{commandId}.
+      Identify technical transfers by code (>= 9000), never by legIndex.
+    values:
+      - {code: 1001, name: P2P_PRINCIPAL}
+      - {code: 1002, name: CASH_IN_PRINCIPAL}
+      - {code: 1003, name: CASH_OUT_PRINCIPAL}
+      - {code: 1004, name: MERCHANT_PAYMENT_PRINCIPAL}
+      - {code: 1005, name: MERCHANT_REFUND_PRINCIPAL}
+      - {code: 1006, name: FLOAT_TRANSFER_PRINCIPAL}
+      - {code: 1007, name: DISBURSEMENT_PRINCIPAL}
+      - {code: 1008, name: EMONEY_ISSUE}
+      - {code: 1009, name: EMONEY_REDEEM}
+      - {code: 1010, name: ADJUSTMENT}
+      - {code: 1011, name: CAMPAIGN_REWARD}
+      - {code: 1012, name: COMMISSION_SETTLEMENT}
+      - {code: 1013, name: REVERSAL, description: "mirror of any leg"}
+      - {code: 1014, name: LIEN, description: "pending (hold); also the void leg of a hold"}
+      - {code: 1015, name: TRUST_REBALANCE}
+      - {code: 1016, name: CLOSURE_PAYOUT}
+      - {code: 2001, name: FEE}
+      - {code: 2002, name: VAT}
+      - {code: 2003, name: COMMISSION}
+      - {code: 2004, name: AIT, description: "withholding on commission"}
+      - {code: 9001, name: BOUNDS_SET, technical: true}
+      - {code: 9002, name: BOUNDS_CHECK, technical: true}
+      - {code: 9003, name: BOUNDS_VOID, technical: true}
+      - {code: 9004, name: BOUNDS_RESET, technical: true}
+      - {code: 9005, name: ACCOUNT_CLOSE, technical: true}
+
+  commandType:
+    description: >-
+      Ledger command type = TB transfer user_data_64 = commandType on ledger.changes and read APIs.
+      Endpoint POST /v1/ledger/commands/{name}. Allowed callers are the ledger's authorisation policy (x-actors per operation).
+    values:
+      - {code: 1, name: post-p2p, pattern: linked, principalCode: 1001, lane: online}
+      - {code: 2, name: post-cash-in, pattern: linked, principalCode: 1002, lane: online}
+      - {code: 3, name: post-cash-out, pattern: linked, principalCode: 1003, lane: online}
+      - {code: 4, name: post-merchant-payment, pattern: linked, principalCode: 1004, lane: online}
+      - {code: 5, name: post-merchant-refund, pattern: linked, principalCode: 1005, lane: online}
+      - {code: 6, name: post-float-transfer, pattern: linked, principalCode: 1006, lane: online}
+      - {code: 7, name: post-reversal, pattern: "linked (leg 0 = hold void, legs 1..5 = mirrors of original legs 0..4)", principalCode: 1013, lane: online}
+      - {code: 8, name: post-disbursement-batch, pattern: "linked per row, batched", principalCode: 1007, lane: bulk}
+      - {code: 9, name: post-emoney-issue, pattern: single, principalCode: 1008, lane: online}
+      - {code: 10, name: post-emoney-redeem, pattern: single, principalCode: 1009, lane: online}
+      - {code: 11, name: post-adjustment, pattern: single, principalCode: 1010, lane: online}
+      - {code: 12, name: post-campaign-reward, pattern: linked, principalCode: 1011, lane: bulk}
+      - {code: 13, name: post-commission-settlement, pattern: "linked (commission + AIT)", principalCode: 1012, lane: bulk}
+      - {code: 14, name: create-hold, pattern: pending, principalCode: 1014, lane: online}
+      - {code: 15, name: release-hold, pattern: void pending, principalCode: 1014, lane: online}
+      - {code: 16, name: post-trust-rebalance, pattern: single, principalCode: 1015, lane: online}
+      - {code: 17, name: post-closure-payout, pattern: single, principalCode: 1016, lane: online}
+
+  commandResult:
+    description: "result of a command response (HTTP 200). EXISTS = already applied, same outcome. REJECTED is final for its commandId."
+    values:
+      - {code: OK}
+      - {code: EXISTS}
+      - {code: REJECTED}
+
+  rejectionCode:
+    description: "rejectionCode of a REJECTED command result (non-null iff result = REJECTED). Final for the commandId."
+    values:
+      - {code: INSUFFICIENT_FUNDS, description: "debit would exceed credits (wallet, CAMPAIGN_FUNDING, hold > available); or trust attribution would go negative (detail TRUST_ATTRIBUTION_EXCEEDED)"}
+      - {code: ACCOUNT_NOT_FOUND, description: "an account does not exist (technical 900/910 always count as not found)"}
+      - {code: ACCOUNT_CLOSED, description: "an account is closed"}
+      - {code: MAX_BALANCE_EXCEEDED, description: "constraints.destinationMaxBalancePoisha breached after the whole chain"}
+      - {code: ORIGINAL_NOT_FOUND, description: "post-reversal: original leg 0 not found"}
+      - {code: ALREADY_REVERSED, description: "post-reversal: another commandId already reversed (or claimed) this original"}
+      - {code: HOLD_NOT_FOUND, description: "release-hold / post-reversal hold void: hold unknown, not OPEN, voided by another command, posted, or not eligible"}
+      - {code: INVALID_AMOUNT, description: "semantic money error decided by the ledger (journaled, final)"}
+      - {code: OTHER, description: "any other rejection; see detail"}
+
+  rejectionDetailToken:
+    description: >-
+      Tokens that may appear in the command response `detail`. Callers may branch ONLY on these tokens; any other
+      `detail` value is free text (raw TigerBeetle result, e.g. "leg 0: exceeds_credits") and must not be parsed.
+    values:
+      - {code: NOT_REVERSIBLE, with: OTHER, description: "post-reversal original command type not in {1-6, 8, 12} (or not 12 for pricing-service)"}
+      - {code: ACCOUNT_TYPE_MISMATCH, with: OTHER, description: "account-type guard failed"}
+      - {code: TRUST_ATTRIBUTION_EXCEEDED, with: INSUFFICIENT_FUNDS, description: "trust account attributed balance would go negative (redeem, rebalance)"}
+      - {code: id_already_failed, with: OTHER, description: "replay of a rejected commandId whose journal row is gone (journal retention 8 days)"}
+      - {code: IDEMPOTENCY_CONFLICT, with: OTHER, description: "disbursement batch only: this row conflicts with an earlier row body under the same commandId"}
+
+  feeBearer:
+    description: "pricing.feeBearer on payment commands 1-6. SHARED is a reserved name: rejected with 400 until enabled (OPEN D-03)."
+    values:
+      - {code: PAYER, description: "fee + VAT debited from fromAccountId"}
+      - {code: PAYEE, description: "fee + VAT debited from toAccountId (e.g. merchant MDR)"}
+      - {code: OPERATOR, description: "fee waived; fee = vat = 0"}
+
+  commissionSource:
+    description: "pricing.commissionSource on payment commands 1-6: the account the commission and AIT legs are debited from."
+    values:
+      - {code: FEE_INCOME, accountId: 00000000-0000-0000-0000-000000000200}
+      - {code: COMMISSION_PAYABLE, accountId: 00000000-0000-0000-0000-000000000220}
+
+  transferFlag:
+    description: "TigerBeetle transfer flags, snake_case, as rendered in flags[] on ledger.changes and read APIs."
+    values:
+      - {code: linked}
+      - {code: pending}
+      - {code: post_pending_transfer}
+      - {code: void_pending_transfer}
+      - {code: balancing_debit}
+      - {code: balancing_credit}
+      - {code: closing_debit}
+      - {code: closing_credit}
+
+  transferDirection:
+    description: "direction of a transfer relative to the queried account (GET /v1/ledger/accounts/{id}/transfers)."
+    values:
+      - {code: DEBIT}
+      - {code: CREDIT}
+
+  balanceSource:
+    description: "byWalletType[].source on the system balance sheet."
+    values:
+      - {code: PROJECTION, description: "CDC projection, eventually consistent (lag in projectionLagMs)"}
+
+  accountCreateResult:
+    description: "result of POST /v1/ledger/accounts and POST /v1/ledger/accounts/{id}:close."
+    values:
+      - {code: OK}
+      - {code: EXISTS, description: "account already exists with identical attributes / already closed"}
+
+problemReasons:
+  - {code: STATE_CONFLICT, reason: BALANCE_NOT_ZERO, operations: ["POST /v1/ledger/accounts/{id}:close"], extensions: []}
+  - {code: STATE_CONFLICT, reason: OPEN_HOLDS, operations: ["POST /v1/ledger/accounts/{id}:close"], extensions: []}
+  - {code: STATE_CONFLICT, reason: SYSTEM_ACCOUNT, operations: ["POST /v1/ledger/accounts/{id}:close"], extensions: []}
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["GET /v1/ledger/accounts/{id}/transfers"], extensions: [], kernelReserved: true}
+
+problemExtensions: []
+
+entityTypes: []   # ledger-service has no maker-checker (callers approve before calling)
+
+notificationTemplates: []   # ledger-service sends no notifications
+
+reasonCodes:
+  - group: Hold
+    field: "create-hold reasonCode; GET /v1/ledger/holds items[].reasonCode"
+    values: [DISPUTE_HOLD, AML_LIEN, WRONG_TRANSFER_HOLD]
+    notes: >-
+      DISPUTE_HOLD and WRONG_TRANSFER_HOLD are support holds and are the only holds a post-reversal may void;
+      AML_LIEN is the compliance lien. An unknown hold code is accepted and logged (metric), never rejected.
+      Each code matches ^[A-Z_]{3,40}$.
+
+txnRefPrefixes: []   # the ledger mints no references; txnRef is an opaque caller string (1..32 [A-Z0-9-])
+
+productCodes: []     # the ledger owns no FEATURE.<PRODUCT> switch
+
+metrics:
+  - {name: bitspay_ledger_commands_total, type: counter, labels: [type, result, rejection_code]}
+  - {name: bitspay_ledger_command_seconds, type: histogram, labels: [type]}
+  - {name: bitspay_ledger_tb_batch_size, type: histogram, labels: [lane]}
+  - {name: bitspay_ledger_tb_request_seconds, type: histogram, labels: [operation]}
+  - {name: bitspay_ledger_batcher_queue_depth, type: gauge, labels: [lane]}
+  - {name: bitspay_ledger_journal_backlog, type: gauge, labels: []}
+  - {name: bitspay_ledger_idempotency_conflicts_total, type: counter, labels: [type]}
+  - {name: bitspay_ledger_missing_idempotency_key_total, type: counter, labels: [type]}
+  - {name: bitspay_ledger_unknown_hold_reason_total, type: counter, labels: [caller]}
+  - {name: bitspay_ledger_cdc_lag_ms, type: gauge, labels: [mode]}
+  - {name: bitspay_ledger_cdc_published_total, type: counter, labels: [mode]}
+  - {name: bitspay_ledger_integrity_mismatch_total, type: counter, labels: []}
+  - {name: bitspay_ledger_inconsistent_replay_total, type: counter, labels: [type]}
+  - {name: bitspay_ledger_bounds_net_nonzero_total, type: counter, labels: [account]}

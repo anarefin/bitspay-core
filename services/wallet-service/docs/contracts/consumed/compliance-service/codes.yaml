@@ -1,0 +1,771 @@
+# compliance-service owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+service: compliance-service
+contractVersion: 1.0.0
+codeSets:
+  screeningResult:
+    description: case.events SCREENING_* `result`; most severe match
+    values:
+    - code: CLEAR
+      description: no match at or above threshold
+    - code: POTENTIAL_MATCH
+      description: name/name+DOB score >= threshold; needs review
+    - code: CONFIRMED_MATCH
+      description: ID-number hash or active blacklist entry matched
+  screeningTrigger:
+    description: case.events SCREENING_* `trigger`
+    values:
+    - code: ONBOARDING
+      description: KYC_SUBMITTED / PARTNER_UPSERTED in PENDING_SCREENING; always emitted
+    - code: RESCREEN
+      description: list activation (DELTA), FULL job, new blacklist entry; emitted only if non-CLEAR or eddRequired
+    - code: MANUAL
+      description: ad-hoc screening of a CUSTOMER/PARTNER subject
+    - code: PROFILE_CHANGE
+      description: name/DOB change of an active customer; emitted only if non-CLEAR or eddRequired
+    - code: PERIODIC
+      description: periodic review (R2); emitted only if non-CLEAR or eddRequired
+  screeningDecision:
+    description: case.events SCREENING_DECIDED `decision`; consumers act on REJECT only when trigger = ONBOARDING
+    values:
+    - code: CLEAR
+      description: cleared by four-eyes decision
+    - code: REJECT
+      description: rejected by four-eyes decision
+  screeningSubjectType:
+    description: case.events SCREENING_* `subjectType` (PERSON reserved, never emitted)
+    values:
+    - code: CUSTOMER
+      description: subjectId = customerId
+    - code: PARTNER
+      description: subjectId = partnerId
+  screeningStatus:
+    description: Screening workflow status (staff API)
+    values:
+    - code: COMPLETED
+      description: automatic result recorded
+    - code: UNDER_REVIEW
+      description: non-CLEAR, case open
+    - code: PENDING_DECISION
+      description: decision proposed, approval pending
+    - code: DECIDED
+      description: four-eyes decision taken
+  matchListCode:
+    description: Match `listCode`
+    values:
+    - code: UN
+      description: UN Security Council consolidated list
+    - code: BFIU
+      description: BFIU domestic list
+    - code: OFAC
+      description: OFAC SDN
+    - code: EU
+      description: EU consolidated financial sanctions
+    - code: UKHMT
+      description: UK HMT consolidated list
+    - code: PEP
+      description: PEP / IP list
+    - code: INTERNAL
+      description: uploaded internal watchlist (incl. adverse-media names, OPEN D-48)
+    - code: BLACKLIST
+      description: limits-risk blacklist entry (blacklist.events)
+  matchListKind:
+    description: Match `listKind`; consumers key PEP on listKind = PEP
+    values:
+    - code: SANCTIONS
+      description: UN, BFIU, OFAC, EU, UKHMT
+    - code: PEP
+      description: PEP list
+    - code: INTERNAL
+      description: internal watchlist
+    - code: BLACKLIST
+      description: limits-risk blacklist
+  matchEntryType:
+    description: Match `entryType`
+    values:
+    - code: INDIVIDUAL
+      description: ''
+    - code: ENTITY
+      description: ''
+    - code: VESSEL
+      description: ''
+    - code: OTHER
+      description: ''
+  matchType:
+    description: Match `matchType` (EDD retired)
+    values:
+    - code: NAME
+      description: name score
+    - code: NAME_DOB
+      description: name score with DOB agreement
+    - code: ID
+      description: ID-number hash equality
+    - code: INTERNAL_BLACKLIST
+      description: active blacklist entry for nidHash / msisdn hash
+  matchedSubjectType:
+    description: Match `matchedSubjectType` on partner-level events
+    values:
+    - code: PARTNER
+      description: legalName / displayName of the partner
+    - code: PERSON
+      description: a key person (matchedSubjectId = personId)
+  caseDomain:
+    description: CASE_*, REVERSAL_RECOMMENDED `domain`
+    values:
+    - code: FRAUD
+      description: fraud case (RISK_* roles)
+    - code: AML
+      description: AML case (COMPLIANCE_OFFICER / CAMLCO)
+  caseType:
+    description: CASE_* `caseType`
+    values:
+    - code: FRAUD
+      description: ''
+    - code: AML_MONITORING
+      description: ''
+    - code: SCREENING
+      description: ''
+    - code: EDD
+      description: ''
+    - code: REGULATORY_INSTRUCTION
+      description: ''
+    - code: PERIODIC_REVIEW
+      description: R2
+    - code: CUSTOMER_REPORT
+      description: R2
+  casePriority:
+    description: CASE_OPENED `priority`
+    values:
+    - code: LOW
+      description: ''
+    - code: MEDIUM
+      description: ''
+    - code: HIGH
+      description: ''
+    - code: CRITICAL
+      description: ''
+  caseStatus:
+    description: Case status (staff API)
+    values:
+    - code: OPEN
+      description: ''
+    - code: ASSIGNED
+      description: ''
+    - code: INVESTIGATING
+      description: ''
+    - code: ESCALATED
+      description: ''
+    - code: PENDING_DECISION
+      description: ''
+    - code: DECIDED
+      description: ''
+    - code: CLOSED
+      description: ''
+  caseDecision:
+    description: CASE_CLOSED `decision`
+    values:
+    - code: CONFIRMED_FRAUD
+      description: FRAUD
+    - code: FALSE_POSITIVE
+      description: FRAUD
+    - code: SUSPICIOUS
+      description: AML
+    - code: NOT_SUSPICIOUS
+      description: AML
+    - code: EDD_APPROVED
+      description: EDD
+    - code: EDD_REJECTED
+      description: EDD
+    - code: SCREENING_CLEAR
+      description: SCREENING
+    - code: SCREENING_REJECT
+      description: SCREENING
+    - code: INSTRUCTION_EXECUTED
+      description: REGULATORY_INSTRUCTION
+    - code: REVIEW_COMPLETED
+      description: PERIODIC_REVIEW
+  caseAction:
+    description: CASE_CLOSED `recommendedActions[]`; case action types
+    values:
+    - code: FREEZE
+      description: wallet BLOCKED
+    - code: DEBIT_BLOCK
+      description: wallet DEBIT_BLOCKED
+    - code: LIEN
+      description: ledger hold AML_LIEN
+    - code: LIFT
+      description: lift a freeze
+    - code: SET_WATCH
+      description: wallet flag 1
+    - code: CLEAR_WATCH
+      description: clear wallet flag 1
+    - code: PROPOSE_BLACKLIST
+      description: limits-risk blacklist proposal
+    - code: STR_DRAFT
+      description: create STR draft
+    - code: REGRADE
+      description: RISK_REGRADE_RECOMMENDED
+    - code: RECOMMEND_REVERSAL
+      description: REVERSAL_RECOMMENDED
+    - code: SUSPEND_PARTNER
+      description: partner status SUSPENDED
+  freezeType:
+    description: FREEZE_* `freezeType`
+    values:
+    - code: FULL_BLOCK
+      description: wallet BLOCKED (F)
+    - code: DEBIT_BLOCK
+      description: wallet DEBIT_BLOCKED (X)
+    - code: LIEN
+      description: ledger hold
+  freezeReasonCode:
+    description: FREEZE_* `reasonCode` (wallet status / hold reason sent downstream)
+    values:
+    - code: AML_FREEZE
+      description: AML domain, regulatory instruction, sanctions auto-freeze
+    - code: FRAUD_FREEZE
+      description: FRAUD domain
+    - code: AML_LIEN
+      description: lien (both domains)
+  freezeStatus:
+    description: Freeze status (staff API)
+    values:
+    - code: REQUESTED
+      description: ''
+    - code: APPLIED
+      description: ''
+    - code: FAILED
+      description: ''
+    - code: LIFT_REQUESTED
+      description: ''
+    - code: LIFTED
+      description: ''
+  riskGrade:
+    description: RISK_REGRADE_RECOMMENDED `currentGrade` / `recommendedGrade`
+    values:
+    - code: LOW
+      description: ''
+    - code: MEDIUM
+      description: ''
+    - code: HIGH
+      description: ''
+  reversalReasonCode:
+    description: REVERSAL_RECOMMENDED `reasonCode` (closed)
+    values:
+    - code: FRAUD_CONFIRMED
+      description: confirmed fraud
+  alertSource:
+    description: Alert source (staff API)
+    values:
+    - code: FRAUD_RULE
+      description: risk.alerts
+    - code: AML_SCENARIO
+      description: monitoring scenario
+    - code: SCREENING
+      description: screening hit
+    - code: CUSTOMER_REPORT
+      description: R2
+    - code: MANUAL
+      description: staff
+    - code: EXTERNAL
+      description: R2 import
+    - code: REGULATORY
+      description: regulatory instruction
+problemReasons:
+- code: STATE_CONFLICT
+  reason: ACTIONS_PENDING
+  operations:
+  - POST /v1/cases/{caseId}:close
+  extensions: []
+- code: STATE_CONFLICT
+  reason: ACTION_NOT_ALLOWED
+  operations:
+  - POST /v1/cases/{caseId}/actions
+  extensions: []
+- code: STATE_CONFLICT
+  reason: ALERTS_NOT_DISPOSITIONED
+  operations:
+  - POST /v1/cases/{caseId}:propose-decision
+  extensions:
+  - pendingAlertIds
+- code: STATE_CONFLICT
+  reason: APPROVAL_EXPIRED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+  extensions: []
+- code: STATE_CONFLICT
+  reason: CASE_CLOSED
+  operations:
+  - POST /v1/cases/{caseId}/actions
+  - POST /v1/cases/{caseId}/evidence
+  - POST /v1/cases/{caseId}/notes
+  extensions: []
+- code: STATE_CONFLICT
+  reason: CHANGE_ALREADY_PENDING
+  operations:
+  - POST /v1/aml/scenarios/{code}:update
+  - POST /v1/freezes/{freezeId}:lift
+  - POST /v1/screening/settings
+  - POST /v1/screening/transliteration
+  extensions:
+  - approvalId
+- code: STATE_CONFLICT
+  reason: CTR_PERIOD_EXISTS
+  operations:
+  - POST /v1/ctr/reports
+  extensions:
+  - reportId
+- code: STATE_CONFLICT
+  reason: DECIDED_VIA_EDD_CASE
+  operations:
+  - POST /v1/screenings/{screeningId}:propose-decision
+  extensions:
+  - caseId
+- code: STATE_CONFLICT
+  reason: DECISION_NOT_ALLOWED
+  operations:
+  - POST /v1/cases/{caseId}:propose-decision
+  extensions: []
+- code: STATE_CONFLICT
+  reason: DUPLICATE_LIST_FILE
+  operations:
+  - POST /v1/screening/lists/{listCode}/versions
+  extensions:
+  - existingVersionId
+- code: STATE_CONFLICT
+  reason: DUPLICATE_REFERENCE
+  operations:
+  - POST /v1/regulatory-instructions
+  extensions:
+  - instructionId
+- code: STATE_CONFLICT
+  reason: EDD_CHECKLIST_INCOMPLETE
+  operations:
+  - POST /v1/cases/{caseId}:propose-decision
+  extensions:
+  - missingFields
+- code: STATE_CONFLICT
+  reason: EVIDENCE_INTEGRITY_FAILED
+  operations:
+  - GET /v1/cases/{caseId}/evidence/{evidenceId}
+  extensions: []
+- code: STATE_CONFLICT
+  reason: EXPORT_NOT_READY
+  operations:
+  - GET /v1/exports/aml/{jobId}/file
+  extensions: []
+- code: STATE_CONFLICT
+  reason: FILE_NOT_AVAILABLE
+  operations:
+  - GET /v1/ctr/reports/{reportId}/file
+  - GET /v1/str/{strId}/file
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: FILE_TOO_LARGE
+  operations:
+  - POST /v1/cases/{caseId}/evidence
+  - POST /v1/regulatory-instructions
+  - POST /v1/screening/lists/{listCode}/versions
+  extensions: []
+- code: STATE_CONFLICT
+  reason: FREEZE_ALREADY_ACTIVE
+  operations:
+  - POST /v1/cases/{caseId}/actions
+  extensions:
+  - freezeId
+- code: STATE_CONFLICT
+  reason: FREEZE_NOT_ACTIVE
+  operations:
+  - POST /v1/freezes/{freezeId}:lift
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: INVALID_SCENARIO_PARAMS
+  operations:
+  - POST /v1/aml/scenarios/{code}:update
+  extensions: []
+- code: STATE_CONFLICT
+  reason: INVALID_TRANSITION
+  operations:
+  - POST /v1/cases/{caseId}/alerts/{alertId}:disposition
+  - POST /v1/cases/{caseId}:assign
+  - POST /v1/cases/{caseId}:close
+  - POST /v1/cases/{caseId}:escalate
+  - POST /v1/cases/{caseId}:propose-decision
+  - POST /v1/cases/{caseId}:reopen
+  - POST /v1/cases/{caseId}:start
+  - POST /v1/ctr/reports/{reportId}:mark-submitted
+  - POST /v1/ctr/reports/{reportId}:submit
+  - POST /v1/freezes/{freezeId}:retry
+  - POST /v1/screening/lists/{listCode}/versions/{versionId}:submit
+  - POST /v1/screenings/{screeningId}/matches/{matchId}:disposition
+  - POST /v1/screenings/{screeningId}:propose-decision
+  - POST /v1/str/{strId}:mark-submitted
+  - POST /v1/str/{strId}:submit
+  - PUT /v1/str/{strId}
+  extensions: []
+- code: STATE_CONFLICT
+  reason: LIST_VERSION_HAS_ERRORS
+  operations:
+  - POST /v1/screening/lists/{listCode}/versions/{versionId}:submit
+  extensions: []
+- code: STATE_CONFLICT
+  reason: MATCHES_NOT_DISPOSITIONED
+  operations:
+  - POST /v1/screenings/{screeningId}:propose-decision
+  extensions:
+  - pendingMatchIds
+- code: ACTOR_NOT_ALLOWED
+  reason: NOT_CASE_ASSIGNEE
+  operations:
+  - POST /v1/cases/{caseId}/alerts/{alertId}:disposition
+  - POST /v1/cases/{caseId}/evidence
+  - POST /v1/cases/{caseId}/notes
+  - POST /v1/cases/{caseId}:close
+  - POST /v1/cases/{caseId}:escalate
+  - POST /v1/cases/{caseId}:propose-decision
+  - POST /v1/cases/{caseId}:start
+  extensions: []
+- code: STATE_CONFLICT
+  reason: NOT_PENDING
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+  extensions: []
+- code: STATE_CONFLICT
+  reason: RESCREEN_ALREADY_RUNNING
+  operations:
+  - POST /v1/screening/rescreens
+  extensions:
+  - jobId
+- code: STATE_CONFLICT
+  reason: REVALIDATION_FAILED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  extensions: []
+- code: STATE_CONFLICT
+  reason: SCENARIO_DISABLED
+  operations:
+  - POST /v1/aml/scenarios/{code}:run
+  extensions: []
+- code: STATE_CONFLICT
+  reason: SCENARIO_RESERVED
+  operations:
+  - POST /v1/aml/scenarios/{code}:update
+  extensions: []
+- code: DEPENDENCY_UNAVAILABLE
+  reason: SCREENING_INDEX_NOT_READY
+  operations:
+  - POST /v1/screenings
+  extensions: []
+- code: STATE_CONFLICT
+  reason: STR_EXISTS
+  operations:
+  - POST /v1/str
+  extensions:
+  - strId
+- code: STATE_CONFLICT
+  reason: STR_NOT_VALID
+  operations:
+  - POST /v1/str/{strId}:submit
+  extensions: []
+- code: STATE_CONFLICT
+  reason: STR_REQUIRED
+  operations:
+  - POST /v1/cases/{caseId}:close
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: UNSUPPORTED_FILE_FORMAT
+  operations:
+  - POST /v1/screening/lists/{listCode}/versions
+  extensions: []
+- code: STATE_CONFLICT
+  reason: VERSION_MISMATCH
+  operations:
+  - PUT /v1/str/{strId}
+  extensions: []
+problemExtensions:
+- name: existingVersionId
+  type: uuid
+  when: reason = DUPLICATE_LIST_FILE
+- name: jobId
+  type: uuid
+  when: reason = RESCREEN_ALREADY_RUNNING
+- name: pendingMatchIds
+  type: array<uuid>
+  when: reason = MATCHES_NOT_DISPOSITIONED
+- name: caseId
+  type: uuid
+  when: reason = DECIDED_VIA_EDD_CASE
+- name: approvalId
+  type: uuid
+  when: reason = CHANGE_ALREADY_PENDING
+- name: pendingAlertIds
+  type: array<uuid>
+  when: reason = ALERTS_NOT_DISPOSITIONED
+- name: missingFields
+  type: array<string>
+  when: reason = EDD_CHECKLIST_INCOMPLETE
+- name: freezeId
+  type: uuid
+  when: reason = FREEZE_ALREADY_ACTIVE
+- name: instructionId
+  type: uuid
+  when: reason = DUPLICATE_REFERENCE
+- name: reportId
+  type: uuid
+  when: reason = CTR_PERIOD_EXISTS
+- name: strId
+  type: uuid
+  when: reason = STR_EXISTS
+entityTypes:
+- module: null
+  values:
+  - ListVersion
+  - ScreeningSettings
+  - TransliterationChangeSet
+  - ScreeningDecision
+  - EddDecision
+  - CaseDecision
+  - CaseAction
+  - FreezeLift
+  - AutoFreezeReview
+  - RegulatoryInstruction
+  - StrReport
+  - CtrReport
+  - AmlScenario
+notificationTemplates:
+- code: CASE_ASSIGNED
+  category: INTERNAL
+  recipient: assignee `recipient.staffUserId`
+  trigger: case assigned
+  channels:
+  - IN_APP
+  variables:
+  - name: caseNo
+    type: TEXT
+    req: true
+  - name: domain
+    type: TEXT
+    req: true
+    notes: enum{AML, FRAUD}
+  - name: caseType
+    type: TEXT
+    req: true
+  - name: priority
+    type: TEXT
+    req: true
+  - name: slaDueAt
+    type: DATETIME
+    req: true
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: CASE_SLA_WARNING
+  category: INTERNAL
+  recipient: assignee `recipient.staffUserId`
+  trigger: case SLA warning (80 % elapsed)
+  channels:
+  - IN_APP
+  variables:
+  - name: caseNo
+    type: TEXT
+    req: true
+  - name: priority
+    type: TEXT
+    req: true
+  - name: slaDueAt
+    type: DATETIME
+    req: true
+  - name: percentElapsed
+    type: INT
+    req: true
+    notes: JSON integer, e.g. 80
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: CASE_SLA_BREACHED
+  category: INTERNAL
+  recipient: '`recipient.role` RISK_CHECKER (FRAUD) / CAMLCO (AML) + assignee `recipient.staffUserId` (one request each)'
+  trigger: case SLA breached
+  channels:
+  - IN_APP
+  variables:
+  - name: caseNo
+    type: TEXT
+    req: true
+  - name: domain
+    type: TEXT
+    req: true
+  - name: priority
+    type: TEXT
+    req: true
+  - name: slaDueAt
+    type: DATETIME
+    req: true
+  - name: escalationLevel
+    type: INT
+    req: true
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: CASE_UNASSIGNED
+  category: INTERNAL
+  recipient: '`recipient.role` RISK_CHECKER (FRAUD) / CAMLCO (AML)'
+  trigger: case open without assignee for > 2 h
+  channels:
+  - IN_APP
+  variables:
+  - name: caseNo
+    type: TEXT
+    req: true
+  - name: domain
+    type: TEXT
+    req: true
+  - name: priority
+    type: TEXT
+    req: true
+  - name: openedAt
+    type: DATETIME
+    req: true
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: SANCTIONS_AUTO_FREEZE
+  category: INTERNAL
+  recipient: '`recipient.role` = CAMLCO'
+  trigger: sanctions auto-freeze executed
+  channels:
+  - IN_APP
+  variables:
+  - name: caseNo
+    type: TEXT
+    req: true
+  - name: listCode
+    type: TEXT
+    req: true
+  - name: walletCount
+    type: INT
+    req: true
+  - name: frozenAt
+    type: DATETIME
+    req: true
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: FREEZE_FAILED
+  category: INTERNAL
+  recipient: '`recipient.role` CAMLCO (AML) / RISK_CHECKER (FRAUD)'
+  trigger: freeze could not be applied (FAILED)
+  channels:
+  - IN_APP
+  variables:
+  - name: freezeType
+    type: TEXT
+    req: true
+  - name: reference
+    type: TEXT
+    req: true
+    notes: <= 64
+  - name: walletIdMasked
+    type: TEXT
+    req: true
+    notes: first 8 chars + `…`
+  - name: lastError
+    type: TEXT
+    req: true
+  - name: deepLink
+    type: TEXT
+    req: true
+- code: WALLET_RESTRICTED_NOTICE
+  category: SERVICE
+  recipient: wallet holder `recipient.walletId`; channels IN_APP, SMS
+  trigger: regulatory-instruction freeze applied, only when `freeze.notify-customer-on-regulatory = true` (OPEN D-06)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: neutral text "regulatory instruction"; never the AML reason code
+  - name: helpline
+    type: TEXT
+    req: true
+    notes: <- param(SUPPORT.HELPLINE); filled by notification, not sent by compliance
+reasonCodes:
+- group: Risk regrade
+  field: case.events RISK_REGRADE_RECOMMENDED.reasonCode
+  values:
+  - AML_CASE_SUSPICIOUS
+  - FRAUD_CONFIRMED
+  - PERIODIC_REVIEW
+  status: OPEN D-32 (seed pending governance sign-off)
+txnRefPrefixes: []
+productCodes: []
+metrics:
+- name: bitspay_compliance_screenings_total
+  type: counter
+  labels:
+  - trigger
+  - result
+- name: bitspay_compliance_screening_seconds
+  type: histogram
+  labels:
+  - trigger
+- name: bitspay_compliance_candidates_capped_total
+  type: counter
+  labels: []
+- name: bitspay_compliance_rescreen_progress
+  type: gauge
+  labels:
+  - mode
+- name: bitspay_compliance_list_index_version
+  type: gauge
+  labels: []
+- name: bitspay_compliance_alerts_total
+  type: counter
+  labels:
+  - domain
+  - source
+  - scenario
+- name: bitspay_compliance_cases_open
+  type: gauge
+  labels:
+  - domain
+  - priority
+- name: bitspay_compliance_sla_breached_total
+  type: counter
+  labels:
+  - domain
+  - priority
+- name: bitspay_compliance_freezes_total
+  type: counter
+  labels:
+  - type
+  - status
+- name: bitspay_compliance_freeze_integration_errors_total
+  type: counter
+  labels:
+  - dependency
+  - kind
+- name: bitspay_compliance_scenario_run_seconds
+  type: histogram
+  labels:
+  - code
+- name: bitspay_compliance_scenario_runs_total
+  type: counter
+  labels:
+  - code
+  - status
+- name: bitspay_compliance_ctr_records_total
+  type: counter
+  labels: []
+- name: bitspay_compliance_str_total
+  type: counter
+  labels:
+  - status
+- name: bitspay_compliance_txn_ingest_rows_total
+  type: counter
+  labels:
+  - event_type
+  - outcome

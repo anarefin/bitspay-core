@@ -1,0 +1,19 @@
+<clickhouse>
+    <profiles>
+        <reporting_readonly><readonly>2</readonly></reporting_readonly>
+    </profiles>
+    <users>
+        <reporting_rw>
+            <password from_env="CLICKHOUSE_RW_PASSWORD"/>
+            <networks><ip>::/0</ip></networks>
+            <profile>default</profile>
+            <quota>default</quota>
+        </reporting_rw>
+        <reporting_ro>
+            <password from_env="CLICKHOUSE_RO_PASSWORD"/>
+            <networks><ip>::/0</ip></networks>
+            <profile>reporting_readonly</profile>
+            <quota>default</quota>
+        </reporting_ro>
+    </users>
+</clickhouse>

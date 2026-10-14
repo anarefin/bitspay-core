@@ -1,0 +1,73 @@
+{
+  "$comment": "Golden vectors for data contract transfer-id-derivation v1 (owner ledger-service). transferId = canonical UUID text of first 16 bytes of SHA-256(uuidBytes(commandId) || uint8(legIndex)), big-endian.",
+  "id": "transfer-id-derivation",
+  "version": 1,
+  "uuidToU128": [
+    {
+      "uuid": "00000000-0000-0000-0000-000000000200",
+      "u128Hex": "0x200"
+    },
+    {
+      "uuid": "fc214b7c-f80c-8143-4f0e-107e2518a302",
+      "hiHex": "0xfc214b7cf80c8143",
+      "loHex": "0x4f0e107e2518a302"
+    }
+  ],
+  "closeCommandId": {
+    "namespace": "6f1c0e1a-0b1d-4c9e-9d0a-6c2b7e3f8a01",
+    "name": "close:0192f2bb-0000-7000-8000-00000000b001",
+    "commandId": "9676d714-4bbe-5f5c-a7f9-57a98bfee5fe"
+  },
+  "vectors": [
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 0,
+      "transferId": "fc214b7c-f80c-8143-4f0e-107e2518a302"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 1,
+      "transferId": "3c9f8cd0-5cc5-1049-aa02-80dfc5c61a13"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 2,
+      "transferId": "586bb84d-c6dc-fcd7-62fc-a264483349f4"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 3,
+      "transferId": "a8580d2b-a5d2-6b88-74e8-76a669797f26"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 4,
+      "transferId": "7104de49-913d-6480-4d0d-893e4507b5c5"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 5,
+      "transferId": "2e0fd399-c0aa-a23b-e82c-c11333517134"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 6,
+      "transferId": "8a6a0a54-a6b7-a6b8-34c7-701106602198"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 7,
+      "transferId": "fdd34b67-9b1b-9cc1-1c20-6a919f387865"
+    },
+    {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "legIndex": 8,
+      "transferId": "f9e77e66-a4c9-6a6b-4ced-b45affd5acee"
+    },
+    {
+      "commandId": "00000000-0000-0000-0000-000000000000",
+      "legIndex": 0,
+      "transferId": "0a881118-5209-5cae-0453-40ea1f0b2799"
+    }
+  ]
+}

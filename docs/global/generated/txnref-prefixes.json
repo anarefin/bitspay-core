@@ -1,0 +1,201 @@
+[
+  {
+    "prefix": "PP",
+    "meaning": "P2P payment",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "CI",
+    "meaning": "Cash-in",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "CO",
+    "meaning": "Cash-out",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "MP",
+    "meaning": "Merchant payment",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "MR",
+    "meaning": "Merchant refund",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "FT",
+    "meaning": "Float transfer",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "RV",
+    "meaning": "Reversal",
+    "format": "{prefix}{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "owner": "transaction-service"
+  },
+  {
+    "prefix": "WC",
+    "kind": "ledger",
+    "meaning": "closure payout (ledger command 17, post-closure-payout)",
+    "format": "WC{yyMMdd}00{8 Crockford base32}",
+    "length": 18,
+    "carriedOnEvent": null,
+    "note": "no producer event carries it yet (OPEN D-51)",
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "A",
+    "kind": "business",
+    "meaning": "partnerCode of an AGENT (not a txnRef)",
+    "format": "A{8-digit sequence}{Luhn digit}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "M",
+    "kind": "business",
+    "meaning": "partnerCode of a MERCHANT (not a txnRef)",
+    "format": "M{8-digit sequence}{Luhn digit}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "D",
+    "kind": "business",
+    "meaning": "partnerCode of a DISTRIBUTOR (not a txnRef)",
+    "format": "D{8-digit sequence}{Luhn digit}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "I",
+    "kind": "business",
+    "meaning": "partnerCode of an INSTITUTION (not a txnRef)",
+    "format": "I{8-digit sequence}{Luhn digit}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "Q",
+    "kind": "business",
+    "meaning": "dynamic Bangla QR reference (tag 62.05; not a txnRef)",
+    "format": "Q{9 Crockford base32}",
+    "length": 10,
+    "owner": "wallet-service"
+  },
+  {
+    "prefix": "CR",
+    "meaning": "campaign reward (ledger post-campaign-reward)",
+    "format": "CR{yyMMdd}00{8 Crockford}",
+    "length": 18,
+    "carriedOn": "REWARD_GRANTED.txnRef",
+    "owner": "pricing-service"
+  },
+  {
+    "prefix": "CC",
+    "meaning": "campaign clawback (ledger post-reversal of an own reward)",
+    "format": "CC{yyMMdd}00{8 Crockford}",
+    "length": 18,
+    "carriedOn": "REWARD_CLAWED_BACK.clawbackTxnRef",
+    "owner": "pricing-service"
+  },
+  {
+    "prefix": "CMS-",
+    "meaning": "commission settlement (ledger post-commission-settlement)",
+    "format": "CMS-{yyyyMMdd(periodEnd)}-{8 Crockford}",
+    "length": 21,
+    "carriedOn": "COMMISSION_SETTLED.txnRef",
+    "owner": "pricing-service"
+  },
+  {
+    "prefix": "EI",
+    "meaning": "e-money issuance (ledger command post-emoney-issue)",
+    "format": "{prefix}{yyMMdd}{10 Crockford base32}",
+    "length": 18,
+    "owner": "treasury-service"
+  },
+  {
+    "prefix": "ER",
+    "meaning": "e-money redemption (ledger command post-emoney-redeem)",
+    "format": "{prefix}{yyMMdd}{10 Crockford base32}",
+    "length": 18,
+    "owner": "treasury-service"
+  },
+  {
+    "prefix": "TR",
+    "meaning": "trust rebalance (ledger command post-trust-rebalance)",
+    "format": "{prefix}{yyMMdd}{10 Crockford base32}",
+    "length": 18,
+    "owner": "treasury-service"
+  },
+  {
+    "prefix": "MJ",
+    "meaning": "manual journal (ledger command post-adjustment)",
+    "format": "{prefix}{yyMMdd}{10 Crockford base32}",
+    "length": 18,
+    "owner": "treasury-service"
+  },
+  {
+    "prefix": "BD",
+    "kind": "non-ledger-reference",
+    "meaning": "batchRef of a disbursement batch (never sent to the ledger, never a txnRef)",
+    "format": "BD{yyMMdd}{8 Crockford base32}",
+    "length": 16,
+    "example": "BD261009K7Q2M4ZD",
+    "open": "D-13",
+    "owner": "disbursement-service"
+  },
+  {
+    "prefix": "RQ",
+    "kind": "non-ledger-reference",
+    "meaning": "requestRef of a payment request (never sent to the ledger, never a txnRef)",
+    "format": "RQ{yyMMdd}{8 Crockford base32}",
+    "length": 16,
+    "example": "RQ261009P3X8K2NM",
+    "open": "D-13",
+    "owner": "disbursement-service"
+  },
+  {
+    "prefix": "BD…-",
+    "kind": "derived-reference",
+    "meaning": "rowRef = {batchRef}-{rowNo}: human-readable ID of one disbursement credit (not a txnRef; no per-row txnRef prefix exists)",
+    "format": "{batchRef}-{rowNo}",
+    "length": "<= 24",
+    "example": "BD261009K7Q2M4ZD-42",
+    "open": "D-13",
+    "owner": "disbursement-service"
+  },
+  {
+    "prefix": "T",
+    "meaning": "support ticket number — a human-readable non-ledger business reference; never a txnRef, never sent to the ledger",
+    "format": "T{yyMMdd}{6+ digit daily seq} (Asia/Dhaka calendar date), 13..14 chars, e.g. T261009000123",
+    "owner": "support-service"
+  },
+  {
+    "prefix": "RCA-",
+    "meaning": "reconciliation ledger adjustment (command 11, module reconciliation)",
+    "format": "RCA-{yyyyMMdd}-{8 Crockford base32} (21 chars)",
+    "owner": "finance-ops-service"
+  },
+  {
+    "prefix": "GLJ",
+    "meaning": "GL journal reference (never a ledger txnRef; no ledger command uses it)",
+    "format": "GLJ-{yyyyMMdd}-L-R{revision} for LEDGER_DAY; GLJ-{yyyyMMdd}-{M|A|X|R|I|Y|O}-{6-digit seq per day} otherwise",
+    "owner": "general-ledger-service"
+  }
+]

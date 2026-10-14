@@ -1,0 +1,55 @@
+{
+  "eventId": "0192f4d0-1111-7c00-8a00-000000000001",
+  "eventType": "PARTNER_UPSERTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T10:00:00.412Z",
+  "producer": "wallet-service",
+  "aggregateType": "Partner",
+  "aggregateId": "0192f4a0-0a01-7c00-8a00-00000000a001",
+  "correlationId": "c-7d1e0a",
+  "data": {
+    "partnerId": "0192f4a0-0a01-7c00-8a00-00000000a001",
+    "partnerCode": "A000045674",
+    "partnerType": "AGENT",
+    "subType": "RETAIL",
+    "categoryCode": 101,
+    "mcc": null,
+    "walletId": "0192f4a1-0a01-7c00-8a00-00000000a001",
+    "parentPartnerId": "0192f4a0-0d03-7c00-8a00-00000000d003",
+    "ancestorPartnerIds": [
+      "0192f4a0-0d03-7c00-8a00-00000000d003",
+      "0192f4a0-0d02-7c00-8a00-00000000d002",
+      "0192f4a0-0d01-7c00-8a00-00000000d001"
+    ],
+    "ancestorWalletIds": [
+      "0192f4a1-0d03-7c00-8a00-00000000d003",
+      "0192f4a1-0d02-7c00-8a00-00000000d002",
+      "0192f4a1-0d01-7c00-8a00-00000000d001"
+    ],
+    "territory": {
+      "division": "30",
+      "district": "3026",
+      "upazila": "302648",
+      "union": null
+    },
+    "status": "ACTIVE",
+    "displayName": "SALMA TELECOM",
+    "msisdn": "8801712345678",
+    "settlementMode": "WALLET",
+    "version": 5,
+    "effectiveFrom": "2026-10-09T10:00:00.000Z",
+    "legalName": "Salma Telecom",
+    "riskGrade": "LOW",
+    "keyPersons": [
+      {
+        "personId": "0192f4b2-0001-7c00-8a00-0000000000c1",
+        "role": "PROPRIETOR",
+        "nameEn": "Salma Begum",
+        "nameBn": "সালমা বেগম",
+        "nidHash": "4be1a0c3d5e7f9012b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192",
+        "dob": "1990-02-14"
+      }
+    ],
+    "tinPresent": true
+  }
+}

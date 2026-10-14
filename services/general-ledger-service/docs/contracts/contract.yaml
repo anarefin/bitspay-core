@@ -1,0 +1,154 @@
+service: general-ledger-service
+number: "16"
+modules: []
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-9
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # 41 operations. Catalogued service reads (x-audience: service): GET /v1/gl/days/{businessDate},
+      # GET /v1/gl/days/{businessDate}/control-totals, GET /v1/gl/accounts, GET /v1/gl/accounts/{code}.
+      # All others: x-audience staff; POST /v1/internal/jobs/gl-day-close:run is internal (local/dev profiles only).
+  events:
+    - topic: gl.events
+      key: "businessDate (GL_DAY_CLOSED, GL_DAY_CERTIFIED) · periodId (GL_PERIOD_STATUS_CHANGED) · journalId (GL_JOURNAL_POSTED) · code (GL_ACCOUNT_UPSERTED) · exceptionId (GL_EXCEPTION_RAISED)"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 1, prod: 3}
+      retention: 14d
+      transport: outbox
+      eventTypes:
+        - {type: GL_DAY_CLOSED, version: 1, aggregateType: GlDay, schema: provided/events/gl.events/GL_DAY_CLOSED.v1.schema.json, example: provided/events/gl.events/GL_DAY_CLOSED.v1.example.json}
+        - {type: GL_DAY_CERTIFIED, version: 1, aggregateType: GlDay, schema: provided/events/gl.events/GL_DAY_CERTIFIED.v1.schema.json, example: provided/events/gl.events/GL_DAY_CERTIFIED.v1.example.json}
+        - {type: GL_PERIOD_STATUS_CHANGED, version: 1, aggregateType: GlPeriod, schema: provided/events/gl.events/GL_PERIOD_STATUS_CHANGED.v1.schema.json, example: provided/events/gl.events/GL_PERIOD_STATUS_CHANGED.v1.example.json}
+        - {type: GL_JOURNAL_POSTED, version: 1, aggregateType: GlJournal, schema: provided/events/gl.events/GL_JOURNAL_POSTED.v1.schema.json, example: provided/events/gl.events/GL_JOURNAL_POSTED.v1.example.json}
+        - {type: GL_ACCOUNT_UPSERTED, version: 1, aggregateType: GlAccount, schema: provided/events/gl.events/GL_ACCOUNT_UPSERTED.v1.schema.json, example: provided/events/gl.events/GL_ACCOUNT_UPSERTED.v1.example.json}
+        - {type: GL_EXCEPTION_RAISED, version: 1, aggregateType: GlException, schema: provided/events/gl.events/GL_EXCEPTION_RAISED.v1.schema.json, example: provided/events/gl.events/GL_EXCEPTION_RAISED.v1.example.json}
+  inboundTopics: []
+  data:
+    - {id: gl-export-generic-csv, version: 1, file: provided/data/gl-export-generic-csv.v1.md, kind: file-format}
+    - {id: gl-posting-golden-vectors, version: 1, file: provided/data/gl-posting-golden-vectors.v1.json, kind: golden-vectors}
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "registry fallback: account type of a ledger account (wallet) not yet seen on wallet.events; failure defers the leg, never guessed"
+      fieldsUsed: ["path.id", "res.accountId", "res.accountType"]
+      codesUsed: [{set: accountType, values: [100, 110, 120, 130, 140]}]   # names CUSTOMER_WALLET..INSTITUTION_WALLET on the wire
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "leg deferred (cause UNKNOWN_ACCOUNT), retried by DeferredResolverJob; 1999 + CRITICAL after unknown-account-wait (1 h), re-keyed later"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts/balances:batchGet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "informational ledger panel on GET /v1/gl/days/{businessDate} (system and trust account balances now)"
+      fieldsUsed: ["req.accountIds", "res.items[].accountId", "res.items[].accountType", "res.items[].ledgerBalancePoisha", "res.items[].asOf", "res.notFound"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "panel shows NOT_AVAILABLE; no close or check depends on it"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/system-balance-sheet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "informational panel on GET /v1/gl/days/{businessDate} (trust mirror total vs GL trust accounts)"
+      fieldsUsed: ["res.asOf", "res.trustMirrorTotalPoisha", "res.trustAccounts[].trustIndex", "res.trustAccounts[].mirrorBalancePoisha", "res.systemAccounts[].accountType", "res.systemAccounts[].balancePoisha", "res.identityHolds"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "panel shows NOT_AVAILABLE"}
+
+  events:
+    - producer: ledger-service
+      topic: ledger.changes
+      eventType: LEDGER_TRANSFER_POSTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.ledger
+      purpose: "stage-1 ingestion into the sub-ledger summary; exactly once via DB-stored offsets (no processed_event), TB-timestamp watermark per partition"
+      fieldsUsed: ["transferId", "commandId", "commandType", "legIndex", "code", "debitAccountId", "creditAccountId", "amountPoisha", "pendingId", "flags", "timestamp",
+                   "debitAccountBalanceAfter.debitsPosted", "debitAccountBalanceAfter.creditsPosted", "creditAccountBalanceAfter.debitsPosted", "creditAccountBalanceAfter.creditsPosted", "reasonCode"]
+      codesUsed:
+        - {set: transferCode, values: "*"}
+        - {set: commandType, values: "*"}
+        - {set: transferFlag, values: [pending, post_pending_transfer, void_pending_transfer]}
+      ordering: "relies on ascending TB timestamp within a partition (re-publication possible, never reordering)"
+    - producer: wallet-service
+      topic: wallet.events
+      eventType: WALLET_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.wallet
+      purpose: "ledger account registry walletId → walletType (latest version wins); compacted, read from earliest"
+      fieldsUsed: ["walletId", "walletType", "version"]
+      codesUsed: [{set: walletType, values: [C, A, D, M, I]}]
+    - producer: treasury-service
+      topic: treasury.events
+      eventType: TRUST_INTEREST_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.treasury
+      purpose: "AUTO_INTEREST journal Dr 1150 / Cr 4301 (flag bitspay.gl.interest.auto-journal.enabled, default false); correction = delta on later recordedAt"
+      fieldsUsed: ["interestId", "trustAccountId", "ledgerTrustAccountId", "month", "interestPoisha", "recordedAt"]
+      codesUsed: []
+    - producer: treasury-service
+      topic: treasury.events
+      eventType: MANUAL_JOURNAL_POSTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.treasury
+      purpose: "reason of a ledger command 11 (gl_command_reason), used only by rule sets with reason keys (none in rule set v1)"
+      fieldsUsed: ["ledgerCommandId", "reasonCode"]
+      codesUsed: []
+    - producer: treasury-service
+      topic: treasury.events
+      eventType: EMONEY_REDEEMED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.treasury
+      purpose: "reason of a ledger command 10 (gl_command_reason), used only by rule sets with reason keys (none in rule set v1)"
+      fieldsUsed: ["ledgerCommandId", "reasonCode"]
+      codesUsed: []
+    - producer: finance-ops-service
+      topic: recon.events
+      eventType: RECON_RUN_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.recon
+      purpose: "certification of a GL day revision by the reconciliation GL tie-out (type GL_TIEOUT); other run types are ignored (FILTERED)"
+      fieldsUsed: ["runId", "type", "businessDate", "status", "exceptions", "summary.glTieOut", "summary.glRevision"]
+      codesUsed:
+        - {set: reconRunType, values: [GL_TIEOUT]}
+        - {set: reconRunCompletedStatus, values: [COMPLETED, COMPLETED_WITH_EXCEPTIONS, FAILED, RESTATED]}
+        - {set: glTieOutResult, values: [MATCHED, BREAK]}
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: general-ledger-service.refdata
+      purpose: "SYSTEM_PARAM CUTOFF.EOD, CUTOFF.EOD_GRACE_MINUTES, CALENDAR.TIMEZONE, CALENDAR.WEEKEND_DAYS, GL.FISCAL_YEAR_START_MONTH and HOLIDAY items into system_param (latest version wins); all other items FILTERED"
+      fieldsUsed: ["type", "code", "attributes.valueType", "attributes.value", "attributes.date", "attributes.bankHoliday", "version", "active"]
+      codesUsed: [{set: refdataType, values: [SYSTEM_PARAM, HOLIDAY]}]
+
+  inboundTopics:
+    - {owner: admin-service, topic: notification.requests, eventType: NOTIFICATION_REQUESTED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"],
+       templates: [GL_DAY_CLOSE_BLOCKED, GL_DAY_CLOSED_WITH_EXCEPTIONS, GL_DAY_CERTIFICATION_FAILED, GL_UNMAPPED_POSTING, GL_PERIOD_CLOSED, GL_EXPORT_READY, GL_EXPORT_FAILED]}
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_REQUESTED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"]}
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_DECIDED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"]}
+    - {owner: admin-service, topic: approval.events, eventType: APPROVAL_EXPIRED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"]}
+    - {owner: admin-service, topic: audit.events, eventType: AUDIT_RECORDED, version: 1, pinnedContractVersion: 1.0.0, fieldsUsed: ["*"]}
+
+  data: []
+
+  codes:
+    - {producer: admin-service, set: refdataType, values: [SYSTEM_PARAM, HOLIDAY]}
+    - {producer: ledger-service, set: accountType, values: "*"}
+    - {producer: ledger-service, set: transferCode, values: "*"}
+    - {producer: ledger-service, set: commandType, values: "*"}
+
+  refdata:
+    - {type: SYSTEM_PARAM, codes: ["CUTOFF.EOD", "CUTOFF.EOD_GRACE_MINUTES", "CALENDAR.TIMEZONE", "CALENDAR.WEEKEND_DAYS", "GL.FISCAL_YEAR_START_MONTH"]}
+    - {type: HOLIDAY, codes: ["*"]}

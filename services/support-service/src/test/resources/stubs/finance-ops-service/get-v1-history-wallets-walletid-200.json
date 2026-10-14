@@ -1,0 +1,45 @@
+{
+  "name": "GET /v1/history/wallets/{walletId} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/history/wallets/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "txnRef": "PP26100900K3M9QX2A",
+          "txnType": "P2P",
+          "status": "COMPLETED",
+          "direction": "OUT",
+          "amountPoisha": 50000,
+          "feePoisha": 500,
+          "vatPoisha": 75,
+          "totalDebitPoisha": 50575,
+          "counterparty": {
+            "walletId": "0192f2bb-0000-7000-8000-00000000b001",
+            "displayName": "Karim A****",
+            "msisdnMasked": "8801900****02"
+          },
+          "channel": "APP",
+          "createdAt": "2026-10-09T04:03:22.000Z",
+          "completedAt": "2026-10-09T04:03:22.123Z",
+          "failureCode": null,
+          "originalTxnRef": null,
+          "source": "TRANSACTION"
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "finance-ops-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

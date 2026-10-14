@@ -1,0 +1,46 @@
+[
+  {
+    "code": "P2P",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "CASH_IN",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "CASH_OUT",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "MERCHANT_PAYMENT",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "MERCHANT_REFUND",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "FLOAT_TRANSFER",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "REVERSAL",
+    "owner": "transaction-service"
+  },
+  {
+    "code": "CAMPAIGN",
+    "owner": "pricing-service"
+  },
+  {
+    "code": "DISBURSEMENT",
+    "owner": "disbursement-service"
+  },
+  {
+    "code": "SCHEDULED_TRANSFER",
+    "owner": "disbursement-service"
+  },
+  {
+    "code": "REQUEST_MONEY",
+    "owner": "disbursement-service"
+  }
+]

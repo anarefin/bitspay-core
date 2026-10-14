@@ -1,0 +1,3667 @@
+# ledger-service (SVC-01) provided REST contract. contractVersion 1.0.0. Changes only via CHANGE-PROCESS.
+openapi: 3.1.0
+info:
+  title: ledger-service API
+  version: 1.0.0
+  description: 'Provided REST contract of ledger-service (SVC-01), contractVersion 1.0.0, kernel 1.0. The only door to TigerBeetle: business commands, account lifecycle and ledger reads. Headers, errors
+    and pagination follow kernel K3. Ledger idempotency is keyed on commandId (kernel K3.3 rule 6 exception); Idempotency-Key is optional and ignored. Money is int64 poisha. Every 128-bit id is canonical
+    lower-case UUID text. Request bodies tolerate unknown fields, except the reserved names feeBearer SHARED / payerShareBps and command 13 vatPoisha, which are rejected with 400. x-actors: allowed actor
+    types; for SERVICE/SYSTEM the allowed X-Actor-Id values; for STAFF the roles (''*'' = any K7 role).'
+servers:
+- url: http://ledger-service:8101
+  description: Compose stack
+- url: http://localhost:8101
+  description: local
+tags:
+- name: commands
+- name: accounts
+- name: reads
+- name: internal
+paths:
+  /v1/ledger/commands/post-p2p:
+    post:
+      operationId: command_post_p2p
+      summary: 'Command 1 post-p2p: P2P payment (customer -> customer)'
+      description: 'Ledger command type 1. Guard: from 100 -> to 100. Principal code 1001. Leg templates in SPEC §7.3. Idempotency: commandId (same commandId + same body => EXISTS with the original result;
+        different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 1
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+              txnRef: PP26100900K3M9QX2A
+              fromAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              toAccountId: 0192f2bb-0000-7000-8000-00000000b001
+              amountPoisha: 50000
+              pricing:
+                feePoisha: 500
+                vatPoisha: 75
+                feeBearer: PAYER
+                commissionPoisha: 0
+                commissionSource: FEE_INCOME
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints:
+                destinationMaxBalancePoisha: 30000000
+              metadata:
+                channel: APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - fc214b7c-f80c-8143-4f0e-107e2518a302
+                    - 3c9f8cd0-5cc5-1049-aa02-80dfc5c61a13
+                    - 586bb84d-c6dc-fcd7-62fc-a264483349f4
+                    postedAt: '2026-10-09T08:03:22.123Z'
+                exists:
+                  summary: EXISTS (replay of the same commandId and body)
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    result: EXISTS
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - fc214b7c-f80c-8143-4f0e-107e2518a302
+                    - 3c9f8cd0-5cc5-1049-aa02-80dfc5c61a13
+                    - 586bb84d-c6dc-fcd7-62fc-a264483349f4
+                    postedAt: '2026-10-09T08:03:22.123Z'
+                rejected:
+                  summary: REJECTED INSUFFICIENT_FUNDS
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    result: REJECTED
+                    rejectionCode: INSUFFICIENT_FUNDS
+                    detail: 'leg 0: exceeds_credits'
+                    transferIds: []
+                    postedAt: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-cash-in:
+    post:
+      operationId: command_post_cash_in
+      summary: 'Command 2 post-cash-in: Cash-in (agent -> customer)'
+      description: 'Ledger command type 2. Guard: from 110 -> to 100; commission beneficiary in {110, 120}. Principal code 1002. Idempotency: commandId (same commandId + same body => EXISTS with the original
+        result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <=
+        20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 2
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3d1-0000-7000-8000-000000000001
+              txnRef: CI26100900M2Q7X4KD
+              fromAccountId: 0192f2cc-0000-7000-8000-00000000c003
+              toAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              amountPoisha: 100000
+              pricing:
+                feePoisha: 0
+                vatPoisha: 0
+                feeBearer: PAYER
+                commissionPoisha: 400
+                commissionSource: COMMISSION_PAYABLE
+                commissionBeneficiaryAccountId: 0192f2cc-0000-7000-8000-00000000c003
+                aitPoisha: 40
+              constraints:
+                destinationMaxBalancePoisha: 30000000
+              metadata:
+                channel: PARTNER_APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3d1-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 4514ecc9-437b-09fe-e1ff-a43b5be2e77c
+                    - 0019c94d-588f-eaa8-dfcb-c47ea31a3754
+                    - 7874e16d-b9ce-e9be-220c-c19a416f7f54
+                    postedAt: '2026-10-09T08:30:00.412Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-cash-out:
+    post:
+      operationId: command_post_cash_out
+      summary: 'Command 3 post-cash-out: Cash-out (customer -> agent)'
+      description: 'Ledger command type 3. Guard: from 100 -> to 110; commission beneficiary in {110, 120}. Principal code 1003. Idempotency: commandId (same commandId + same body => EXISTS with the original
+        result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <=
+        20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 3
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3d0-0000-7000-8000-000000000001
+              txnRef: CO26100900H4W8P2ZN
+              fromAccountId: 0192f2bb-0000-7000-8000-00000000b002
+              toAccountId: 0192f2cc-0000-7000-8000-00000000c003
+              amountPoisha: 50000
+              pricing:
+                feePoisha: 750
+                vatPoisha: 112
+                feeBearer: PAYER
+                commissionPoisha: 300
+                commissionSource: FEE_INCOME
+                commissionBeneficiaryAccountId: 0192f2cc-0000-7000-8000-00000000c003
+                aitPoisha: 30
+              constraints:
+                destinationMaxBalancePoisha: 500000000
+              metadata:
+                channel: USSD
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3d0-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - c5b496e8-1aa9-093d-930a-e107848107c2
+                    - aa8c5943-a9ea-25bf-1e15-2fbe19752f1f
+                    - 08f54db5-44b8-87b7-f16f-965f75f64b01
+                    - 127ae35f-10e2-5ac5-89f9-16c567ae0950
+                    - dc466b2d-ca31-7df9-d5b5-01f5ec55fbe4
+                    postedAt: '2026-10-09T08:10:05.481Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-merchant-payment:
+    post:
+      operationId: command_post_merchant_payment
+      summary: 'Command 4 post-merchant-payment: Merchant payment (customer -> merchant)'
+      description: 'Ledger command type 4. Guard: from 100 -> to 130. Principal code 1004. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED
+        is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 4
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3d2-0000-7000-8000-000000000001
+              txnRef: MP26100900T5R8K2WB
+              fromAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              toAccountId: 0192f2dd-0000-7000-8000-00000000d004
+              amountPoisha: 35000
+              pricing:
+                feePoisha: 525
+                vatPoisha: 79
+                feeBearer: PAYEE
+                commissionPoisha: 0
+                commissionSource: null
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints: null
+              metadata:
+                channel: APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3d2-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 67d4ed29-7228-8ac1-b868-df912edc7d8b
+                    - d1279d70-33a5-bcdc-91c1-e5db21470bcd
+                    - fbefb4db-dd3a-f572-29da-f091e5e0cdfa
+                    postedAt: '2026-10-09T08:30:00.412Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-merchant-refund:
+    post:
+      operationId: command_post_merchant_refund
+      summary: 'Command 5 post-merchant-refund: Merchant refund (merchant -> customer)'
+      description: 'Ledger command type 5. Guard: from 130 -> to 100. Principal code 1005. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED
+        is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 5
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3d3-0000-7000-8000-000000000001
+              txnRef: MR26100900B6N3Q8ZT
+              fromAccountId: 0192f2dd-0000-7000-8000-00000000d004
+              toAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              amountPoisha: 35000
+              pricing:
+                feePoisha: 0
+                vatPoisha: 0
+                feeBearer: PAYER
+                commissionPoisha: 0
+                commissionSource: null
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints:
+                destinationMaxBalancePoisha: 30000000
+              metadata:
+                channel: PARTNER_APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3d3-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 63521298-cb3c-e735-2dfb-3f1a63a25554
+                    postedAt: '2026-10-09T08:30:00.412Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-float-transfer:
+    post:
+      operationId: command_post_float_transfer
+      summary: 'Command 6 post-float-transfer: Float transfer (distributor/agent <-> distributor/agent)'
+      description: 'Ledger command type 6. Guard: from {110, 120} -> to {110, 120}. Principal code 1006. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different
+        body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 20 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+      x-command-type: 6
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommandRequest'
+            example:
+              commandId: 0192f3d4-0000-7000-8000-000000000001
+              txnRef: FT26100900W3K9P5MD
+              fromAccountId: 0192f2ee-0000-7000-8000-00000000e120
+              toAccountId: 0192f2cc-0000-7000-8000-00000000c003
+              amountPoisha: 5000000
+              pricing:
+                feePoisha: 0
+                vatPoisha: 0
+                feeBearer: PAYER
+                commissionPoisha: 0
+                commissionSource: null
+                commissionBeneficiaryAccountId: null
+                aitPoisha: 0
+              constraints: null
+              metadata:
+                channel: PARTNER_APP
+                initiatorActorId: 0192f1bb-0000-7000-8000-000000000001
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f3d4-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - dedec24a-80c2-300c-08a5-444c78da5acb
+                    postedAt: '2026-10-09T08:30:00.412Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-reversal:
+    post:
+      operationId: command_post_reversal
+      summary: 'Command 7 post-reversal: Reversal (compensating mirror legs, optional hold void)'
+      description: 'Ledger command type 7. Leg 0 = void of releaseHoldCommandId''s hold; leg 1+i = mirror of original leg i (code 1013). At most one posted reversal per original. Idempotency: commandId
+        (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only
+        in the `local` profile). Lane online; service-side p99 <= 40 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+        - pricing-service
+        rule: 'pricing-service (campaign module only): original must be command type 12 and reverseFee = reverseCommission = false (flag true => 400 VALIDATION_FAILED; other original type => REJECTED OTHER
+          NOT_REVERSIBLE); never sends amountPoisha or releaseHoldCommandId'
+      x-command-type: 7
+      x-rejection-codes:
+      - ORIGINAL_NOT_FOUND
+      - ALREADY_REVERSED
+      - HOLD_NOT_FOUND
+      - INSUFFICIENT_FUNDS
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReversalCommandRequest'
+            example:
+              commandId: 0192f4a0-0000-7000-8000-000000000001
+              txnRef: RV26100900Q2D5M8XT
+              originalCommandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+              reverseFee: true
+              reverseCommission: true
+              releaseHoldCommandId: 0192f5aa-0000-7000-8000-000000000001
+              amountPoisha: null
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f4a0-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - c6d74bfc-9f92-5091-7130-6843b971ba38
+                    - a66ac277-0275-9166-f478-3d0c830b968b
+                    - b065c298-89d5-243b-c4ee-6cdce0f44029
+                    - 8c5abd7a-5677-220e-a280-773632c60302
+                    postedAt: '2026-10-09T09:20:41.007Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-disbursement-batch:
+    post:
+      operationId: command_post_disbursement_batch
+      summary: 'Command 8 post-disbursement-batch: Disbursement batch (<= 1,000 rows, one chain per row)'
+      description: 'Ledger command type 8. Per row: leg 0 payer -> row toAccountId, code 1007; legs 5-8 technical when constraints set. 409 only if every row conflicts; a single row conflict => that row
+        REJECTED OTHER detail IDEMPOTENCY_CONFLICT. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command
+        endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane bulk; service-side p99 <= 250 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - disbursement-service
+      x-command-type: 8
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisbursementBatchRequest'
+            example:
+              batchId: 0192f400-1111-7000-8000-000000000001
+              payerAccountId: 0192f2ee-0000-7000-8000-00000000e001
+              rows:
+              - commandId: 5b1f3c2e-9a7d-5e41-8c0b-2f6d1a9e4b70
+                toAccountId: 0192f2aa-0000-7000-8000-00000000a001
+                amountPoisha: 1500000
+                constraints:
+                  destinationMaxBalancePoisha: 30000000
+              - commandId: 6c2a4d3f-0b8e-5f52-9d1c-3a7e2b0f5c81
+                toAccountId: 0192f2aa-0000-7000-8000-00000000a002
+                amountPoisha: 1500000
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisbursementBatchResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    batchId: 0192f400-1111-7000-8000-000000000001
+                    results:
+                    - commandId: 5b1f3c2e-9a7d-5e41-8c0b-2f6d1a9e4b70
+                      result: OK
+                      rejectionCode: null
+                      detail: null
+                      transferIds:
+                      - cd88d35c-9eac-ed16-d7b3-da141b9bc743
+                      postedAt: '2026-10-09T09:00:01.002Z'
+                    - commandId: 6c2a4d3f-0b8e-5f52-9d1c-3a7e2b0f5c81
+                      result: REJECTED
+                      rejectionCode: ACCOUNT_CLOSED
+                      detail: 'leg 0: credit_account_already_closed'
+                      transferIds: []
+                      postedAt: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-emoney-issue:
+    post:
+      operationId: command_post_emoney_issue
+      summary: 'Command 9 post-emoney-issue: E-money issuance (trust -> wallet)'
+      description: 'Ledger command type 9. Single transfer, code 1008: debit trustAccountId, credit toAccountId. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different
+        body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - treasury-service
+      x-command-type: 9
+      x-rejection-codes:
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmoneyIssueRequest'
+            example:
+              commandId: 0192f520-0000-7000-8000-000000000001
+              txnRef: EI261009K3M9QX2A7B
+              trustAccountId: 00000000-0000-0000-0000-000000030001
+              toAccountId: 0192f2dd-0000-7000-8000-00000000d001
+              amountPoisha: 100000000
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f520-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 0e96d31c-4306-80bd-572f-5b5d0b500c27
+                    postedAt: '2026-10-09T07:30:00.415Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-emoney-redeem:
+    post:
+      operationId: command_post_emoney_redeem
+      summary: 'Command 10 post-emoney-redeem: E-money redemption (wallet/system -> trust)'
+      description: 'Ledger command type 10. Single transfer, code 1009: debit fromAccountId, credit trustAccountId. Trust attribution below 0 => REJECTED INSUFFICIENT_FUNDS detail TRUST_ATTRIBUTION_EXCEEDED.
+        Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE
+        (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - treasury-service
+      x-command-type: 10
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmoneyRedeemRequest'
+            example:
+              commandId: 0192f521-0000-7000-8000-000000000001
+              txnRef: ER261009H4W8P2ZN5C
+              fromAccountId: 00000000-0000-0000-0000-000000000200
+              trustAccountId: 00000000-0000-0000-0000-000000030001
+              amountPoisha: 2500000
+              reasonCode: REVENUE_SWEEP
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f521-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - e4ed2435-f1cb-361a-8d58-be13a1fe38ac
+                    postedAt: '2026-10-09T16:45:12.090Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-adjustment:
+    post:
+      operationId: command_post_adjustment
+      summary: 'Command 11 post-adjustment: Adjustment / manual journal'
+      description: 'Ledger command type 11. Single transfer, code 1010. Which accounts are allowed is caller policy; the ledger only forbids 900/910 and debit = credit. Idempotency: commandId (same commandId
+        + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile).
+        Lane online; service-side p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - treasury-service
+        - finance-ops-service
+        rule: 'finance-ops-service: reconciliation module only (caller-guaranteed)'
+      x-command-type: 11
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentRequest'
+            example:
+              commandId: 0192f540-0000-7000-8000-000000000001
+              txnRef: RCA-20261010-K3M9QX2A
+              debitAccountId: 00000000-0000-0000-0000-000000000400
+              creditAccountId: 00000000-0000-0000-0000-000000030001
+              amountPoisha: 10000
+              reasonCode: RECON_BANK_CHARGE
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f540-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 23a510af-d593-ee78-ca9c-986988fbc494
+                    postedAt: '2026-10-10T06:12:44.301Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-campaign-reward:
+    post:
+      operationId: command_post_campaign_reward
+      summary: 'Command 12 post-campaign-reward: Campaign reward (CAMPAIGN_FUNDING -> wallet)'
+      description: 'Ledger command type 12. Leg 0: 240 -> toAccountId, code 1011; legs 5-8 technical when constraints set (OPEN D-09). Idempotency: commandId (same commandId + same body => EXISTS with the
+        original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane bulk; service-side
+        p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - pricing-service
+        rule: campaign module only (caller-guaranteed)
+      x-command-type: 12
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignRewardRequest'
+            example:
+              commandId: 4e7b2a10-6c3d-5f8e-9a1b-2c3d4e5f6a70
+              txnRef: CR26100900P7K2M4QX
+              toAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              amountPoisha: 5000
+              constraints:
+                destinationMaxBalancePoisha: 30000000
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 4e7b2a10-6c3d-5f8e-9a1b-2c3d4e5f6a70
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 61f7c834-d2ef-3a1d-c980-7509e1b6ea53
+                    postedAt: '2026-10-09T10:00:00.250Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-commission-settlement:
+    post:
+      operationId: command_post_commission_settlement
+      summary: 'Command 13 post-commission-settlement: Commission settlement (COMMISSION_PAYABLE -> beneficiary, AIT)'
+      description: 'Ledger command type 13. Leg 0: 220 -> beneficiary gross - ait, code 1012; leg 1: 220 -> 230 ait, code 2004 (only if ait > 0). Idempotency: commandId (same commandId + same body => EXISTS
+        with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane bulk; service-side
+        p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - pricing-service
+        rule: pricing module (caller-guaranteed)
+      x-command-type: 13
+      x-rejection-codes:
+      - INVALID_AMOUNT
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommissionSettlementRequest'
+            example:
+              commandId: 0192f560-0000-7000-8000-000000000001
+              txnRef: CMS-20261031-K3M9QX2A
+              beneficiaryAccountId: 0192f2cc-0000-7000-8000-00000000c003
+              grossPoisha: 120000
+              aitPoisha: 12000
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f560-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 79251445-410c-e6e9-5f97-056e1a0920cd
+                    - 706587b8-3b99-72db-8de4-d204f2c6539c
+                    postedAt: '2026-10-31T18:05:00.120Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/create-hold:
+    post:
+      operationId: command_create_hold
+      summary: 'Command 14 create-hold: Create hold (lien)'
+      description: 'Ledger command type 14. Pending transfer accountId -> HOLD_CONTROL, code 1014, timeout 0 (no auto-expiry). Idempotency: commandId (same commandId + same body => EXISTS with the original
+        result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <=
+        40 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - support-service
+        - compliance-service
+      x-command-type: 14
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHoldRequest'
+            example:
+              commandId: 5d0f2c6e-8f6a-5b2e-9a77-0c3e1d2f4a10
+              accountId: 0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12
+              amountPoisha: 14820000
+              reasonCode: AML_LIEN
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 5d0f2c6e-8f6a-5b2e-9a77-0c3e1d2f4a10
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - c0d62a83-e445-e31e-98ac-bd45d19b763f
+                    postedAt: '2026-10-09T11:02:17.555Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/release-hold:
+    post:
+      operationId: command_release_hold
+      summary: 'Command 15 release-hold: Release hold (void pending)'
+      description: 'Ledger command type 15. Void of transferId(holdCommandId, 0). Already voided by this commandId => EXISTS; unknown / voided by another command / posted => REJECTED HOLD_NOT_FOUND (callers
+        treat it as already released). Idempotency: commandId (same commandId + same body => EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints
+        require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 40 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - support-service
+        - compliance-service
+      x-command-type: 15
+      x-rejection-codes:
+      - HOLD_NOT_FOUND
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseHoldRequest'
+            example:
+              commandId: 7a1e0c4b-3d2f-5a6b-8c9d-0e1f2a3b4c5d
+              holdCommandId: 5d0f2c6e-8f6a-5b2e-9a77-0c3e1d2f4a10
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 7a1e0c4b-3d2f-5a6b-8c9d-0e1f2a3b4c5d
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - b111a5e0-6227-f840-535a-4773a9d0a0ca
+                    postedAt: '2026-10-12T09:30:00.012Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-trust-rebalance:
+    post:
+      operationId: command_post_trust_rebalance
+      summary: 'Command 16 post-trust-rebalance: Trust rebalance (trust -> trust)'
+      description: 'Ledger command type 16. Single transfer, code 1015: DEBIT toTrustAccountId, CREDIT fromTrustAccountId. Total e-money unchanged. Idempotency: commandId (same commandId + same body =>
+        EXISTS with the original result; different body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online;
+        service-side p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - treasury-service
+      x-command-type: 16
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrustRebalanceRequest'
+            example:
+              commandId: 0192f580-0000-7000-8000-000000000001
+              txnRef: TR261009Q2D5M8XT3A
+              fromTrustAccountId: 00000000-0000-0000-0000-000000030001
+              toTrustAccountId: 00000000-0000-0000-0000-000000030002
+              amountPoisha: 50000000
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 0192f580-0000-7000-8000-000000000001
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 3b5a0270-29b9-443e-a579-25c855487edd
+                    postedAt: '2026-10-09T12:00:00.777Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/post-closure-payout:
+    post:
+      operationId: command_post_closure_payout
+      summary: 'Command 17 post-closure-payout: Closure payout (wallet -> same-person wallet)'
+      description: 'Ledger command type 17. Single transfer, code 1016; legs 5-8 technical when constraints set. Idempotency: commandId (same commandId + same body => EXISTS with the original result; different
+        body => 409; REJECTED is final for the commandId). Command endpoints require X-Actor-Type SERVICE (SYSTEM accepted only in the `local` profile). Lane online; service-side p99 <= 50 ms.'
+      tags:
+      - commands
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - wallet-service
+        rule: wallet module; source wallet in PENDING_CLOSURE and destination a same-person wallet (caller-checked)
+      x-command-type: 17
+      x-rejection-codes:
+      - INSUFFICIENT_FUNDS
+      - MAX_BALANCE_EXCEEDED
+      - ACCOUNT_NOT_FOUND
+      - ACCOUNT_CLOSED
+      - INVALID_AMOUNT
+      - OTHER
+      x-idempotency: commandId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClosurePayoutRequest'
+            example:
+              commandId: 2f9c4e1a-7b3d-5c8e-9f0a-1b2c3d4e5f60
+              txnRef: WC26101300R4T8N2KD
+              fromAccountId: 0192f2aa-0000-7000-8000-00000000a001
+              toAccountId: 0192f2cc-0000-7000-8000-00000000c003
+              amountPoisha: 149425
+      responses:
+        '200':
+          description: Command outcome (OK, EXISTS or REJECTED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+              examples:
+                ok:
+                  summary: OK
+                  value:
+                    commandId: 2f9c4e1a-7b3d-5c8e-9f0a-1b2c3d4e5f60
+                    result: OK
+                    rejectionCode: null
+                    detail: null
+                    transferIds:
+                    - 6a81e2fe-f631-60bb-4de8-3d690d8f6a04
+                    postedAt: '2026-10-13T10:15:30.640Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/accounts:
+    post:
+      operationId: createAccount
+      summary: Create a ledger account (idempotent)
+      tags:
+      - accounts
+      description: 'Creates a TB account for a wallet (types 100-140) or a TRUST_SETTLEMENT instance (300). Idempotent on accountId: EXISTS when TB answers exists. 201 is never used so retries look identical.
+        Writes ledger_account + audit LEDGER_ACCOUNT_CREATED in one DB transaction after TB ok/exists.'
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - wallet-service
+        rule: wallet types 100-140
+      - type: SERVICE
+        ids:
+        - treasury-service
+        rule: TRUST_SETTLEMENT only
+      x-idempotency: accountId (Idempotency-Key optional, logged only)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+            example:
+              accountId: 0192f2bb-0000-7000-8000-00000000b001
+              accountType: CUSTOMER_WALLET
+              ownerType: CUSTOMER
+      responses:
+        '200':
+          description: Created (OK) or already existing with identical attributes (EXISTS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAccountResponse'
+              example:
+                accountId: 0192f2bb-0000-7000-8000-00000000b001
+                accountType: CUSTOMER_WALLET
+                code: 100
+                ownerType: CUSTOMER
+                result: OK
+                createdAt: '2026-10-09T08:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/accounts/{id}:close:
+    post:
+      operationId: closeAccount
+      summary: Close an account (TB closing transfer, code 9005)
+      tags:
+      - accounts
+      description: 'No body. Idempotent (deterministic close command id). Precondition: debits_posted = credits_posted and both pendings 0. The closing transfer uses flags pending | closing_debit only (closes
+        the account, never SUSPENSE). Already closed => 200 EXISTS.'
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - wallet-service
+      x-idempotency: accountId (deterministic closeCommandId)
+      x-problem-reasons:
+        STATE_CONFLICT:
+        - BALANCE_NOT_ZERO
+        - OPEN_HOLDS
+        - SYSTEM_ACCOUNT
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/AccountIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Closed (OK) or already closed (EXISTS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloseAccountResponse'
+              example:
+                accountId: 0192f2bb-0000-7000-8000-00000000b001
+                result: OK
+                closedAt: '2026-10-09T10:00:00.000Z'
+        '409':
+          description: 409 STATE_CONFLICT with reason BALANCE_NOT_ZERO | OPEN_HOLDS | SYSTEM_ACCOUNT
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Problem'
+                - type: object
+                  properties:
+                    reason:
+                      type: string
+                      enum:
+                      - BALANCE_NOT_ZERO
+                      - OPEN_HOLDS
+                      - SYSTEM_ACCOUNT
+              example:
+                type: about:blank
+                title: State conflict
+                status: 409
+                code: STATE_CONFLICT
+                detail: account balance is not zero
+                instance: /v1/ledger/accounts/0192f2bb-0000-7000-8000-00000000b001:close
+                correlationId: c-0f3e9a
+                reason: BALANCE_NOT_ZERO
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/accounts/{id}/balance:
+    get:
+      operationId: getBalance
+      summary: Balance of one account (read from TigerBeetle, never cached)
+      tags:
+      - reads
+      description: Read-only, key-free. Formulas in codes.yaml accountType. 404 also for technical 900/910. p95 <= 10 ms.
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - wallet-service
+        - support-service
+        - compliance-service
+        - treasury-service
+        - disbursement-service
+        - pricing-service
+        - general-ledger-service
+      - type: SYSTEM
+        ids:
+        - general-ledger-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      - type:
+        - CUSTOMER
+        - AGENT
+        - DISTRIBUTOR
+        - MERCHANT
+        - INSTITUTION
+        rule: only when X-Actor-Wallet-Id = {id}
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/AccountIdPath'
+      - $ref: '#/components/parameters/XActorRoles'
+      - $ref: '#/components/parameters/XActorWalletId'
+      responses:
+        '200':
+          description: Balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+              example:
+                accountId: 0192f2aa-0000-7000-8000-00000000a001
+                ledgerBalancePoisha: 149425
+                availableBalancePoisha: 149425
+                heldPoisha: 0
+                asOf: '2026-10-09T08:03:22.130Z'
+                accountType: CUSTOMER_WALLET
+                closed: false
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/accounts/balances:batchGet:
+    post:
+      operationId: batchGetBalances
+      summary: Balances of up to 500 accounts (one TB lookup)
+      tags:
+      - reads
+      description: Read-only; no Idempotency-Key. accountIds 1..500 (else 400). Unknown and technical ids go to notFound.
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+        - treasury-service
+        - wallet-service
+        - general-ledger-service
+      - type: SYSTEM
+        ids:
+        - general-ledger-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchGetBalancesRequest'
+            example:
+              accountIds:
+              - 00000000-0000-0000-0000-000000000200
+              - 0192f2cc-0000-7000-8000-00000000c009
+      responses:
+        '200':
+          description: Balances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchGetBalancesResponse'
+              example:
+                items:
+                - accountId: 00000000-0000-0000-0000-000000000200
+                  ledgerBalancePoisha: 1000
+                  availableBalancePoisha: 1000
+                  heldPoisha: 0
+                  asOf: '2026-10-09T18:00:00.000Z'
+                  accountType: FEE_INCOME
+                  closed: false
+                notFound:
+                - 0192f2cc-0000-7000-8000-00000000c009
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/commands/{commandId}:
+    get:
+      operationId: getCommand
+      summary: Command lookup by derived transfer IDs (never 404)
+      tags:
+      - reads
+      description: 'Kernel K3.3 rule 4 lookup operation for ledger commands. One lookup_transfers of transferId(commandId, 0..8) plus the rejection store and journal. Interpretation: result = REJECTED =>
+        rejected (whatever found says); found = true and result in {OK, EXISTS} => posted; otherwise not posted (caller may re-post with the same commandId and body). Journal retention 8 days. p99 <= 15
+        ms.'
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - transaction-service
+        - pricing-service
+        - disbursement-service
+        - treasury-service
+        - finance-ops-service
+        - support-service
+        - compliance-service
+        - wallet-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/CommandIdPath'
+      - $ref: '#/components/parameters/XActorRoles'
+      responses:
+        '200':
+          description: Lookup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandLookupResponse'
+              examples:
+                posted:
+                  summary: Posted
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    found: true
+                    result: OK
+                    rejectionCode: null
+                    transfers:
+                    - transferId: fc214b7c-f80c-8143-4f0e-107e2518a302
+                      legIndex: 0
+                      code: 1001
+                      commandType: 1
+                      debitAccountId: 0192f2aa-0000-7000-8000-00000000a001
+                      creditAccountId: 0192f2bb-0000-7000-8000-00000000b001
+                      amountPoisha: 50000
+                      pendingId: null
+                      flags:
+                      - linked
+                      timestamp: 1791533002123000000
+                      postedAt: '2026-10-09T08:03:22.123Z'
+                rejected:
+                  summary: Journaled rejection
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    found: false
+                    result: REJECTED
+                    rejectionCode: INSUFFICIENT_FUNDS
+                    transfers: []
+                unknown:
+                  summary: Not posted
+                  value:
+                    commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                    found: false
+                    result: null
+                    rejectionCode: null
+                    transfers: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/accounts/{id}/transfers:
+    get:
+      operationId: listAccountTransfers
+      summary: Transfer history of one account (TB get_account_transfers)
+      tags:
+      - reads
+      description: Kernel K3.4 pagination (limit 1..200, default 50; cursor opaque, 24 h). Items ascending by TB timestamp; technical codes 9xxx filtered out. balanceAfterPoisha from get_account_balances
+        for accounts with the history flag.
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - finance-ops-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      x-idempotency: read-only
+      x-problem-reasons:
+        VALIDATION_FAILED:
+        - INVALID_CURSOR
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/AccountIdPath'
+      - $ref: '#/components/parameters/XActorRoles'
+      - name: fromTs
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+        description: Inclusive
+      - name: toTs
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+        description: Exclusive
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Page of transfers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountTransferPage'
+              example:
+                items:
+                - transferId: fc214b7c-f80c-8143-4f0e-107e2518a302
+                  commandId: 0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11
+                  commandType: 1
+                  legIndex: 0
+                  code: 1001
+                  direction: DEBIT
+                  debitAccountId: 0192f2aa-0000-7000-8000-00000000a001
+                  creditAccountId: 0192f2bb-0000-7000-8000-00000000b001
+                  amountPoisha: 50000
+                  pendingId: null
+                  flags:
+                  - linked
+                  timestamp: 1791533002123000000
+                  postedAt: '2026-10-09T08:03:22.123Z'
+                  balanceAfterPoisha: 150000
+                nextCursor: MTc5MTUzMzAwMjEyMzAwMDAwMA
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/holds:
+    get:
+      operationId: listOpenHolds
+      summary: Open holds on an account (not paged)
+      tags:
+      - reads
+      description: 'Only OPEN holds from the hold registry. Not paged: bounded by the open holds of one account (no limit/cursor).'
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - support-service
+        - compliance-service
+        - wallet-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      - name: accountId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: Open holds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldList'
+              example:
+                items:
+                - holdCommandId: 0192f5aa-0000-7000-8000-000000000001
+                  accountId: 0192f2bb-0000-7000-8000-00000000b001
+                  amountPoisha: 50000
+                  reasonCode: WRONG_TRANSFER_HOLD
+                  transferId: 4af8bc15-345c-e4d7-f5fd-ed8171026a0a
+                  createdBy: support-service
+                  createdAt: '2026-10-09T09:10:00.000Z'
+                totalHeldPoisha: 50000
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/ledger/system-balance-sheet:
+    get:
+      operationId: getSystemBalanceSheet
+      summary: System balance sheet (SRS LED-019)
+      tags:
+      - reads
+      description: Exact totals of trust and system accounts from TigerBeetle plus the double-entry identity; byWalletType from the CDC projection (eventually consistent; lag in projectionLagMs, alert >
+        10 s; OPEN D-45). p99 <= 30 ms.
+      x-audience: service
+      x-actors:
+      - type: SERVICE
+        ids:
+        - treasury-service
+        - finance-ops-service
+        - general-ledger-service
+      - type: SYSTEM
+        ids:
+        - general-ledger-service
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      responses:
+        '200':
+          description: Balance sheet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemBalanceSheet'
+              example:
+                asOf: '2026-10-09T08:05:00.000Z'
+                trustMirrorTotalPoisha: 100000000
+                trustAccounts:
+                - accountId: 00000000-0000-0000-0000-000000030001
+                  trustIndex: 1
+                  mirrorBalancePoisha: 100000000
+                  debitsPostedPoisha: 100000000
+                  creditsPostedPoisha: 0
+                systemAccounts:
+                - accountType: FEE_INCOME
+                  accountId: 00000000-0000-0000-0000-000000000200
+                  balancePoisha: 500
+                - accountType: VAT_PAYABLE
+                  accountId: 00000000-0000-0000-0000-000000000210
+                  balancePoisha: 75
+                - accountType: COMMISSION_PAYABLE
+                  accountId: 00000000-0000-0000-0000-000000000220
+                  balancePoisha: -400
+                - accountType: AIT_PAYABLE
+                  accountId: 00000000-0000-0000-0000-000000000230
+                  balancePoisha: 40
+                - accountType: CAMPAIGN_FUNDING
+                  accountId: 00000000-0000-0000-0000-000000000240
+                  balancePoisha: 0
+                - accountType: SUSPENSE
+                  accountId: 00000000-0000-0000-0000-000000000400
+                  balancePoisha: 0
+                - accountType: ADJUSTMENT_CLEARING
+                  accountId: 00000000-0000-0000-0000-000000000410
+                  balancePoisha: 0
+                - accountType: HOLD_CONTROL
+                  accountId: 00000000-0000-0000-0000-000000000420
+                  balancePoisha: 0
+                  pendingInPoisha: 50000
+                walletsTotalPoisha: 99999785
+                eMoneyLiabilityPoisha: 100000000
+                byWalletType:
+                - accountType: CUSTOMER_WALLET
+                  balancePoisha: 99000000
+                  source: PROJECTION
+                - accountType: AGENT_WALLET
+                  balancePoisha: 999785
+                  source: PROJECTION
+                - accountType: DISTRIBUTOR_WALLET
+                  balancePoisha: 0
+                  source: PROJECTION
+                - accountType: MERCHANT_WALLET
+                  balancePoisha: 0
+                  source: PROJECTION
+                - accountType: INSTITUTION_WALLET
+                  balancePoisha: 0
+                  source: PROJECTION
+                projectionAsOf: '2026-10-09T08:04:59.870Z'
+                projectionLagMs: 130
+                identityHolds: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/internal/ledger/chart-of-accounts:
+    get:
+      operationId: internalChartOfAccounts
+      summary: Chart of accounts (account_type rows)
+      tags:
+      - internal
+      x-audience: internal
+      x-actors:
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      - type: SERVICE
+        ids:
+        - '*'
+        rule: any service (read-only metadata)
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      responses:
+        '200':
+          description: Rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChartOfAccounts'
+              example:
+                items:
+                - code: 100
+                  name: CUSTOMER_WALLET
+                  normalSide: CREDIT
+                  tbFlags:
+                  - debits_must_not_exceed_credits
+                  - history
+                  isSystem: false
+                  fixedAccountId: null
+                  creatableViaApi: true
+                  walletTypeCode: C
+                - code: 200
+                  name: FEE_INCOME
+                  normalSide: CREDIT
+                  tbFlags:
+                  - history
+                  isSystem: true
+                  fixedAccountId: 00000000-0000-0000-0000-000000000200
+                  creatableViaApi: false
+                  walletTypeCode: null
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/internal/ledger/accounts/{id}/raw:
+    get:
+      operationId: internalRawAccount
+      summary: Raw TigerBeetle account fields (u128 as decimal strings)
+      tags:
+      - internal
+      x-audience: internal
+      x-actors:
+      - type: STAFF
+        roles:
+        - ADMIN
+        - AUDITOR
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/AccountIdPath'
+      - $ref: '#/components/parameters/XActorRoles'
+      responses:
+        '200':
+          description: Raw account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawAccount'
+              example:
+                accountId: 00000000-0000-0000-0000-000000000200
+                code: 200
+                ledger: 1
+                flags:
+                - history
+                userData128: '0'
+                userData64: '0'
+                userData32: 9
+                debitsPosted: '0'
+                creditsPosted: '500'
+                debitsPending: '0'
+                creditsPending: '0'
+                timestamp: 1791532800000000000
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/internal/ledger/integrity:verify:
+    post:
+      operationId: internalIntegrityVerify
+      summary: Run the integrity verifier on a journal window
+      tags:
+      - internal
+      description: Recomputes journal row MACs and checks TB existence of OK rows' transfers. Each mismatch is audited (LEDGER_INTEGRITY_MISMATCH) and counted.
+      x-audience: internal
+      x-actors:
+      - type: STAFF
+        roles:
+        - ADMIN
+        - AUDITOR
+      x-idempotency: naturally idempotent (read and report)
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrityVerifyRequest'
+            example:
+              from: '2026-10-09T00:00:00.000Z'
+              to: '2026-10-09T01:00:00.000Z'
+              sample: 1000
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityVerifyResponse'
+              example:
+                checkedRows: 1000
+                mismatches: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /v1/internal/ledger/cdc/status:
+    get:
+      operationId: internalCdcStatus
+      summary: CDC bridge status
+      tags:
+      - internal
+      x-audience: internal
+      x-actors:
+      - type: STAFF
+        roles:
+        - '*'
+        rule: any kernel K7 role
+      - type: SYSTEM
+        ids:
+        - '*'
+        rule: platform tools
+      x-idempotency: read-only
+      parameters:
+      - $ref: '#/components/parameters/XCorrelationId'
+      - $ref: '#/components/parameters/XActorType'
+      - $ref: '#/components/parameters/XActorId'
+      - $ref: '#/components/parameters/XChannel'
+      - $ref: '#/components/parameters/XActorRoles'
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CdcStatus'
+              example:
+                mode: amqp
+                leader: true
+                cursorTbTimestamp: 1791533002123000000
+                cursorAt: '2026-10-09T08:03:22.123Z'
+                lagMs: 85
+                lastError: null
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: true
+      required:
+      - type
+      - title
+      - status
+      - code
+      - correlationId
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+          maxLength: 200
+        status:
+          type: integer
+          format: int32
+        code:
+          type: string
+          enum:
+          - VALIDATION_FAILED
+          - ACTOR_NOT_ALLOWED
+          - NOT_FOUND
+          - IDEMPOTENCY_CONFLICT
+          - STATE_CONFLICT
+          - SOD_VIOLATION
+          - INSUFFICIENT_FUNDS
+          - LIMIT_EXCEEDED
+          - RISK_BLOCKED
+          - RISK_STEP_UP_REQUIRED
+          - RISK_HELD_FOR_REVIEW
+          - WALLET_NOT_TRANSACTABLE
+          - MAX_BALANCE_EXCEEDED
+          - REFUND_EXCEEDS_ORIGINAL
+          - SERVICE_DISABLED
+          - MAKER_CHECKER_VIOLATION
+          - DEPENDENCY_UNAVAILABLE
+        detail:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+        instance:
+          type:
+          - string
+          - 'null'
+        correlationId:
+          type: string
+        reason:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Z][A-Z0-9_]*$
+        errors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - field
+            - message
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        retryable:
+          type: boolean
+          const: true
+      description: Kernel K3.6 problem body. ledger-service adds no extension members.
+    Pricing:
+      type: object
+      additionalProperties: true
+      required:
+      - feePoisha
+      - vatPoisha
+      - feeBearer
+      - commissionPoisha
+      - commissionSource
+      - commissionBeneficiaryAccountId
+      - aitPoisha
+      properties:
+        feePoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000000000
+          description: Fee, poisha
+        vatPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000000000
+          description: VAT on the fee, poisha
+        feeBearer:
+          type: string
+          enum:
+          - PAYER
+          - PAYEE
+          - OPERATOR
+          description: OPERATOR => fee = vat = 0 (else REJECTED INVALID_AMOUNT). SHARED is reserved and rejected with 400 (OPEN D-03).
+        commissionPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000000000
+          description: Gross commission, poisha
+        commissionSource:
+          type:
+          - string
+          - 'null'
+          enum:
+          - FEE_INCOME
+          - COMMISSION_PAYABLE
+          - null
+          description: Required when commissionPoisha > 0; null allowed when commission = 0.
+        commissionBeneficiaryAccountId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Required when commissionPoisha > 0; account type in {110, 120}.
+        aitPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000000000
+          description: AIT withheld on commission, 0 <= ait <= commission
+      description: 'Pricing of a payment command. Omitted => all amounts 0, feeBearer = PAYER. Reserved, not accepted: payerShareBps (D-03), vatOnCommissionPoisha (D-02).'
+    Constraints:
+      type:
+      - object
+      - 'null'
+      additionalProperties: true
+      required: []
+      properties:
+        destinationMaxBalancePoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+          description: Max available balance of the credited account after the whole chain (available = credits_posted - debits_posted - debits_pending; held funds and incoming pendings excluded). Breach
+            => REJECTED MAX_BALANCE_EXCEEDED.
+      description: Optional constraints. Omitted/null => no bound.
+    CommandMetadata:
+      type:
+      - object
+      - 'null'
+      additionalProperties: true
+      required: []
+      properties:
+        channel:
+          type:
+          - string
+          - 'null'
+          description: Kernel K3.1 X-Channel value of the business request
+        initiatorActorId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+      description: Informational. Excluded from the idempotency comparison.
+    PaymentCommandRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - fromAccountId
+      - toAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Stable across retries of the same business intent; idempotency key of the command.
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        fromAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Debit of leg 0; type per the account-type guard; != toAccountId (else REJECTED INVALID_AMOUNT)
+        toAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Credit of leg 0; type per the account-type guard
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: Principal, 1..10^13
+        pricing:
+          anyOf:
+          - $ref: '#/components/schemas/Pricing'
+          - type: 'null'
+        constraints:
+          $ref: '#/components/schemas/Constraints'
+        metadata:
+          $ref: '#/components/schemas/CommandMetadata'
+      description: Body of commands 1-6 (post-p2p, post-cash-in, post-cash-out, post-merchant-payment, post-merchant-refund, post-float-transfer).
+    ReversalCommandRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - originalCommandId
+      - reverseFee
+      - reverseCommission
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Stable per attempt
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        originalCommandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Original command; type in {1-6, 8 (row commandId), 12}; other => REJECTED OTHER NOT_REVERSIBLE; unknown => REJECTED ORIGINAL_NOT_FOUND
+        reverseFee:
+          type: boolean
+          description: Mirror original legs 1-2. Must be false when partial and for pricing-service.
+        reverseCommission:
+          type: boolean
+          description: Mirror original legs 3-4. Must be false when partial and for pricing-service.
+        releaseHoldCommandId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Optional hold to void in the same chain (leg 0). Must be OPEN, on the original leg-0 credit account, created by support-service with reasonCode DISPUTE_HOLD or WRONG_TRANSFER_HOLD;
+            else REJECTED HOLD_NOT_FOUND.
+        amountPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: Absent/null or = original principal => full; 0 < x < principal => partial (flags must be false); x > principal or x <= 0 => 400
+      description: Body of command 7 post-reversal.
+    DisbursementRow:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - toAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Row commandId (user_data_128 of the row's legs); stable per row attempt
+        toAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type 100
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+        constraints:
+          $ref: '#/components/schemas/Constraints'
+    DisbursementBatchRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - batchId
+      - payerAccountId
+      - rows
+      properties:
+        batchId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        payerAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Debit of every row; type in bitspay.ledger.disbursement.payer-codes (seed {140})
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/DisbursementRow'
+          description: Applied in array order
+      description: Body of command 8 post-disbursement-batch. No txnRef.
+    EmoneyIssueRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - trustAccountId
+      - toAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = issuanceId
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        trustAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type 300 (00000000-0000-0000-0000-0000000300nn); debit
+        toAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in bitspay.ledger.emoney.issue-target-codes {110, 120, 140, 240}; credit
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+      description: Body of command 9 post-emoney-issue.
+    EmoneyRedeemRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - fromAccountId
+      - trustAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = redemptionId
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        fromAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in bitspay.ledger.emoney.redeem-source-codes {110, 120, 130, 140, 200, 210, 230, 240}; debit
+        trustAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type 300; credit
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+        reasonCode:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 40
+          pattern: ^(?=.*\S).{1,40}$
+          description: Optional caller reason (1..40), journaled, not validated; copied to ledger.changes reasonCode.
+      description: Body of command 10 post-emoney-redeem.
+    AdjustmentRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - debitAccountId
+      - creditAccountId
+      - amountPoisha
+      - reasonCode
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = journalId / adjustmentId
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        debitAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Existing account, never 900/910
+        creditAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Existing account, never 900/910; != debit (else REJECTED INVALID_AMOUNT)
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: ^(?=.*\S).{1,40}$
+          description: Caller-owned reason, 1..40 chars; journaled, not validated by the ledger
+      description: Body of command 11 post-adjustment.
+    CampaignRewardRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - toAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Stable per attempt
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        toAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in {100, 110, 130}
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+        constraints:
+          $ref: '#/components/schemas/Constraints'
+      description: Body of command 12 post-campaign-reward (debit CAMPAIGN_FUNDING, fixed).
+    CommissionSettlementRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - beneficiaryAccountId
+      - grossPoisha
+      - aitPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = settlementId
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        beneficiaryAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in {110, 120}
+        grossPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13 (else 400)
+        aitPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10000000000000
+          description: 0 <= ait < gross; ait < 0 => 400; ait >= gross => REJECTED INVALID_AMOUNT
+      description: Body of command 13 post-commission-settlement. vatPoisha is reserved (OPEN D-02) and must be absent (present => 400).
+    CreateHoldRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - accountId
+      - amountPoisha
+      - reasonCode
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = holdCommandId; stable per attempt
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in {100, 110, 120, 130, 140}
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13; <= available, else REJECTED INSUFFICIENT_FUNDS
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: ^(?=.*\S).{1,40}$
+          description: 'Hold reason code (codes.yaml reasonCodes group Hold: DISPUTE_HOLD, WRONG_TRANSFER_HOLD, AML_LIEN); unknown accepted and logged'
+      description: Body of command 14 create-hold. No txnRef.
+    ReleaseHoldRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - holdCommandId
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Caller-chosen, stable per hold
+        holdCommandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: The hold commandId that actually posted
+      description: Body of command 15 release-hold. No txnRef.
+    TrustRebalanceRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - fromTrustAccountId
+      - toTrustAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: = rebalanceId
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        fromTrustAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type 300; the ledger CREDITS it
+        toTrustAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type 300, != from (else REJECTED INVALID_AMOUNT); the ledger DEBITS it
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+      description: Body of command 16 post-trust-rebalance.
+    ClosurePayoutRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - txnRef
+      - fromAccountId
+      - toAccountId
+      - amountPoisha
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Stable per attempt
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[A-Z0-9-]{1,32}$
+          description: Opaque caller reference, journaled only, never parsed by the ledger.
+        fromAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in {100..140}
+        toAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Type in {100..140}, != from (else REJECTED INVALID_AMOUNT)
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10000000000000
+          description: 1..10^13
+        constraints:
+          $ref: '#/components/schemas/Constraints'
+      description: Body of command 17 post-closure-payout.
+    CommandResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - result
+      - rejectionCode
+      - detail
+      - transferIds
+      - postedAt
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Echo
+        result:
+          type: string
+          enum:
+          - OK
+          - EXISTS
+          - REJECTED
+        rejectionCode:
+          type:
+          - string
+          - 'null'
+          enum:
+          - INSUFFICIENT_FUNDS
+          - ACCOUNT_NOT_FOUND
+          - ACCOUNT_CLOSED
+          - MAX_BALANCE_EXCEEDED
+          - ORIGINAL_NOT_FOUND
+          - ALREADY_REVERSED
+          - HOLD_NOT_FOUND
+          - INVALID_AMOUNT
+          - OTHER
+          - null
+          description: Non-null iff result = REJECTED
+        detail:
+          type:
+          - string
+          - 'null'
+          description: Raw TB result or a ledger token (codes.yaml rejectionDetailToken). Callers may branch only on the listed tokens.
+        transferIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Business legs created, leg-index order; [] when REJECTED; technical legs never listed
+        postedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Null when REJECTED; for EXISTS the original posting time (leg 0)
+      description: Single command response (types 1-7, 9-17), HTTP 200 for OK, EXISTS and REJECTED.
+    DisbursementBatchResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - batchId
+      - results
+      properties:
+        batchId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Echo
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommandResponse'
+          description: Exactly one per request row, in request row order; commandId = row commandId
+    CreateAccountRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - accountId
+      - accountType
+      - ownerType
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: 'Wallet types: UUIDv7 (= walletId, version nibble 7, timestamp prefix != 0); TRUST_SETTLEMENT: 00000000-0000-0000-0000-0000000300nn, nn 01..99'
+        accountType:
+          type: string
+          enum:
+          - CUSTOMER_WALLET
+          - AGENT_WALLET
+          - DISTRIBUTOR_WALLET
+          - MERCHANT_WALLET
+          - INSTITUTION_WALLET
+          - TRUST_SETTLEMENT
+        ownerType:
+          type: string
+          enum:
+          - CUSTOMER
+          - AGENT
+          - DISTRIBUTOR
+          - MERCHANT
+          - INSTITUTION
+          - SYSTEM
+          description: 'Must match: CUSTOMER<->100, AGENT<->110, DISTRIBUTOR<->120, MERCHANT<->130, INSTITUTION<->140, SYSTEM<->300'
+    CreateAccountResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - accountId
+      - accountType
+      - code
+      - ownerType
+      - result
+      - createdAt
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        accountType:
+          type: string
+        code:
+          type: integer
+          format: int32
+          description: codes.yaml accountType code
+        ownerType:
+          type: string
+        result:
+          type: string
+          enum:
+          - OK
+          - EXISTS
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Original creation time
+    CloseAccountResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - accountId
+      - result
+      - closedAt
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        result:
+          type: string
+          enum:
+          - OK
+          - EXISTS
+          description: EXISTS = already closed
+        closedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+    Balance:
+      type: object
+      additionalProperties: true
+      required:
+      - accountId
+      - ledgerBalancePoisha
+      - availableBalancePoisha
+      - heldPoisha
+      - asOf
+      - accountType
+      - closed
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        ledgerBalancePoisha:
+          type: integer
+          format: int64
+          description: May be negative for 220, 400, 410
+        availableBalancePoisha:
+          type: integer
+          format: int64
+          description: = ledger - held
+        heldPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Held (pending) amount, >= 0
+        asOf:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+        accountType:
+          type: string
+          description: codes.yaml accountType name
+        closed:
+          type: boolean
+    BatchGetBalancesRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - accountIds
+      properties:
+        accountIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: string
+            format: uuid
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    BatchGetBalancesResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - items
+      - notFound
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Balance'
+        notFound:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: May be empty; includes technical 900/910
+    CommandTransfer:
+      type: object
+      additionalProperties: true
+      required:
+      - transferId
+      - legIndex
+      - code
+      - commandType
+      - debitAccountId
+      - creditAccountId
+      - amountPoisha
+      - pendingId
+      - flags
+      - timestamp
+      - postedAt
+      properties:
+        transferId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        legIndex:
+          type: integer
+          format: int32
+          minimum: 0
+        code:
+          type: integer
+          format: int32
+          description: codes.yaml transferCode (business only)
+        commandType:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 17
+          description: codes.yaml commandType
+        debitAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        creditAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+        pendingId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: Set on void/post legs
+        flags:
+          type: array
+          items:
+            type: string
+          description: TB snake_case flag names
+        timestamp:
+          type: integer
+          format: int64
+          description: TB timestamp, ns since epoch (JSON number)
+        postedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+    CommandLookupResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - commandId
+      - found
+      - result
+      - rejectionCode
+      - transfers
+      properties:
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        found:
+          type: boolean
+          description: true <=> >= 1 business leg exists with user_data_128 = commandId
+        result:
+          type:
+          - string
+          - 'null'
+          enum:
+          - OK
+          - REJECTED
+          - null
+          description: OK when found; REJECTED for a journaled rejection; null when unknown. Callers also accept EXISTS as posted.
+        rejectionCode:
+          type:
+          - string
+          - 'null'
+          enum:
+          - INSUFFICIENT_FUNDS
+          - ACCOUNT_NOT_FOUND
+          - ACCOUNT_CLOSED
+          - MAX_BALANCE_EXCEEDED
+          - ORIGINAL_NOT_FOUND
+          - ALREADY_REVERSED
+          - HOLD_NOT_FOUND
+          - INVALID_AMOUNT
+          - OTHER
+          - null
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommandTransfer'
+          description: Business legs only, leg order
+    AccountTransfer:
+      type: object
+      additionalProperties: true
+      required:
+      - transferId
+      - commandId
+      - commandType
+      - legIndex
+      - code
+      - direction
+      - debitAccountId
+      - creditAccountId
+      - amountPoisha
+      - pendingId
+      - flags
+      - timestamp
+      - postedAt
+      - balanceAfterPoisha
+      properties:
+        transferId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        commandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: user_data_128
+        commandType:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 17
+        legIndex:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5
+        code:
+          type: integer
+          format: int32
+          description: Business code
+        direction:
+          type: string
+          enum:
+          - DEBIT
+          - CREDIT
+          description: Relative to {id}
+        debitAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        creditAccountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+        pendingId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        flags:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: integer
+          format: int64
+          description: TB ns
+        postedAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+        balanceAfterPoisha:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: '{id}''s ledger balance after this transfer (codes.yaml accountType formula); null for accounts without the TB history flag'
+    AccountTransferPage:
+      type: object
+      additionalProperties: true
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountTransfer'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    Hold:
+      type: object
+      additionalProperties: true
+      required:
+      - holdCommandId
+      - accountId
+      - amountPoisha
+      - reasonCode
+      - transferId
+      - createdBy
+      - createdAt
+      properties:
+        holdCommandId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        amountPoisha:
+          type: integer
+          format: int64
+          minimum: 1
+        reasonCode:
+          type: string
+          description: codes.yaml reasonCodes group Hold
+        transferId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          description: transferId(holdCommandId, 0)
+        createdBy:
+          type: string
+          description: Caller X-Actor-Id
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+    HoldList:
+      type: object
+      additionalProperties: true
+      required:
+      - items
+      - totalHeldPoisha
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hold'
+        totalHeldPoisha:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Sum of items
+      description: 'Not paged: bounded by the open holds of one account.'
+    SystemBalanceSheet:
+      type: object
+      additionalProperties: true
+      required:
+      - asOf
+      - trustMirrorTotalPoisha
+      - trustAccounts
+      - systemAccounts
+      - walletsTotalPoisha
+      - eMoneyLiabilityPoisha
+      - byWalletType
+      - projectionAsOf
+      - projectionLagMs
+      - identityHolds
+      properties:
+        asOf:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Exact part (TB read)
+        trustMirrorTotalPoisha:
+          type: integer
+          format: int64
+          description: Sum over trust accounts of debits_posted - credits_posted (exact)
+        trustAccounts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - accountId
+            - trustIndex
+            - mirrorBalancePoisha
+            - debitsPostedPoisha
+            - creditsPostedPoisha
+            properties:
+              accountId:
+                type: string
+                format: uuid
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+              trustIndex:
+                type: integer
+                format: int32
+                minimum: 1
+                maximum: 99
+              mirrorBalancePoisha:
+                type: integer
+                format: int64
+              debitsPostedPoisha:
+                type: integer
+                format: int64
+              creditsPostedPoisha:
+                type: integer
+                format: int64
+        systemAccounts:
+          type: array
+          description: 200, 210, 220, 230, 240, 400, 410, 420; 900/910 never listed
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - accountType
+            - accountId
+            - balancePoisha
+            properties:
+              accountType:
+                type: string
+              accountId:
+                type: string
+                format: uuid
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+              balancePoisha:
+                type: integer
+                format: int64
+                description: credits_posted - debits_posted (signed)
+              pendingInPoisha:
+                type: integer
+                format: int64
+                minimum: 0
+                description: 'Present only for HOLD_CONTROL (420): credits_pending'
+        walletsTotalPoisha:
+          type: integer
+          format: int64
+          description: Wallets only = trustMirrorTotalPoisha - sum(systemAccounts[].balancePoisha) (exact)
+        eMoneyLiabilityPoisha:
+          type: integer
+          format: int64
+          description: All wallets + e-money system accounts = trustMirrorTotalPoisha (exact)
+        byWalletType:
+          type: array
+          description: One per wallet type 100-140; eventually consistent (CDC projection)
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - accountType
+            - balancePoisha
+            - source
+            properties:
+              accountType:
+                type: string
+              balancePoisha:
+                type: integer
+                format: int64
+              source:
+                type: string
+                enum:
+                - PROJECTION
+        projectionAsOf:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Last projected TB timestamp
+        projectionLagMs:
+          type: integer
+          format: int64
+          minimum: 0
+        identityHolds:
+          type: boolean
+          description: walletsTotalPoisha + sum(systemAccounts) = trustMirrorTotalPoisha, and the projection total of wallets is within in-flight lag of walletsTotalPoisha
+    ChartOfAccounts:
+      type: object
+      additionalProperties: true
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - code
+            - name
+            - normalSide
+            - tbFlags
+            - isSystem
+            - fixedAccountId
+            - creatableViaApi
+            - walletTypeCode
+            properties:
+              code:
+                type: integer
+                format: int32
+              name:
+                type: string
+              normalSide:
+                type: string
+                enum:
+                - CREDIT
+                - DEBIT
+                - EITHER
+              tbFlags:
+                type: array
+                items:
+                  type: string
+              isSystem:
+                type: boolean
+              fixedAccountId:
+                type:
+                - string
+                - 'null'
+                format: uuid
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+              creatableViaApi:
+                type: boolean
+              walletTypeCode:
+                type:
+                - string
+                - 'null'
+      description: Rows of the account_type table. Not paged (bounded, < 32 rows).
+    RawAccount:
+      type: object
+      additionalProperties: true
+      required:
+      - accountId
+      - code
+      - ledger
+      - flags
+      - userData128
+      - userData64
+      - userData32
+      - debitsPosted
+      - creditsPosted
+      - debitsPending
+      - creditsPending
+      - timestamp
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        code:
+          type: integer
+          format: int32
+        ledger:
+          type: integer
+          format: int32
+        flags:
+          type: array
+          items:
+            type: string
+        userData128:
+          type: string
+          description: u128 as decimal string
+        userData64:
+          type: string
+          description: u64 as decimal string
+        userData32:
+          type: integer
+          format: int64
+        debitsPosted:
+          type: string
+          description: u128 decimal string
+        creditsPosted:
+          type: string
+        debitsPending:
+          type: string
+        creditsPending:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+          description: TB ns
+    IntegrityVerifyRequest:
+      type: object
+      additionalProperties: true
+      required:
+      - from
+      - to
+      - sample
+      properties:
+        from:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Window start (inclusive)
+        to:
+          type: string
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+          description: Window end (exclusive)
+        sample:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100000
+          description: Rows to sample, 1..100000
+    IntegrityVerifyResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - checkedRows
+      - mismatches
+      properties:
+        checkedRows:
+          type: integer
+          format: int64
+          minimum: 0
+        mismatches:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required:
+            - commandId
+            - kind
+            - detail
+            properties:
+              commandId:
+                type: string
+                format: uuid
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+              kind:
+                type: string
+                enum:
+                - MAC_MISMATCH
+                - TRANSFER_MISSING
+                - USER_DATA_MISMATCH
+              detail:
+                type:
+                - string
+                - 'null'
+    CdcStatus:
+      type: object
+      additionalProperties: true
+      required:
+      - mode
+      - leader
+      - cursorTbTimestamp
+      - cursorAt
+      - lagMs
+      - lastError
+      properties:
+        mode:
+          type: string
+          enum:
+          - amqp
+          - poll
+          - 'off'
+        leader:
+          type: boolean
+        cursorTbTimestamp:
+          type: integer
+          format: int64
+        cursorAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$
+        lagMs:
+          type: integer
+          format: int64
+          minimum: 0
+        lastError:
+          type:
+          - string
+          - 'null'
+  parameters:
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 64
+        pattern: ^[A-Za-z0-9._-]{1,64}$
+      description: Kernel K3.1; generated if absent
+    XActorType:
+      name: X-Actor-Type
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+        - CUSTOMER
+        - AGENT
+        - MERCHANT
+        - DISTRIBUTOR
+        - INSTITUTION
+        - STAFF
+        - SYSTEM
+        - SERVICE
+    XActorId:
+      name: X-Actor-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 64
+    XChannel:
+      name: X-Channel
+      in: header
+      required: true
+      schema:
+        type: string
+        enum:
+        - APP
+        - USSD
+        - PARTNER_APP
+        - PORTAL
+        - BACKOFFICE
+        - API
+        - SYSTEM
+    XActorRoles:
+      name: X-Actor-Roles
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Required for STAFF (kernel K7 codes, comma-separated)
+    XActorWalletId:
+      name: X-Actor-Wallet-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      description: Required for wallet-holder actors
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 64
+        pattern: ^[A-Za-z0-9_-]{1,64}$
+      description: Optional and ignored for idempotency (logged only; missing => WARN log + metric). Ledger idempotency is keyed on commandId (kernel K3.3 rule 6 exception). Recommended value = commandId.
+    AccountIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      description: Ledger account id (canonical UUID)
+    CommandIdPath:
+      name: commandId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+  responses:
+    BadRequest:
+      description: 400 VALIDATION_FAILED (structural; nothing journaled; never retry unchanged)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Validation failed
+            status: 400
+            code: VALIDATION_FAILED
+            detail: amountPoisha must be between 1 and 10000000000000
+            instance: /v1/ledger/commands/post-p2p
+            correlationId: c-0f3e9a
+            reason: null
+            errors:
+            - field: amountPoisha
+              message: must be >= 1
+    Forbidden:
+      description: 403 ACTOR_NOT_ALLOWED (actor type or caller not permitted; definitive)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Actor not allowed
+            status: 403
+            code: ACTOR_NOT_ALLOWED
+            detail: null
+            instance: /v1/ledger/commands/post-p2p
+            correlationId: c-0f3e9a
+            reason: null
+    NotFound:
+      description: 404 NOT_FOUND
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Not found
+            status: 404
+            code: NOT_FOUND
+            detail: null
+            instance: /v1/ledger/accounts/0192f2cc-0000-7000-8000-00000000c009/balance
+            correlationId: c-0f3e9a
+            reason: null
+    IdempotencyConflict:
+      description: 409 IDEMPOTENCY_CONFLICT (same commandId / accountId, different body; never retry)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Idempotency conflict
+            status: 409
+            code: IDEMPOTENCY_CONFLICT
+            detail: null
+            instance: /v1/ledger/commands/post-p2p
+            correlationId: c-0f3e9a
+            reason: null
+    Unavailable:
+      description: '503 DEPENDENCY_UNAVAILABLE (TigerBeetle unreachable or no answer in time, or ledger Postgres down where required). Outcome unknown: retry with the same commandId and body, or resolve
+        via GET /v1/ledger/commands/{commandId}.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Dependency unavailable
+            status: 503
+            code: DEPENDENCY_UNAVAILABLE
+            detail: TigerBeetle did not answer in time
+            instance: /v1/ledger/commands/post-p2p
+            correlationId: c-0f3e9a
+            reason: null
+            retryable: true

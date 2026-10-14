@@ -1,0 +1,1227 @@
+# wallet-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# Producer-owned (O1): only wallet-service edits this file, through CHANGE-PROCESS.
+codeSets:
+  walletStatus:
+    description: Effective wallet status. Single-letter code on the wire and in the status cache; requests accept the code or the name. Directions per code below.
+    values:
+    - code: P
+      name: PENDING_KYC
+      description: debit no; credit only when the reader's policy WALLET.ALLOW_INBOUND_BEFORE_KYC is true (default false)
+      debitAllowed: false
+      creditAllowed: policy
+    - code: A
+      name: ACTIVE
+      description: debit and credit
+      debitAllowed: true
+      creditAllowed: true
+    - code: D
+      name: DORMANT
+      description: credit only
+      debitAllowed: false
+      creditAllowed: true
+    - code: X
+      name: DEBIT_BLOCKED
+      description: credit only
+      debitAllowed: false
+      creditAllowed: true
+    - code: C
+      name: CREDIT_BLOCKED
+      description: debit only
+      debitAllowed: true
+      creditAllowed: false
+    - code: F
+      name: BLOCKED
+      description: no debit, no credit
+      debitAllowed: false
+      creditAllowed: false
+    - code: Q
+      name: PENDING_CLOSURE
+      description: debit only by the closure payout (ledger command 17) or a treasury closure redemption (command 10, reasonCode CLOSURE_PAYOUT, partner wallets A/D/M/I);
+        no credit
+      debitAllowed: closure-only
+      creditAllowed: false
+    - code: Z
+      name: CLOSED
+      description: no debit, no credit; never deleted from the cache
+      debitAllowed: false
+      creditAllowed: false
+  walletType:
+    description: Wallet type code (status cache, events, responses) and the matching ledger account type.
+    values:
+    - code: C
+      name: CUSTOMER
+      ledgerAccountType: CUSTOMER_WALLET
+      ownerType: CUSTOMER
+    - code: A
+      name: AGENT
+      ledgerAccountType: AGENT_WALLET
+      ownerType: AGENT
+    - code: D
+      name: DISTRIBUTOR
+      ledgerAccountType: DISTRIBUTOR_WALLET
+      ownerType: DISTRIBUTOR
+    - code: M
+      name: MERCHANT
+      ledgerAccountType: MERCHANT_WALLET
+      ownerType: MERCHANT
+    - code: I
+      name: INSTITUTION
+      ledgerAccountType: INSTITUTION_WALLET
+      ownerType: INSTITUTION
+  walletStatusReason:
+    description: Wallet statusReasonCode / status-changes reasonCode values (reasonCodes group 'Wallet status'); RESTRICTED is display-only.
+    values:
+    - KYC_APPROVED
+    - KYC_EXPIRED
+    - DORMANCY
+    - CUSTOMER_REQUEST
+    - FRAUD_FREEZE
+    - AML_FREEZE
+    - COURT_ORDER
+    - REGULATORY_INSTRUCTION
+    - CLOSURE
+    - WALLET_CREATED
+    - PRE_REGISTRATION
+    - REACTIVATION
+    - KYC_UPGRADE
+    - RISK_REGRADE
+    - SCREENING_REJECT
+    - PARTNER_SUSPENDED
+    - PARTNER_REACTIVATED
+    - PARTNER_TERMINATED
+    - RESTRICTED
+  ownerType:
+    description: Wallet owner type.
+    values:
+    - CUSTOMER
+    - AGENT
+    - MERCHANT
+    - DISTRIBUTOR
+    - INSTITUTION
+  categoryCode:
+    description: Partner category (int32, 0..99999), derived only by the partner module; never an MCC. CUSTOMER = 0; AGENT 101..104; DISTRIBUTOR 201..203; INSTITUTION
+      401..404; MERCHANT = 3000 + d*100 + g with d = MICRO 1, SMALL 2, ENTERPRISE 3, ONLINE 4 and g = refdata MCC attributes.group (01 GROCERY_RETAIL, 02 FOOD, 03
+      UTILITY_TELCO, 04 TRANSPORT, 05 HEALTH, 06 EDUCATION, 07 DIGITAL, 99 OTHER). Consumers may match a merchant size class by its hundred group (3100, 3200, 3300,
+      3400). Pending architect sign-off (OPEN D-21).
+    formula: 'merchant: 3000 + d*100 + int(mccGroup)'
+    values:
+    - code: 0
+      name: CUSTOMER
+      description: customer wallets (C)
+    - code: 101
+      name: AGENT_RETAIL
+    - code: 102
+      name: AGENT_SUPER_AGENT
+    - code: 103
+      name: AGENT_MERCHANT_AGENT
+    - code: 104
+      name: AGENT_BANK_AGENT
+    - code: 201
+      name: DISTRIBUTOR_MASTER
+    - code: 202
+      name: DISTRIBUTOR_DISTRIBUTOR
+    - code: 203
+      name: DISTRIBUTOR_SUB
+    - code: 3101
+      name: MERCHANT_MICRO_GROCERY_RETAIL
+    - code: 3102
+      name: MERCHANT_MICRO_FOOD
+    - code: 3103
+      name: MERCHANT_MICRO_UTILITY_TELCO
+    - code: 3104
+      name: MERCHANT_MICRO_TRANSPORT
+    - code: 3105
+      name: MERCHANT_MICRO_HEALTH
+    - code: 3106
+      name: MERCHANT_MICRO_EDUCATION
+    - code: 3107
+      name: MERCHANT_MICRO_DIGITAL
+    - code: 3199
+      name: MERCHANT_MICRO_OTHER
+    - code: 3201
+      name: MERCHANT_SMALL_GROCERY_RETAIL
+    - code: 3202
+      name: MERCHANT_SMALL_FOOD
+    - code: 3203
+      name: MERCHANT_SMALL_UTILITY_TELCO
+    - code: 3204
+      name: MERCHANT_SMALL_TRANSPORT
+    - code: 3205
+      name: MERCHANT_SMALL_HEALTH
+    - code: 3206
+      name: MERCHANT_SMALL_EDUCATION
+    - code: 3207
+      name: MERCHANT_SMALL_DIGITAL
+    - code: 3299
+      name: MERCHANT_SMALL_OTHER
+    - code: 3301
+      name: MERCHANT_ENTERPRISE_GROCERY_RETAIL
+    - code: 3302
+      name: MERCHANT_ENTERPRISE_FOOD
+    - code: 3303
+      name: MERCHANT_ENTERPRISE_UTILITY_TELCO
+    - code: 3304
+      name: MERCHANT_ENTERPRISE_TRANSPORT
+    - code: 3305
+      name: MERCHANT_ENTERPRISE_HEALTH
+    - code: 3306
+      name: MERCHANT_ENTERPRISE_EDUCATION
+    - code: 3307
+      name: MERCHANT_ENTERPRISE_DIGITAL
+    - code: 3399
+      name: MERCHANT_ENTERPRISE_OTHER
+    - code: 3401
+      name: MERCHANT_ONLINE_GROCERY_RETAIL
+    - code: 3402
+      name: MERCHANT_ONLINE_FOOD
+    - code: 3403
+      name: MERCHANT_ONLINE_UTILITY_TELCO
+    - code: 3404
+      name: MERCHANT_ONLINE_TRANSPORT
+    - code: 3405
+      name: MERCHANT_ONLINE_HEALTH
+    - code: 3406
+      name: MERCHANT_ONLINE_EDUCATION
+    - code: 3407
+      name: MERCHANT_ONLINE_DIGITAL
+    - code: 3499
+      name: MERCHANT_ONLINE_OTHER
+    - code: 401
+      name: INSTITUTION_EMPLOYER
+    - code: 402
+      name: INSTITUTION_GOVERNMENT
+    - code: 403
+      name: INSTITUTION_NGO
+    - code: 404
+      name: INSTITUTION_OTHER
+  kycTier:
+    description: KYC tier (definitions configurable in KYC_TIERS).
+    values:
+    - code: 0
+      name: MOBILE_VERIFIED
+    - code: 1
+      name: SIMPLIFIED
+    - code: 2
+      name: FULL
+  riskGrade:
+    description: Customer / partner risk grade.
+    values:
+    - LOW
+    - MEDIUM
+    - HIGH
+  walletFlag:
+    description: flags bitmask. Bits 4 and 16 are not externally settable.
+    values:
+    - code: 1
+      name: AML_WATCH
+    - code: 2
+      name: PIN_RESET_COOLING
+    - code: 4
+      name: PRE_REGISTERED
+      externallySettable: false
+    - code: 8
+      name: HAS_OPEN_LIEN
+    - code: 16
+      name: NEW_DEVICE_COOLING
+      description: reserved for the auth layer
+      externallySettable: false
+  statusChangeTarget:
+    description: targetStatus of POST /v1/wallets/{walletId}/status-changes (name or code).
+    values:
+    - code: BLOCKED
+      description: add FULL_BLOCK
+    - code: DEBIT_BLOCKED
+      description: add DEBIT_BLOCK
+    - code: CREDIT_BLOCKED
+      description: add CREDIT_BLOCK
+    - code: ACTIVE
+      description: lift / reactivate
+    - code: DORMANT
+      description: set dormancy
+  statusChangeOutcome:
+    description: Outcome of a wallet status change.
+    values:
+    - APPLIED
+    - PENDING_APPROVAL
+    - NOOP
+  customerStatus:
+    values:
+    - PRE_REGISTERED
+    - REGISTERED
+    - ACTIVE
+    - CLOSED
+  kycStatus:
+    description: Derived from the latest submission (BR-W-37).
+    values:
+    - NOT_STARTED
+    - IN_PROGRESS
+    - PENDING_REVIEW
+    - APPROVED
+    - REJECTED
+  kycReviewStatus:
+    values:
+    - NONE
+    - DUE
+    - OVERDUE
+  customerScreeningStatus:
+    values:
+    - NOT_SCREENED
+    - PENDING
+    - CLEAR
+    - POTENTIAL_MATCH
+    - CONFIRMED_MATCH
+    - REJECTED
+  gender:
+    values:
+    - MALE
+    - FEMALE
+    - THIRD_GENDER
+  incomeBand:
+    values:
+    - UP_TO_BDT_10K
+    - BDT_10K_25K
+    - BDT_25K_50K
+    - BDT_50K_100K
+    - ABOVE_BDT_100K
+  preRegisterResult:
+    values:
+    - CREATED
+    - EXISTS
+    - REJECTED
+  preRegisterRejectReason:
+    values:
+    - INVALID_MSISDN
+    - MSISDN_COOLING
+    - CLOSED_WALLET
+  partnerType:
+    values:
+    - AGENT
+    - MERCHANT
+    - DISTRIBUTOR
+    - INSTITUTION
+  partnerSubType:
+    description: Partner sub-type per partner type.
+    values:
+    - code: RETAIL
+      partnerType: AGENT
+    - code: SUPER_AGENT
+      partnerType: AGENT
+    - code: MERCHANT_AGENT
+      partnerType: AGENT
+    - code: BANK_AGENT
+      partnerType: AGENT
+    - code: MICRO
+      partnerType: MERCHANT
+    - code: SMALL
+      partnerType: MERCHANT
+    - code: ENTERPRISE
+      partnerType: MERCHANT
+    - code: ONLINE
+      partnerType: MERCHANT
+    - code: MASTER
+      partnerType: DISTRIBUTOR
+    - code: DISTRIBUTOR
+      partnerType: DISTRIBUTOR
+    - code: SUB
+      partnerType: DISTRIBUTOR
+    - code: EMPLOYER
+      partnerType: INSTITUTION
+    - code: GOVERNMENT
+      partnerType: INSTITUTION
+    - code: NGO
+      partnerType: INSTITUTION
+    - code: OTHER
+      partnerType: INSTITUTION
+  partnerStatus:
+    description: Compliance screens on PENDING_SCREENING; money paths treat only ACTIVE as active (float return also from PENDING_TERMINATION).
+    values:
+    - PENDING_SCREENING
+    - PENDING_APPROVAL
+    - ACTIVE
+    - SUSPENDED
+    - PENDING_TERMINATION
+    - TERMINATED
+    - REJECTED
+  partnerStatusTarget:
+    values:
+    - SUSPENDED
+    - ACTIVE
+    - PENDING_TERMINATION
+  partnerFlag:
+    values:
+    - PERFORMANCE_WATCH
+    - COMPLAINT_WATCH
+    - FRAUD_WATCH
+    - AML_WATCH
+    - BLACKLIST_MATCH
+    - INACTIVE
+  keyPersonRole:
+    values:
+    - PROPRIETOR
+    - DIRECTOR
+    - PARTNER
+    - AUTHORISED_SIGNATORY
+    - BENEFICIAL_OWNER
+  settlementMode:
+    description: Only WALLET produced in R1; BANK reserved (OPEN D-42).
+    values:
+    - WALLET
+    - BANK
+  hierarchyLevel:
+    values:
+    - code: 0
+      name: OPERATOR
+    - code: 1
+      name: MASTER_DISTRIBUTOR
+    - code: 2
+      name: DISTRIBUTOR
+    - code: 3
+      name: SUB_DISTRIBUTOR
+    - code: 4
+      name: OUTLET
+  qrPointOfInitiation:
+    values:
+    - STATIC
+    - DYNAMIC
+  qrNotPayableReason:
+    values:
+    - EXPIRED
+    - REVOKED
+    - PARTNER_NOT_ACTIVE
+    - UNKNOWN_ACCOUNT
+    - TAMPERED
+    - OFF_US_NOT_SUPPORTED
+    - CURRENCY_NOT_SUPPORTED
+  qrDecodeError:
+    description: errors[].message of 400 on POST /v1/qr/decode.
+    values:
+    - CRC_MISMATCH
+    - BAD_TLV
+    - MISSING_TAG
+    - BAD_FORMAT
+problemReasons:
+- code: STATE_CONFLICT
+  reason: DUPLICATE_MSISDN
+  operations:
+  - POST /v1/wallets
+  - POST /v1/customers
+  - PATCH /v1/customers/{customerId}
+  - POST /v1/partners/{partnerId}/profile-changes
+  - POST /v1/partners/{partnerId}/users
+- code: STATE_CONFLICT
+  reason: MSISDN_COOLING
+  operations:
+  - POST /v1/wallets
+  - POST /v1/customers
+  - PATCH /v1/customers/{customerId}
+  - POST /v1/partners/{partnerId}/profile-changes
+- code: STATE_CONFLICT
+  reason: OWNER_HAS_DIFFERENT_MSISDN
+  operations:
+  - POST /v1/wallets
+- code: STATE_CONFLICT
+  reason: WALLET_CLOSED
+  operations:
+  - POST /v1/wallets/{walletId}/status-changes
+  - PATCH /v1/wallets/{walletId}/category
+  - POST /v1/wallets/{walletId}/flags
+  - POST /v1/wallets/{walletId}/closures
+- code: STATE_CONFLICT
+  reason: TARGET_NOT_ALLOWED
+  operations:
+  - POST /v1/wallets/{walletId}/status-changes
+- code: STATE_CONFLICT
+  reason: ALREADY_PENDING
+  operations:
+  - POST /v1/wallets/{walletId}/status-changes
+  - PATCH /v1/customers/{customerId}
+  - POST /v1/kyc/exceptions/{itemId}:resolve
+  - POST /v1/wallet-config/{key}/versions
+  - POST /v1/partners/{partnerId}/status-changes
+  - POST /v1/partners/{partnerId}/category-changes
+  - POST /v1/partners/{partnerId}/profile-changes
+  - PUT /v1/partner-config/{section}
+  extensions:
+  - changeRequestId
+- code: STATE_CONFLICT
+  reason: REKYC_REQUIRED
+  operations:
+  - POST /v1/wallets/{walletId}/status-changes
+- code: STATE_CONFLICT
+  reason: OPEN_REGULATORY_FREEZE
+  operations:
+  - POST /v1/wallets/{walletId}/status-changes
+- code: STATE_CONFLICT
+  reason: CUSTOMER_WALLET
+  operations:
+  - PATCH /v1/wallets/{walletId}/category
+- code: STATE_CONFLICT
+  reason: FIELD_LOCKED
+  operations:
+  - PATCH /v1/customers/{customerId}
+- code: STATE_CONFLICT
+  reason: INVALID_TRANSITION
+  operations:
+  - POST /v1/partners/{partnerId}/status-changes
+  - POST /v1/partners/{partnerId}:complete-termination
+  - partner application, QR, closure and KYC state transitions
+- code: STATE_CONFLICT
+  reason: HAS_ACTIVE_DESCENDANTS
+  operations:
+  - POST /v1/partners/{partnerId}/status-changes
+  extensions:
+  - activeDescendants
+- code: STATE_CONFLICT
+  reason: BALANCE_NOT_ZERO
+  operations:
+  - POST /v1/partners/{partnerId}:complete-termination
+  extensions:
+  - ledgerBalancePoisha
+  - heldPoisha
+- code: STATE_CONFLICT
+  reason: CONSENT_REQUIRED
+  operations:
+  - POST /v1/customers/{customerId}/consents/{consentId}:withdraw
+- code: STATE_CONFLICT
+  reason: ALREADY_WITHDRAWN
+  operations:
+  - POST /v1/customers/{customerId}/consents/{consentId}:withdraw
+- code: STATE_CONFLICT
+  reason: OPEN_SUBMISSION_EXISTS
+  operations:
+  - POST /v1/customers/{customerId}/kyc-submissions
+  extensions:
+  - existingId
+- code: STATE_CONFLICT
+  reason: MAX_ATTEMPTS
+  operations:
+  - POST /v1/customers/{customerId}/kyc-submissions
+- code: STATE_CONFLICT
+  reason: TIER_NOT_HIGHER
+  operations:
+  - POST /v1/customers/{customerId}/kyc-submissions
+- code: STATE_CONFLICT
+  reason: NOT_DRAFT
+  operations:
+  - PATCH /v1/kyc-submissions/{submissionId}
+  - POST /v1/kyc-submissions/{submissionId}/documents
+  - POST /v1/kyc-submissions/{submissionId}:submit
+- code: STATE_CONFLICT
+  reason: NOT_PENDING_REVIEW
+  operations:
+  - POST /v1/kyc-submissions/{submissionId}:decide
+- code: STATE_CONFLICT
+  reason: GATE_NOT_SATISFIED
+  operations:
+  - POST /v1/kyc-submissions/{submissionId}:decide
+  - POST /v1/approvals/{id}:approve
+- code: STATE_CONFLICT
+  reason: NOT_OPEN
+  operations:
+  - POST /v1/kyc/exceptions/{itemId}:resolve
+- code: STATE_CONFLICT
+  reason: CLOSURE_OPEN
+  operations:
+  - POST /v1/wallets/{walletId}/closures
+  extensions:
+  - existingId
+- code: STATE_CONFLICT
+  reason: PAYOUT_TARGET_NOT_ELIGIBLE
+  operations:
+  - POST /v1/wallets/{walletId}/closures
+- code: STATE_CONFLICT
+  reason: NOT_PENDING
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: STATE_CONFLICT
+  reason: EXPIRED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: STATE_CONFLICT
+  reason: REVALIDATION_FAILED
+  operations:
+  - POST /v1/approvals/{id}:approve
+- code: STATE_CONFLICT
+  reason: SCREENING_NOT_CLEAR
+  operations:
+  - POST /v1/approvals/{id}:approve
+- code: STATE_CONFLICT
+  reason: DUPLICATE_PARTNER
+  operations:
+  - POST /v1/partner-applications/{applicationId}:submit
+- code: STATE_CONFLICT
+  reason: NO_APPROVAL_CHAIN
+  operations:
+  - POST /v1/partner-applications/{applicationId}:submit
+- code: STATE_CONFLICT
+  reason: MAX_RESUBMISSIONS
+  operations:
+  - POST /v1/partner-applications/{applicationId}:submit
+- code: STATE_CONFLICT
+  reason: CYCLE
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: DEPTH_EXCEEDED
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: PARENT_NOT_ACTIVE
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: RULE_NOT_ALLOWED
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: BACKDATED
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: ALREADY_SCHEDULED
+  operations:
+  - POST /v1/partners/{partnerId}/hierarchy-changes
+- code: STATE_CONFLICT
+  reason: PARTNER_NOT_ACTIVE
+  operations:
+  - POST /v1/qr/static
+  - POST /v1/qr/dynamic
+- code: STATE_CONFLICT
+  reason: OUTLET_CLOSED
+  operations:
+  - POST /v1/qr/static
+  - POST /v1/qr/dynamic
+- code: RISK_BLOCKED
+  reason: BLACKLISTED
+  operations:
+  - POST /v1/partner-applications/{applicationId}/key-persons
+  - PUT /v1/partner-applications/{applicationId}/key-persons/{keyPersonId}
+  - POST /v1/partner-applications/{applicationId}/bank-accounts
+  - POST /v1/partner-applications/{applicationId}:submit
+  - POST /v1/partners/{partnerId}/profile-changes
+  - POST /v1/partners/{partnerId}/bank-accounts
+- code: SERVICE_DISABLED
+  reason: SELF_REGISTRATION_DISABLED
+  operations:
+  - POST /v1/partner-applications
+- code: SERVICE_DISABLED
+  reason: BANK_SETTLEMENT_DISABLED
+  operations:
+  - POST /v1/partner-applications
+- code: VALIDATION_FAILED
+  reason: INVALID_CURSOR
+  operations:
+  - every paged operation (kernel-reserved)
+problemExtensions:
+- name: changeRequestId
+  type: uuid
+  when: reason = ALREADY_PENDING (the existing pending request)
+- name: activeDescendants
+  type: int32
+  when: reason = HAS_ACTIVE_DESCENDANTS
+- name: ledgerBalancePoisha
+  type: int64 (poisha)
+  when: reason = BALANCE_NOT_ZERO
+- name: heldPoisha
+  type: int64 (poisha)
+  when: reason = BALANCE_NOT_ZERO
+- name: existingId
+  type: uuid
+  when: reason = OPEN_SUBMISSION_EXISTS | CLOSURE_OPEN (the existing open entity)
+- name: missingItems
+  type: array<string>
+  when: 400 on partner application submit (missing documents / key persons / bank account / site visit); errors[] lists the same
+entityTypes:
+- module: wallet
+  values:
+  - WalletStatusChange
+  - KycSubmission
+  - CustomerProfile
+  - CustomerRiskGrade
+  - WalletClosure
+  - ConfigDocument
+  - ExceptionItem
+  actions:
+    WalletStatusChange:
+    - APPLY
+    KycSubmission:
+    - APPROVE_KYC
+    - REJECT_KYC
+    CustomerProfile:
+    - UPDATE
+    CustomerRiskGrade:
+    - CHANGE_GRADE
+    WalletClosure:
+    - CLOSE
+    ConfigDocument:
+    - ACTIVATE
+    ExceptionItem:
+    - OVERRIDE
+- module: partner
+  values:
+  - Partner
+  - PartnerApplication
+  - HierarchyAssignment
+  - Config
+  - BankAccount
+  actions:
+    Partner:
+    - SUSPEND
+    - REACTIVATE
+    - TERMINATE
+    - CANCEL_TERMINATION
+    - CHANGE_CATEGORY
+    - CHANGE_TERRITORY
+    - UPDATE_PROFILE
+    PartnerApplication:
+    - APPROVE_STAGE_SALES
+    - APPROVE_STAGE_COMPLIANCE
+    - APPROVE_STAGE_EDD
+    - APPROVE_STAGE_FINANCE
+    - APPROVE_STAGE_OPERATIONS
+    HierarchyAssignment:
+    - CHANGE_HIERARCHY
+    Config:
+    - CONFIG_APPROVAL_CHAINS
+    - CONFIG_HIERARCHY_RULES
+    - CONFIG_HIERARCHY_LEVELS
+    - CONFIG_CATEGORY_CODES
+    - CONFIG_DOCUMENT_CHECKLISTS
+    - CONFIG_RISK_SCORE_RULES
+    - CONFIG_PARAMS
+    BankAccount:
+    - ADD_BANK_ACCOUNT
+    - REMOVE_BANK_ACCOUNT
+notificationTemplates:
+- code: WALLET_CLOSURE_REQUESTED
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: closureId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: requestedAt
+    type: DATETIME
+    req: true
+    notes: ''
+  - name: awaitingZeroBalance
+    type: TEXT
+    req: true
+    notes: enum{true,false}
+  module: wallet
+  trigger: closure request accepted
+- code: WALLET_CLOSURE_APPROVED
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: closureId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: settleAfter
+    type: DATETIME
+    req: true
+    notes: required
+  module: wallet
+  trigger: closure approved
+- code: WALLET_CLOSURE_COMPLETED
+  category: SERVICE
+  recipient: msisdn only (closed wallet)
+  channels:
+  - SMS
+  variables:
+  - name: closureId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: closedAt
+    type: DATETIME
+    req: true
+    notes: ''
+  module: wallet
+  trigger: wallet closed (Z, reason CLOSURE)
+- code: WALLET_CLOSURE_REVERTED
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: closureId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: reason
+    type: TEXT
+    req: true
+    notes: blocking check code, e.g. BALANCE_NOT_ZERO, AWAITING_ZERO_BALANCE
+  module: wallet
+  trigger: closure reverted (blocking final check or payout rejected)
+- code: WALLET_DORMANCY_WARNING
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - SMS
+  - IN_APP
+  variables:
+  - name: dormantFrom
+    type: DATE
+    req: true
+    notes: ''
+  - name: inactiveDays
+    type: INT
+    req: true
+    notes: ''
+  module: wallet
+  trigger: dormancy warning job
+- code: KYC_REVIEW_DUE
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - SMS
+  - IN_APP
+  variables:
+  - name: dueDate
+    type: DATE
+    req: true
+    notes: ''
+  module: wallet
+  trigger: re-KYC due job (single sender of re-KYC reminders, OPEN D-11)
+- code: KYC_REVIEW_OVERDUE
+  category: SERVICE
+  recipient: wallet holder (walletId)
+  channels:
+  - SMS
+  - IN_APP
+  variables:
+  - name: dueDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: restrictFrom
+    type: DATE
+    req: true
+    notes: ''
+  module: wallet
+  trigger: re-KYC overdue job
+- code: PARTNER_APPLICATION_RECEIVED
+  category: SERVICE
+  recipient: applicant msisdn
+  channels:
+  - SMS
+  variables:
+  - name: applicationId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: partnerType
+    type: TEXT
+    req: true
+    notes: partner type
+  module: partner
+  trigger: application submitted
+- code: PARTNER_APPLICATION_RETURNED
+  category: SERVICE
+  recipient: applicant msisdn + initiator staffUserId (one request each)
+  channels: []
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: REASON_CODE code
+  module: partner
+  trigger: application returned for correction
+- code: PARTNER_APPLICATION_REJECTED
+  category: SERVICE
+  recipient: applicant msisdn
+  channels:
+  - SMS
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: REASON_CODE code
+  module: partner
+  trigger: application rejected
+- code: PARTNER_ACTIVATED
+  category: SERVICE
+  recipient: partner wallet (walletId)
+  channels:
+  - IN_APP
+  - SMS
+  variables:
+  - name: partnerCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: displayName
+    type: TEXT
+    req: true
+    notes: ''
+  module: partner
+  trigger: partner activated
+- code: PARTNER_SUSPENDED
+  category: SERVICE
+  recipient: partner wallet (walletId); + parent wallet for DST-008
+  channels: []
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: partner status reason code
+  - name: until
+    type: DATE
+    req: false
+    notes: ''
+  module: partner
+  trigger: partner suspended
+- code: PARTNER_REACTIVATED
+  category: SERVICE
+  recipient: partner wallet (walletId); + parent wallet for DST-008
+  channels: []
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: ''
+  - name: until
+    type: DATE
+    req: false
+    notes: ''
+  module: partner
+  trigger: partner reactivated
+- code: PARTNER_TERMINATED
+  category: SERVICE
+  recipient: partner wallet (walletId)
+  channels: []
+  variables:
+  - name: reason
+    type: TEXT
+    req: true
+    notes: ''
+  - name: until
+    type: DATE
+    req: false
+    notes: ''
+  module: partner
+  trigger: partner terminated
+- code: AGREEMENT_EXPIRING
+  category: SERVICE
+  recipient: partner wallet (walletId); second request recipient.role = PARTNER_OPS_MAKER (IN_APP)
+  channels:
+  - IN_APP
+  variables:
+  - name: expiryDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: daysLeft
+    type: INT
+    req: true
+    notes: ''
+  module: partner
+  trigger: agreement expiry job
+- code: TRADE_LICENCE_EXPIRING
+  category: SERVICE
+  recipient: partner wallet (walletId); second request recipient.role = PARTNER_OPS_MAKER (IN_APP)
+  channels:
+  - IN_APP
+  variables:
+  - name: expiryDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: daysLeft
+    type: INT
+    req: true
+    notes: ''
+  module: partner
+  trigger: trade-licence expiry job
+- code: PARTNER_APPLICATION_SLA_BREACHED
+  category: INTERNAL
+  recipient: recipient.role = the stage's role (one request per role)
+  channels:
+  - IN_APP
+  variables:
+  - name: applicationId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: stageCode
+    type: TEXT
+    req: true
+    notes: ''
+  module: partner
+  trigger: application stage SLA breached / screening timeout
+reasonCodes:
+- group: Wallet status
+  field: wallet statusReasonCode / status-changes reasonCode
+  values:
+  - KYC_APPROVED
+  - KYC_EXPIRED
+  - DORMANCY
+  - CUSTOMER_REQUEST
+  - FRAUD_FREEZE
+  - AML_FREEZE
+  - COURT_ORDER
+  - REGULATORY_INSTRUCTION
+  - CLOSURE
+  - WALLET_CREATED
+  - PRE_REGISTRATION
+  - REACTIVATION
+  - KYC_UPGRADE
+  - RISK_REGRADE
+  - SCREENING_REJECT
+  - PARTNER_SUSPENDED
+  - PARTNER_REACTIVATED
+  - PARTNER_TERMINATED
+  displayOnly:
+  - RESTRICTED
+  notes: Customer notification of AML_FREEZE, REGULATORY_INSTRUCTION, COURT_ORDER (and lifts) is suppressed; FRAUD_FREEZE is notified (OPEN D-06). RESTRICTED is returned
+    to holder actors by GET /v1/wallets/{walletId} instead of those three; never stored or emitted.
+- group: Partner status
+  field: partner statusReasonCode / partner status-changes reasonCode
+  values:
+  - AML_FREEZE
+  - FRAUD_FREEZE
+  - SCREENING_REJECTED
+  - RISK_PERFORMANCE
+  - DISTRIBUTOR_SUSPENSION
+  - BLACKLIST_MATCH
+  - ONBOARDING_APPROVED
+  - SUSPENSION_EXPIRED
+  - NAME_CHANGED
+  - PARTNER_REJECTED
+  - BLACKLISTED
+  notes: ONBOARDING_APPROVED .. BLACKLISTED pending governance sign-off (OPEN D-32).
+- group: KYC
+  field: customer.events reasonCode (KYC_* types); KYC decision reasonCode
+  values:
+  - KYC_SUBMITTED
+  - KYC_APPROVED
+  - KYC_UPGRADE
+  - RISK_REGRADE
+  - NID_MISMATCH
+  - IMAGE_UNCLEAR
+  - SELFIE_MISMATCH
+  - INCOMPLETE
+  - DUPLICATE
+  - SCREENING_REJECT
+  - BLACKLISTED
+  - FRAUD_SUSPECTED
+  - UNDERAGE
+  - OTHER
+  notes: OPEN D-32
+- group: Customer profile
+  field: customer.events reasonCode (CUSTOMER_REGISTERED, CUSTOMER_PROFILE_UPDATED)
+  values:
+  - REGISTERED
+  - PROFILE_UPDATED
+  - PREFERENCES_UPDATED
+  - NOMINEES_UPDATED
+  - KYC_REVIEW_DUE
+  - KYC_REVIEW_OVERDUE
+  notes: CUSTOMER_REGISTERED also uses PRE_REGISTRATION (Wallet status group). OPEN D-32
+- group: Wallet flag
+  field: POST /v1/wallets/{walletId}/flags reasonCode
+  values:
+  - AML_WATCH
+  - AML_LIEN
+  - PIN_RESET
+  - NEW_DEVICE
+  notes: Also accepts the Hold group codes owned by ledger-service (DISPUTE_HOLD, AML_LIEN, WRONG_TRANSFER_HOLD). OPEN D-32
+- group: Partner application
+  field: stage return / reject reasonCode; PARTNER_APPLICATION_RETURNED / _REJECTED variable reason
+  values:
+  - INCOMPLETE_KYB
+  - DOCUMENT_UNREADABLE
+  - DOCUMENT_EXPIRED
+  - SITE_VISIT_FAILED
+  - DUPLICATE_PARTNER
+  - SCREENING_REJECTED
+  - BLACKLISTED
+  - OTHER
+  notes: new seed introduced by this pack (OPEN D-32)
+- group: Partner change
+  field: hierarchy / category / territory change reasonCode
+  values:
+  - TERRITORY_REALIGNMENT
+  - BUSINESS_GROWTH
+  - SHOP_MOVED
+  - CORRECTION
+  - OTHER
+  notes: new seed (OPEN D-32)
+- group: QR revoke
+  field: POST /v1/qr/{qrPayloadId}:revoke reasonCode
+  values:
+  - LOST_STICKER
+  - DAMAGED
+  - NAME_CHANGED
+  - REGENERATED
+  - OUTLET_CLOSED
+  - PARTNER_TERMINATED
+  - OTHER
+  notes: new seed (OPEN D-32)
+txnRefPrefixes:
+- prefix: WC
+  kind: ledger
+  meaning: closure payout (ledger command 17, post-closure-payout)
+  format: WC{yyMMdd}00{8 Crockford base32}
+  length: 18
+  carriedOnEvent: null
+  note: no producer event carries it yet (OPEN D-51)
+- prefix: A
+  kind: business
+  meaning: partnerCode of an AGENT (not a txnRef)
+  format: A{8-digit sequence}{Luhn digit}
+  length: 10
+- prefix: M
+  kind: business
+  meaning: partnerCode of a MERCHANT (not a txnRef)
+  format: M{8-digit sequence}{Luhn digit}
+  length: 10
+- prefix: D
+  kind: business
+  meaning: partnerCode of a DISTRIBUTOR (not a txnRef)
+  format: D{8-digit sequence}{Luhn digit}
+  length: 10
+- prefix: I
+  kind: business
+  meaning: partnerCode of an INSTITUTION (not a txnRef)
+  format: I{8-digit sequence}{Luhn digit}
+  length: 10
+- prefix: Q
+  kind: business
+  meaning: dynamic Bangla QR reference (tag 62.05; not a txnRef)
+  format: Q{9 Crockford base32}
+  length: 10
+productCodes: []
+metrics:
+- name: bitspay_wallet_registrations_total
+  type: counter
+  labels:
+  - channel
+  description: customer registrations
+- name: bitspay_wallet_kyc_submissions_total
+  type: counter
+  labels:
+  - state
+  description: KYC submissions by resulting state
+- name: bitspay_wallet_kyc_queue_size
+  type: gauge
+  labels:
+  - state
+  description: open submissions per queue state
+- name: bitspay_wallet_kyc_queue_oldest_seconds
+  type: gauge
+  labels: []
+  description: age of the oldest PENDING_REVIEW submission
+- name: bitspay_wallet_status_changes_total
+  type: counter
+  labels:
+  - reason
+  - outcome
+  description: status-change requests
+- name: bitspay_wallet_cache_writethrough_total
+  type: counter
+  labels:
+  - result
+  description: write-through CAS results (applied, stale, error)
+- name: bitspay_wallet_cache_writethrough_failures_total
+  type: counter
+  labels: []
+  description: write-through given up after 3 attempts
+- name: bitspay_wallet_cache_loader_lag_seconds
+  type: gauge
+  labels: []
+  description: loader lag on wallet.events
+- name: bitspay_wallet_cache_sample_total
+  type: counter
+  labels: []
+  description: sampler comparisons
+- name: bitspay_wallet_cache_mismatch_total
+  type: counter
+  labels:
+  - type
+  description: sampler mismatches (MISSING, STALE, DIVERGENT, AHEAD)
+- name: bitspay_wallet_provisioning_pending
+  type: gauge
+  labels: []
+  description: wallets in LEDGER_PENDING
+- name: bitspay_wallet_closures_total
+  type: counter
+  labels:
+  - state
+  description: closure state transitions
+- name: bitspay_wallet_closure_payouts_total
+  type: counter
+  labels:
+  - result
+  description: closure payout command results
+- name: bitspay_wallet_dormancy_marked_total
+  type: counter
+  labels: []
+  description: wallets moved to DORMANT
+- name: bitspay_wallet_readrepair_dropped_total
+  type: counter
+  labels: []
+  description: read-repair writes dropped on queue overflow
+- name: bitspay_partner_applications_total
+  type: counter
+  labels:
+  - type
+  - outcome
+  description: applications by outcome
+- name: bitspay_partner_application_stage_sla_breached_total
+  type: counter
+  labels:
+  - stage
+  description: stage SLA breaches
+- name: bitspay_partner_activation_pending
+  type: gauge
+  labels: []
+  description: activations not DONE
+- name: bitspay_partner_activation_attempts_total
+  type: counter
+  labels:
+  - result
+  description: activation saga attempts
+- name: bitspay_partner_status_changes_total
+  type: counter
+  labels:
+  - to
+  - actorType
+  description: partner status changes
+- name: bitspay_partner_hierarchy_republished_total
+  type: counter
+  labels: []
+  description: PARTNER_UPSERTED emitted by subtree recomputes
+- name: bitspay_partner_qr_generated_total
+  type: counter
+  labels:
+  - type
+  description: QR codes generated
+- name: bitspay_partner_qr_decode_total
+  type: counter
+  labels:
+  - onUs
+  - payable
+  - reason
+  description: decode outcomes
+- name: bitspay_partner_qr_decode_seconds
+  type: histogram
+  labels: []
+  description: decode latency
+- name: bitspay_partner_blacklist_matches_total
+  type: counter
+  labels: []
+  description: blacklist matches on partners

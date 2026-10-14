@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/general-ledger-service/gl.events/GL_DAY_CLOSED.v1.schema.json",
+  "title": "gl.events GL_DAY_CLOSED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Asia/Dhaka, CUTOFF.EOD; = key"
+    },
+    "revision": {
+      "type": "integer",
+      "format": "int32",
+      "description": "≥ 1; +1 per restatement"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "CLOSED",
+        "CLOSED_WITH_EXCEPTIONS"
+      ],
+      "description": "CLOSED_WITH_EXCEPTIONS = a control check failed or HIGH+ exceptions are open for the day"
+    },
+    "forced": {
+      "type": "boolean",
+      "description": "closed by an approved force-close (readiness not met)"
+    },
+    "restated": {
+      "type": "boolean",
+      "description": "= revision > 1"
+    },
+    "ruleSetVersion": {
+      "type": "integer",
+      "format": "int32",
+      "description": "≥ 1; posting rule set applicable to the posting date"
+    },
+    "ledgerJournalId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "the LEDGER_DAY journal of this revision"
+    },
+    "ledgerJournalRef": {
+      "type": "string",
+      "description": "`GLJ-{yyyyMMdd}-L-R{revision}`"
+    },
+    "totalDebitPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "description": "≥ 0; LEDGER_DAY journal"
+    },
+    "totalCreditPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "description": "= totalDebitPoisha"
+    },
+    "checks": {
+      "$ref": "#/$defs/GlDayChecks",
+      "description": "control checks GL-1…GL-7 (SPEC §7, day close)"
+    },
+    "exceptionCount": {
+      "type": "integer",
+      "format": "int64",
+      "description": "≥ 0; open HIGH+ exceptions for the day"
+    },
+    "closedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+    }
+  },
+  "required": [
+    "businessDate",
+    "revision",
+    "status",
+    "forced",
+    "restated",
+    "ruleSetVersion",
+    "ledgerJournalId",
+    "ledgerJournalRef",
+    "totalDebitPoisha",
+    "totalCreditPoisha",
+    "checks",
+    "exceptionCount",
+    "closedAt"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "GlDayChecks": {
+      "type": "object",
+      "properties": {
+        "journalBalanced": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-1 Σ debit = Σ credit in every journal of the day"
+        },
+        "trialBalanceZero": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-2 cumulative Σ closing net debit = 0"
+        },
+        "ledgerControlTrust": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-3a GL trust accounts = TB trust mirror (exact, history flag)"
+        },
+        "ledgerControlSystem": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-3b per TB system account (exact; NOT_VERIFIED only when bitspay.gl.control.system-accounts=NOT_VERIFIED)"
+        },
+        "summaryComplete": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-4 Σ debit-side = Σ credit-side summary amounts and leg counts for the day"
+        },
+        "mustBeZero": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-5 accounts flagged must_be_zero close at 0"
+        },
+        "ledgerControlledIntegrity": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-6 no non-ledger line on a ledger-controlled account"
+        },
+        "normalBalance": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "NOT_VERIFIED"
+          ],
+          "description": "GL-7 (informational) wrong-sign balances"
+        }
+      },
+      "required": [
+        "journalBalanced",
+        "trialBalanceZero",
+        "ledgerControlTrust",
+        "ledgerControlSystem",
+        "summaryComplete",
+        "mustBeZero",
+        "ledgerControlledIntegrity",
+        "normalBalance"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

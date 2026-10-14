@@ -1,0 +1,31 @@
+{
+  "name": "POST /v1/ledger/commands/post-p2p → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-p2p(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "fc214b7c-f80c-8143-4f0e-107e2518a302",
+        "3c9f8cd0-5cc5-1049-aa02-80dfc5c61a13",
+        "586bb84d-c6dc-fcd7-62fc-a264483349f4"
+      ],
+      "postedAt": "2026-10-09T08:03:22.123Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

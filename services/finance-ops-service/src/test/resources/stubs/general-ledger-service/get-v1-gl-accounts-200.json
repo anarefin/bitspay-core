@@ -1,0 +1,68 @@
+{
+  "name": "GET /v1/gl/accounts → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/gl/accounts(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "code": "2101",
+          "nameEn": "E-money liability - customers",
+          "nameBn": null,
+          "accountClass": "LIABILITY",
+          "normalSide": "CREDIT",
+          "contra": false,
+          "parentCode": "2100",
+          "level": 3,
+          "postable": true,
+          "ledgerControlled": true,
+          "manualPostingAllowed": false,
+          "mustBeZero": false,
+          "status": "ACTIVE",
+          "provisional": true,
+          "version": 1,
+          "updatedAt": "2026-10-01T00:00:05.000Z",
+          "templateCode": null,
+          "description": "All CUSTOMER_WALLET (100) accounts",
+          "effectiveFrom": "2026-10-01",
+          "createdAt": "2026-10-01T00:00:05.000Z"
+        },
+        {
+          "code": "5301",
+          "nameEn": "Bank charges",
+          "nameBn": null,
+          "accountClass": "EXPENSE",
+          "normalSide": "DEBIT",
+          "contra": false,
+          "parentCode": "5300",
+          "level": 3,
+          "postable": true,
+          "ledgerControlled": false,
+          "manualPostingAllowed": true,
+          "mustBeZero": false,
+          "status": "ACTIVE",
+          "provisional": true,
+          "version": 3,
+          "updatedAt": "2026-10-01T00:00:05.000Z",
+          "templateCode": null,
+          "description": "Operating bank account charges",
+          "effectiveFrom": "2026-10-01",
+          "createdAt": "2026-10-01T00:00:05.000Z"
+        }
+      ],
+      "nextCursor": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "general-ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

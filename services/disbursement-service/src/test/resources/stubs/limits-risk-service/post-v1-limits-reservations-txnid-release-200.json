@@ -1,0 +1,24 @@
+{
+  "name": "POST /v1/limits/reservations/{txnId}:release → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/limits/reservations/[^/]+:release(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "txnId": "0192f4d0-0000-7000-8000-000000000001",
+      "released": true,
+      "state": "RELEASED"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

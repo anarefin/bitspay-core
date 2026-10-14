@@ -1,0 +1,40 @@
+{
+  "name": "GET /v1/pricing/plans → 400",
+  "priority": 9,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/pricing/plans(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "400"
+      }
+    }
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "Validation failed",
+      "status": 400,
+      "code": "VALIDATION_FAILED",
+      "detail": null,
+      "instance": "/v1/pricing/quote",
+      "correlationId": "c-0f3e9a",
+      "reason": null,
+      "errors": [
+        {
+          "field": "amountPoisha",
+          "message": "must be between 1 and 10000000000000"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "pricing-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

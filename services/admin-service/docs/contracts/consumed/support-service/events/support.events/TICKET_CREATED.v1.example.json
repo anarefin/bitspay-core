@@ -1,0 +1,29 @@
+{
+  "eventId": "0192f806-0000-7000-8000-000000000001",
+  "eventType": "TICKET_CREATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T08:00:00.012Z",
+  "producer": "support-service",
+  "aggregateType": "Ticket",
+  "aggregateId": "0192f800-0000-7000-8000-000000000123",
+  "correlationId": "c-77a1",
+  "data": {
+    "ticketId": "0192f800-0000-7000-8000-000000000123",
+    "ticketNumber": "T261009000123",
+    "category": "WRONG_TRANSFER",
+    "subCategory": null,
+    "bbCategory": "BB_TRANSACTION",
+    "priority": "P2",
+    "source": "CALL_CENTRE",
+    "channel": "BACKOFFICE",
+    "customerId": "0192f2a0-0000-7000-8000-00000000a001",
+    "walletId": "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+    "msisdn": "8801812000001",
+    "language": "bn",
+    "txnRef": "PP26100900W7RT2X9B",
+    "status": "NEW",
+    "customerVisibleStatus": "RECEIVED",
+    "resolutionDueAt": "2026-10-12T08:00:00.000Z",
+    "createdAt": "2026-10-09T08:00:00.000Z"
+  }
+}

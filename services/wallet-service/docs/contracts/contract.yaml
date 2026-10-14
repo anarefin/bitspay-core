@@ -1,0 +1,376 @@
+# wallet-service — contract manifest (CONTRACT-MODEL §3)
+service: wallet-service
+number: "03"
+modules: [wallet, partner]
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-3
+moduleOwners: {wallet: Dev-3, partner: Dev-4}
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # every operation in the openapi is provided; x-audience service|staff|customer|partner|internal, x-actors per operation
+  events:
+    - topic: wallet.events
+      key: "walletId"
+      compacted: true
+      tombstones: false
+      partitions: {dev: 3, prod: 48}
+      retention: compacted
+      transport: outbox
+      eventTypes:
+        - {type: WALLET_UPSERTED, version: 1, aggregateType: Wallet, schema: provided/events/wallet.events/WALLET_UPSERTED.v1.schema.json}
+    - topic: customer.events
+      key: "customerId"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 24}
+      retention: 7d
+      transport: outbox
+      eventTypes:
+        - {type: CUSTOMER_REGISTERED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/CUSTOMER_REGISTERED.v1.schema.json}
+        - {type: KYC_SUBMITTED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/KYC_SUBMITTED.v1.schema.json}
+        - {type: KYC_APPROVED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/KYC_APPROVED.v1.schema.json}
+        - {type: KYC_REJECTED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/KYC_REJECTED.v1.schema.json}
+        - {type: KYC_TIER_CHANGED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/KYC_TIER_CHANGED.v1.schema.json}
+        - {type: RISK_GRADE_CHANGED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/RISK_GRADE_CHANGED.v1.schema.json}
+        - {type: CUSTOMER_PROFILE_UPDATED, version: 1, aggregateType: Customer, schema: provided/events/customer.events/CUSTOMER_PROFILE_UPDATED.v1.schema.json}
+    - topic: partner.events
+      key: "partnerId"
+      compacted: true
+      tombstones: false
+      partitions: {dev: 3, prod: 12}
+      retention: compacted
+      transport: outbox
+      eventTypes:
+        - {type: PARTNER_UPSERTED, version: 1, aggregateType: Partner, schema: provided/events/partner.events/PARTNER_UPSERTED.v1.schema.json}
+  inboundTopics: []
+  data:
+    - {id: wallet-status-cache, version: 1, file: provided/data/wallet-status-cache.v1.md, kind: redis-format}
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    # ---------------- ledger-service
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "create the wallet's ledger account first (wallet creation, registration, pre-registration, partner activation)"
+      fieldsUsed: ["req.accountId", "req.accountType", "req.ownerType", "res.accountId", "res.result"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "503 to caller; row LEDGER_PENDING; retry job"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts/{id}:close"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "close the wallet's ledger account at the end of a closure"
+      fieldsUsed: ["path.id", "res.result", "res.closedAt", "problem.reason"]
+      codesUsed: []
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "stay CLOSING, retried each settle run; CLOSURE_STUCK after 24 h"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: both
+      purpose: "closure pre-check / final check (wallet); zero-balance check at partner termination (partner)"
+      fieldsUsed: ["path.id", "res.ledgerBalancePoisha", "res.availableBalancePoisha", "res.heldPoisha", "res.closed"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "pre-check UNKNOWN (blocking); termination 503"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/holds"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "closure pre-check: open holds"
+      fieldsUsed: ["query.accountId", "res.items[].holdCommandId", "res.items[].amountPoisha", "res.items[].reasonCode", "res.totalHeldPoisha"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "pre-check UNKNOWN (blocking)"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts/balances:batchGet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "unclaimed-balance report (R2)"
+      fieldsUsed: ["req.accountIds", "res.items[].accountId", "res.items[].ledgerBalancePoisha", "res.notFound"]
+      codesUsed: []
+      resilience: {timeoutMs: 3000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "503 to report caller"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-closure-payout"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "post-closure-payout (command 17): pay a closing wallet's residual balance to a same-person wallet"
+      fieldsUsed: ["req.commandId", "req.txnRef", "req.fromAccountId", "req.toAccountId", "req.amountPoisha",
+                   "req.constraints.destinationMaxBalancePoisha", "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds"]
+      codesUsed: []
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "UNKNOWN: resolve via GET /v1/ledger/commands/{commandId}, else retry same commandId and body"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/commands/{commandId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "resolve an unknown closure-payout outcome"
+      fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "retry next settle run"}
+    # ---------------- limits-risk-service
+    - producer: limits-risk-service
+      operation: "GET /v1/blacklist/check"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: both
+      purpose: "blacklist checks at registration / KYC submit (wallet) and key person / bank account / submit / MSISDN change (partner); always valueHash"
+      fieldsUsed: ["query.type", "query.valueHash", "res.listed", "res.entries[].entryId", "res.entries[].type", "res.entries[].reasonCode", "res.entries[].expiresAt"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "wallet: blacklistCheck PENDING + recheck job (500 ms read); partner: 503, nothing changed"}
+    - producer: limits-risk-service
+      operation: "GET /v1/limits/wallets/{walletId}/usage"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "closure payout: destination maxBalancePoisha for command 17 constraints"
+      fieldsUsed: ["path.walletId", "res.maxBalancePoisha"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "no payout this settle run"}
+    # ---------------- admin-service
+    - producer: admin-service
+      operation: "GET /v1/retention/legal-holds"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: wallet
+      purpose: "R2: skip KYC anonymisation of an entity under legal hold"
+      fieldsUsed: ["query.subjectType", "query.subjectId", "query.category", "res.items"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "skip the entity this run"}
+    - producer: admin-service
+      operation: "GET /v1/refdata/{type}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      module: both
+      purpose: "bootstrap the GEO / MCC / REASON_CODE / BANK / SYSTEM_PARAM projections when empty"
+      fieldsUsed: ["path.type", "res.items[].type", "res.items[].code", "res.items[].parentCode", "res.items[].nameEn", "res.items[].nameBn",
+                   "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "local defaults; validation skipped with WARN"}
+
+  events:
+    # ---------------- compliance-service case.events
+    - producer: compliance-service
+      topic: case.events
+      eventType: SCREENING_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "customer onboarding screening result (correlated by sourceEventId)"
+      fieldsUsed: ["screeningId", "subjectType", "subjectId", "trigger", "result", "eddRequired", "sourceEventId", "matches[].listKind"]
+      codesUsed: []
+    - producer: compliance-service
+      topic: case.events
+      eventType: SCREENING_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "customer screening decision after four-eyes review; PEP rule"
+      fieldsUsed: ["screeningId", "subjectType", "subjectId", "trigger", "result", "eddRequired", "sourceEventId", "matches[].listKind", "decision", "decidedAt"]
+      codesUsed: []
+    - producer: compliance-service
+      topic: case.events
+      eventType: RISK_REGRADE_RECOMMENDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "R2 risk regrade via CustomerRiskGrade / CHANGE_GRADE approval"
+      fieldsUsed: ["subjectType", "subjectId", "currentGrade", "recommendedGrade", "caseId", "reasonCode"]
+      codesUsed: []
+    - producer: compliance-service
+      topic: case.events
+      eventType: SCREENING_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service.partner-case-events
+      module: partner
+      purpose: "partner screening result (correlated by sourceVersion / sourceEventId), key-person matches rolled up"
+      fieldsUsed: ["screeningId", "subjectType", "subjectId", "trigger", "result", "eddRequired", "sourceEventId", "sourceVersion",
+                   "matches[].listKind", "matches[].matchedSubjectType", "matches[].matchedSubjectId"]
+      codesUsed: []
+    - producer: compliance-service
+      topic: case.events
+      eventType: SCREENING_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service.partner-case-events
+      module: partner
+      purpose: "partner screening decision (REJECT acts only for ONBOARDING)"
+      fieldsUsed: ["screeningId", "subjectType", "subjectId", "trigger", "result", "eddRequired", "sourceEventId", "sourceVersion",
+                   "matches[].listKind", "matches[].matchedSubjectType", "matches[].matchedSubjectId", "decision", "decidedAt"]
+      codesUsed: []
+    # ---------------- support-service support.events
+    - producer: support-service
+      topic: support.events
+      eventType: DISPUTE_OPENED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "closure pre-check projection (open_dispute)"
+      fieldsUsed: ["disputeId", "ticketId", "walletIds", "openedAt"]
+      codesUsed: []
+    - producer: support-service
+      topic: support.events
+      eventType: DISPUTE_RESOLVED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "remove the dispute from the projection"
+      fieldsUsed: ["disputeId"]
+      codesUsed: []
+    - producer: support-service
+      topic: support.events
+      eventType: REVERSAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "closure pre-check projection (open reversal request)"
+      fieldsUsed: ["reversalRequestId", "ticketId", "walletIds", "requestedAt"]
+      codesUsed: []
+    - producer: support-service
+      topic: support.events
+      eventType: REVERSAL_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "remove the reversal request from the projection (any terminal outcome)"
+      fieldsUsed: ["reversalRequestId"]
+      codesUsed: []
+    # ---------------- limits-risk-service blacklist.events
+    - producer: limits-risk-service
+      topic: blacklist.events
+      eventType: BLACKLIST_ENTRY_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "re-check open submissions and live customers (NID, MSISDN, WALLET)"
+      fieldsUsed: ["entryId", "type", "valueHash", "active", "expiresAt", "reasonCode"]
+      codesUsed: []
+    - producer: limits-risk-service
+      topic: blacklist.events
+      eventType: BLACKLIST_ENTRY_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service.partner-blacklist-events
+      module: partner
+      purpose: "partner blacklist projection and matches (MSISDN, NID, BANK_ACCOUNT, WALLET, PARTNER)"
+      fieldsUsed: ["entryId", "type", "valueHash", "active", "expiresAt", "reasonCode"]
+      codesUsed: []
+    # ---------------- transaction-service txn.events
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "dormancy activity projection (REVERSAL rows ignored)"
+      fieldsUsed: ["txnRef", "txnType", "fromWalletId", "toWalletId", "completedAt"]
+      codesUsed: []
+    # ---------------- admin-service refdata.events
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service
+      module: wallet
+      purpose: "GEO and REASON_CODE validation; SYSTEM_PARAM RETENTION.CUSTOMER_KYC"
+      fieldsUsed: ["type", "code", "parentCode", "nameEn", "nameBn", "attributes", "version", "active"]
+      codesUsed: []
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service.partner-refdata-events
+      module: partner
+      purpose: "GEO (chain, riskFlag, qrCity), MCC (group, riskLevel), REASON_CODE, BANK"
+      fieldsUsed: ["type", "code", "parentCode", "nameEn", "nameBn", "attributes", "version", "active"]
+      codesUsed: []
+    # ---------------- own wallet.events (cache loader)
+    - producer: wallet-service
+      topic: wallet.events
+      eventType: WALLET_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: wallet-service.status-cache-loader
+      module: wallet
+      purpose: "cache loader: Lua CAS into ws:{bucket} (rebuild / follow)"
+      fieldsUsed: ["walletId", "version", "status", "kycTier", "walletType", "categoryCode", "flags"]
+      codesUsed: []
+
+  inboundTopics:
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: [WALLET_CLOSURE_REQUESTED, WALLET_CLOSURE_APPROVED, WALLET_CLOSURE_COMPLETED, WALLET_CLOSURE_REVERTED,
+                  WALLET_DORMANCY_WARNING, KYC_REVIEW_DUE, KYC_REVIEW_OVERDUE,
+                  PARTNER_APPLICATION_RECEIVED, PARTNER_APPLICATION_RETURNED, PARTNER_APPLICATION_REJECTED, PARTNER_ACTIVATED,
+                  PARTNER_SUSPENDED, PARTNER_REACTIVATED, PARTNER_TERMINATED, AGREEMENT_EXPIRING, TRADE_LICENCE_EXPIRING,
+                  PARTNER_APPLICATION_SLA_BREACHED]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_EXPIRED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: audit.events
+      eventType: AUDIT_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+
+  data: []
+
+  codes:
+    - {producer: admin-service, set: refdataType, values: [GEO, MCC, REASON_CODE, BANK, SYSTEM_PARAM]}
+    - {producer: compliance-service, set: screeningResult, values: [CLEAR, POTENTIAL_MATCH, CONFIRMED_MATCH]}
+    - {producer: compliance-service, set: screeningDecision, values: [CLEAR, REJECT]}
+    - {producer: compliance-service, set: screeningTrigger, values: [ONBOARDING]}
+    - {producer: compliance-service, set: screeningSubjectType, values: [CUSTOMER, PARTNER]}
+    - {producer: compliance-service, set: matchListKind, values: [PEP]}
+    - {producer: limits-risk-service, set: blacklistType, values: [NID, MSISDN, WALLET, BANK_ACCOUNT, PARTNER]}
+    - {producer: transaction-service, set: txnType, values: [REVERSAL]}
+    - {producer: ledger-service, set: commandResult, values: [OK, EXISTS, REJECTED]}
+
+  refdata:
+    - {type: GEO, codes: ["*"]}
+    - {type: MCC, codes: ["*"]}
+    - {type: REASON_CODE, codes: ["*"]}
+    - {type: BANK, codes: ["*"]}
+    - {type: SYSTEM_PARAM, codes: ["RETENTION.CUSTOMER_KYC"]}

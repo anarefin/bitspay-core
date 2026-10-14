@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/SCREENING_COMPLETED.v1.schema.json",
+  "title": "case.events SCREENING_COMPLETED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "screeningId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv7"
+    },
+    "subjectType": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER",
+        "PARTNER"
+      ],
+      "description": "`PERSON` is never emitted (reserved)"
+    },
+    "subjectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "customerId / partnerId"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "ONBOARDING",
+        "RESCREEN",
+        "MANUAL",
+        "PROFILE_CHANGE",
+        "PERIODIC"
+      ],
+      "description": "always set"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "CLEAR",
+        "POTENTIAL_MATCH",
+        "CONFIRMED_MATCH"
+      ],
+      "description": "most severe match the true result; CLEAR possible with eddRequired"
+    },
+    "eddRequired": {
+      "type": "boolean",
+      "description": "customers: PEP hit or riskGrade HIGH (with `edd.hold-via-screening`); partners: PEP hit only consumers hold exactly like POTENTIAL_MATCH"
+    },
+    "sourceEventId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "`eventId` of the triggering KYC_SUBMITTED / PARTNER_UPSERTED null for RESCREEN / PERIODIC / MANUAL / PROFILE_CHANGE"
+    },
+    "sourceVersion": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int64",
+      "description": "partner `version` screened null for customers"
+    },
+    "matches": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Match"
+      },
+      "description": "`[]` when no match"
+    }
+  },
+  "required": [
+    "screeningId",
+    "subjectType",
+    "subjectId",
+    "trigger",
+    "result",
+    "eddRequired",
+    "sourceEventId",
+    "sourceVersion",
+    "matches"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "Match": {
+      "type": "object",
+      "properties": {
+        "listCode": {
+          "type": "string",
+          "enum": [
+            "UN",
+            "BFIU",
+            "OFAC",
+            "EU",
+            "UKHMT",
+            "PEP",
+            "INTERNAL",
+            "BLACKLIST"
+          ],
+          "description": "`BLACKLIST` = limits-risk blacklist hit; `INTERNAL` = uploaded internal watchlist"
+        },
+        "listKind": {
+          "type": "string",
+          "enum": [
+            "SANCTIONS",
+            "PEP",
+            "INTERNAL",
+            "BLACKLIST"
+          ],
+          "description": "consumers key PEP on `listKind = PEP`"
+        },
+        "listVersion": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0,
+          "description": ">= 1; `0` for BLACKLIST"
+        },
+        "externalRef": {
+          "type": "string",
+          "description": "list reference; blacklist `entryId` for BLACKLIST"
+        },
+        "entryType": {
+          "type": "string",
+          "enum": [
+            "INDIVIDUAL",
+            "ENTITY",
+            "VESSEL",
+            "OTHER"
+          ]
+        },
+        "matchedName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "null for matchType ID / INTERNAL_BLACKLIST"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "0.0000 … 1.0000, 4 decimals not money"
+        },
+        "matchType": {
+          "type": "string",
+          "enum": [
+            "NAME",
+            "NAME_DOB",
+            "ID",
+            "INTERNAL_BLACKLIST"
+          ]
+        },
+        "matchedSubjectType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "PARTNER",
+            "PERSON",
+            null
+          ],
+          "description": "partner events only"
+        },
+        "matchedSubjectId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid",
+          "description": "partnerId or key person `personId`"
+        }
+      },
+      "required": [
+        "listCode",
+        "listKind",
+        "listVersion",
+        "externalRef",
+        "entryType",
+        "matchedName",
+        "score",
+        "matchType"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

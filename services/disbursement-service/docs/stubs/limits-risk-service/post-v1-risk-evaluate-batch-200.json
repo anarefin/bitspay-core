@@ -1,0 +1,35 @@
+{
+  "name": "POST /v1/risk/evaluate:batch → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/risk/evaluate:batch(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "txnId": "0192f4d0-0000-7000-8000-000000000001",
+          "decision": "ALLOW",
+          "reasonCodes": [],
+          "riskScore": 0,
+          "reservationId": "0192f4d0-0000-7000-8000-000000000001",
+          "receiverMaxBalancePoisha": 10000000,
+          "usage": {
+            "senderMonthlyCountForTxnType": 0
+          },
+          "violatedLimit": null
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "limits-risk-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

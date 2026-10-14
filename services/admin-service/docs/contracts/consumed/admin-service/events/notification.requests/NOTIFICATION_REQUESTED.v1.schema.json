@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/admin-service/notification.requests/NOTIFICATION_REQUESTED.v1.schema.json",
+  "title": "notification.requests NOTIFICATION_REQUESTED data (inbound topic owned by admin-service)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "requestId",
+    "templateCode",
+    "recipient",
+    "channels",
+    "priority",
+    "language",
+    "variables"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "templateCode": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "walletId",
+        "staffUserId",
+        "msisdn"
+      ],
+      "properties": {
+        "walletId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "staffUserId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "msisdn": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^8801[3-9][0-9]{8}$"
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 254
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "OPS_MAKER",
+            "OPS_CHECKER",
+            "FIN_MAKER",
+            "FIN_CHECKER",
+            "SUP_AGENT",
+            "SUP_MAKER",
+            "SUP_CHECKER",
+            "RISK_ANALYST",
+            "RISK_CHECKER",
+            "COMPLIANCE_OFFICER",
+            "CAMLCO",
+            "PARTNER_OPS_MAKER",
+            "PARTNER_OPS_CHECKER",
+            "PRICING_MAKER",
+            "PRICING_CHECKER",
+            "ADMIN",
+            "AUDITOR",
+            "READ_ONLY",
+            null
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "walletId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          "required": [
+            "walletId"
+          ]
+        },
+        {
+          "properties": {
+            "staffUserId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          "required": [
+            "staffUserId"
+          ]
+        },
+        {
+          "properties": {
+            "msisdn": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "msisdn"
+          ]
+        },
+        {
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "OPS_MAKER",
+                "OPS_CHECKER",
+                "FIN_MAKER",
+                "FIN_CHECKER",
+                "SUP_AGENT",
+                "SUP_MAKER",
+                "SUP_CHECKER",
+                "RISK_ANALYST",
+                "RISK_CHECKER",
+                "COMPLIANCE_OFFICER",
+                "CAMLCO",
+                "PARTNER_OPS_MAKER",
+                "PARTNER_OPS_CHECKER",
+                "PRICING_MAKER",
+                "PRICING_CHECKER",
+                "ADMIN",
+                "AUDITOR",
+                "READ_ONLY"
+              ]
+            }
+          },
+          "required": [
+            "role"
+          ]
+        }
+      ]
+    },
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "IN_APP",
+          "SMS",
+          "PUSH",
+          "EMAIL",
+          "IVR"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "priority": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "SECURITY",
+        "TRANSACTIONAL",
+        "SERVICE",
+        "REMINDER",
+        "MARKETING",
+        null
+      ]
+    },
+    "language": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "bn",
+        "en",
+        null
+      ]
+    },
+    "variables": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][A-Za-z0-9]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer"
+        ],
+        "maxLength": 500
+      }
+    },
+    "dedupeKey": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "reminder": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "required": [
+        "policyCode",
+        "subjectType",
+        "subjectRef",
+        "dueAt"
+      ],
+      "properties": {
+        "policyCode": {
+          "type": "string",
+          "enum": [
+            "PAYMENT_REQUEST_DUE",
+            "SCHEDULED_TRANSFER_PRE",
+            "KYC_EXPIRY",
+            "BILL_DUE"
+          ]
+        },
+        "subjectType": {
+          "type": "string",
+          "enum": [
+            "PAYMENT_REQUEST",
+            "SCHEDULED_TRANSFER",
+            "KYC_EXPIRY",
+            "BILL_DUE",
+            "SERVICE_EXPIRY",
+            "AGREEMENT_EXPIRY"
+          ]
+        },
+        "subjectRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "dueAt": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+        }
+      }
+    }
+  }
+}

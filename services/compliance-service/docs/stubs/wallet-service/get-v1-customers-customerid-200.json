@@ -1,0 +1,72 @@
+{
+  "name": "GET /v1/customers/{customerId} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/customers/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "customerId": "0192f2a0-5b1c-7d10-8e11-0a1b2c3d4e01",
+      "status": "ACTIVE",
+      "msisdn": "8801812000001",
+      "email": null,
+      "nameEn": "Rahim Uddin",
+      "nameBn": "রহিম উদ্দিন",
+      "nidMasked": "******6789",
+      "dob": "1990-04-12",
+      "gender": "MALE",
+      "occupation": "SALARIED",
+      "incomeBand": "BDT_25K_50K",
+      "sourceOfFunds": "SALARY",
+      "purposeOfAccount": "PERSONAL",
+      "presentAddress": {
+        "line1": "House 12, Road 3",
+        "line2": null,
+        "division": "30",
+        "district": "3026",
+        "upazila": "302648",
+        "union": null,
+        "postCode": "1216"
+      },
+      "language": "bn",
+      "kycTier": 2,
+      "kycStatus": "APPROVED",
+      "kycReviewDueAt": "2031-10-08T18:00:00.000Z",
+      "kycReviewStatus": "NONE",
+      "riskGrade": "LOW",
+      "eddRequired": false,
+      "screeningStatus": "CLEAR",
+      "wallets": [
+        {
+          "walletId": "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+          "walletType": "C",
+          "status": "A"
+        }
+      ],
+      "nominees": [
+        {
+          "name": "Ayesha Begum",
+          "relationship": "SPOUSE",
+          "shareBps": 10000
+        }
+      ],
+      "registrationChannel": "PARTNER_APP",
+      "assistedBy": {
+        "actorType": "AGENT",
+        "actorId": "0192f4a0-0a01-7c00-8a00-00000000a001"
+      },
+      "createdAt": "2026-10-09T05:00:00.000Z",
+      "updatedAt": "2026-10-09T06:05:00.000Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

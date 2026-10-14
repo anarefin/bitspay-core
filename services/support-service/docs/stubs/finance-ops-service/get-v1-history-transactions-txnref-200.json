@@ -1,0 +1,40 @@
+{
+  "name": "GET /v1/history/transactions/{txnRef} → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/history/transactions/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "txnRef": "BD261009K7Q2M4ZD-1",
+      "txnType": null,
+      "status": "COMPLETED",
+      "direction": "OUT",
+      "amountPoisha": 1500000,
+      "feePoisha": 0,
+      "vatPoisha": 0,
+      "totalDebitPoisha": 1500000,
+      "counterparty": {
+        "walletId": "0192f2aa-7c11-7d00-8a10-1b2c3d4e5f60",
+        "displayName": "Rahim Uddin",
+        "msisdnMasked": "8801900****01"
+      },
+      "channel": null,
+      "createdAt": "2026-10-09T05:00:01.000Z",
+      "completedAt": "2026-10-09T05:00:01.210Z",
+      "failureCode": null,
+      "originalTxnRef": null,
+      "source": "DISBURSEMENT"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "finance-ops-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

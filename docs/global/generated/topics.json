@@ -1,0 +1,351 @@
+[
+  {
+    "topic": "ledger.changes",
+    "owner": "ledger-service",
+    "kind": "events",
+    "key": "debitAccountId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 48
+    },
+    "eventTypes": [
+      "LEDGER_TRANSFER_POSTED v1"
+    ]
+  },
+  {
+    "topic": "txn.events",
+    "owner": "transaction-service",
+    "kind": "events",
+    "key": "sender (from) walletId of the transaction described in data; TRANSACTION_REVERSED / TRANSACTION_REFUNDED: the ORIGINAL's from walletId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 96
+    },
+    "eventTypes": [
+      "TRANSACTION_COMPLETED v1",
+      "TRANSACTION_FAILED v1",
+      "TRANSACTION_REVERSED v1",
+      "TRANSACTION_REFUNDED v1"
+    ]
+  },
+  {
+    "topic": "wallet.events",
+    "owner": "wallet-service",
+    "kind": "events",
+    "key": "walletId",
+    "compacted": true,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 48
+    },
+    "eventTypes": [
+      "WALLET_UPSERTED v1"
+    ]
+  },
+  {
+    "topic": "customer.events",
+    "owner": "wallet-service",
+    "kind": "events",
+    "key": "customerId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 24
+    },
+    "eventTypes": [
+      "CUSTOMER_REGISTERED v1",
+      "KYC_SUBMITTED v1",
+      "KYC_APPROVED v1",
+      "KYC_REJECTED v1",
+      "KYC_TIER_CHANGED v1",
+      "RISK_GRADE_CHANGED v1",
+      "CUSTOMER_PROFILE_UPDATED v1"
+    ]
+  },
+  {
+    "topic": "partner.events",
+    "owner": "wallet-service",
+    "kind": "events",
+    "key": "partnerId",
+    "compacted": true,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 12
+    },
+    "eventTypes": [
+      "PARTNER_UPSERTED v1"
+    ]
+  },
+  {
+    "topic": "risk.alerts",
+    "owner": "limits-risk-service",
+    "kind": "events",
+    "key": "sender (from) walletId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 12
+    },
+    "eventTypes": [
+      "RISK_ALERT_RAISED v1"
+    ]
+  },
+  {
+    "topic": "blacklist.events",
+    "owner": "limits-risk-service",
+    "kind": "events",
+    "key": "entryId",
+    "compacted": true,
+    "tombstones": false,
+    "partitions": {
+      "dev": 1,
+      "prod": 3
+    },
+    "eventTypes": [
+      "BLACKLIST_ENTRY_UPSERTED v1"
+    ]
+  },
+  {
+    "topic": "fee.rules",
+    "owner": "pricing-service",
+    "kind": "events",
+    "key": "planId",
+    "compacted": true,
+    "tombstones": true,
+    "partitions": {
+      "dev": 1,
+      "prod": 1
+    },
+    "eventTypes": [
+      "PRICING_PLAN_UPSERTED v1"
+    ]
+  },
+  {
+    "topic": "commission.events",
+    "owner": "pricing-service",
+    "kind": "events",
+    "key": "beneficiaryWalletId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 12
+    },
+    "eventTypes": [
+      "COMMISSION_ACCRUED v1",
+      "COMMISSION_SETTLED v1"
+    ]
+  },
+  {
+    "topic": "campaign.events",
+    "owner": "pricing-service",
+    "kind": "events",
+    "key": "walletId (beneficiary)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 12
+    },
+    "eventTypes": [
+      "REWARD_GRANTED v1",
+      "REWARD_CLAWED_BACK v1"
+    ]
+  },
+  {
+    "topic": "treasury.events",
+    "owner": "treasury-service",
+    "kind": "events",
+    "key": "trustAccountId (EMONEY_ISSUED, EMONEY_REDEEMED, EMONEY_REDEMPTION_PAID_OUT, TRUST_BALANCE_CONFIRMED, TRUST_INTEREST_RECORDED); fromTrustAccountId (TRUST_REBALANCED); requesterWalletId (FLOAT_REQUEST_UPDATED); walletId (LIQUIDITY_THRESHOLD_BREACHED); debitAccountId (MANUAL_JOURNAL_POSTED)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 6
+    },
+    "eventTypes": [
+      "EMONEY_ISSUED v1",
+      "EMONEY_REDEEMED v1",
+      "EMONEY_REDEMPTION_PAID_OUT v1",
+      "TRUST_BALANCE_CONFIRMED v1",
+      "FLOAT_REQUEST_UPDATED v1",
+      "LIQUIDITY_THRESHOLD_BREACHED v1",
+      "MANUAL_JOURNAL_POSTED v1",
+      "TRUST_REBALANCED v1",
+      "TRUST_INTEREST_RECORDED v1"
+    ]
+  },
+  {
+    "topic": "disbursement.events",
+    "owner": "disbursement-service",
+    "kind": "events",
+    "key": "batchId (BATCH_*) · scheduleId (SCHEDULED_TRANSFER_EXECUTED) · requestId (PAYMENT_REQUEST_*)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 12
+    },
+    "eventTypes": [
+      "BATCH_SUBMITTED v1",
+      "BATCH_APPROVED v1",
+      "BATCH_ROW_PAID v1",
+      "BATCH_ROW_FAILED v1",
+      "BATCH_COMPLETED v1",
+      "SCHEDULED_TRANSFER_EXECUTED v1",
+      "PAYMENT_REQUEST_CREATED v1",
+      "PAYMENT_REQUEST_ACCEPTED v1",
+      "PAYMENT_REQUEST_DECLINED v1"
+    ]
+  },
+  {
+    "topic": "support.events",
+    "owner": "support-service",
+    "kind": "events",
+    "key": "ticketId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 6
+    },
+    "eventTypes": [
+      "TICKET_CREATED v1",
+      "TICKET_STATUS_CHANGED v1",
+      "DISPUTE_OPENED v1",
+      "DISPUTE_RESOLVED v1",
+      "REVERSAL_REQUESTED v1",
+      "REVERSAL_COMPLETED v1"
+    ]
+  },
+  {
+    "topic": "case.events",
+    "owner": "compliance-service",
+    "kind": "events",
+    "key": "subjectId (SCREENING_COMPLETED, SCREENING_DECIDED, RISK_REGRADE_RECOMMENDED) · caseId (CASE_OPENED, CASE_CLOSED, REVERSAL_RECOMMENDED) · walletId (FREEZE_APPLIED, FREEZE_LIFTED)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 6
+    },
+    "eventTypes": [
+      "SCREENING_COMPLETED v1",
+      "SCREENING_DECIDED v1",
+      "CASE_OPENED v1",
+      "CASE_CLOSED v1",
+      "FREEZE_APPLIED v1",
+      "FREEZE_LIFTED v1",
+      "RISK_REGRADE_RECOMMENDED v1",
+      "REVERSAL_RECOMMENDED v1"
+    ]
+  },
+  {
+    "topic": "recon.events",
+    "owner": "finance-ops-service",
+    "kind": "events",
+    "key": "runId (all three eventTypes; exceptions outside a run attach to the day's LEDGER_TXN run)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 1,
+      "prod": 3
+    },
+    "eventTypes": [
+      "RECON_RUN_COMPLETED v1",
+      "EMONEY_VARIANCE_DETECTED v1",
+      "RECON_EXCEPTION_RAISED v1"
+    ]
+  },
+  {
+    "topic": "refdata.events",
+    "owner": "admin-service",
+    "kind": "events",
+    "key": "{type}:{code}",
+    "compacted": true,
+    "tombstones": false,
+    "partitions": {
+      "dev": 1,
+      "prod": 3
+    },
+    "eventTypes": [
+      "REFDATA_UPSERTED v1"
+    ]
+  },
+  {
+    "topic": "notification.requests",
+    "owner": "admin-service",
+    "kind": "inboundTopics",
+    "key": "first non-null of recipient.walletId → recipient.staffUserId → recipient.msisdn → recipient.role (never a partnerId); NOTIFICATION_REMINDER_CANCELLED: the key of the registering request",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 24
+    },
+    "eventTypes": [
+      "NOTIFICATION_REQUESTED v1",
+      "NOTIFICATION_REMINDER_CANCELLED v1"
+    ]
+  },
+  {
+    "topic": "approval.events",
+    "owner": "admin-service",
+    "kind": "inboundTopics",
+    "key": "approvalId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 3,
+      "prod": 6
+    },
+    "eventTypes": [
+      "APPROVAL_REQUESTED v1",
+      "APPROVAL_DECIDED v1",
+      "APPROVAL_EXPIRED v1"
+    ]
+  },
+  {
+    "topic": "audit.events",
+    "owner": "admin-service",
+    "kind": "inboundTopics",
+    "key": "entityId",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 6,
+      "prod": 48
+    },
+    "eventTypes": [
+      "AUDIT_RECORDED v1"
+    ]
+  },
+  {
+    "topic": "gl.events",
+    "owner": "general-ledger-service",
+    "kind": "events",
+    "key": "businessDate (GL_DAY_CLOSED, GL_DAY_CERTIFIED) · periodId (GL_PERIOD_STATUS_CHANGED) · journalId (GL_JOURNAL_POSTED) · code (GL_ACCOUNT_UPSERTED) · exceptionId (GL_EXCEPTION_RAISED)",
+    "compacted": false,
+    "tombstones": false,
+    "partitions": {
+      "dev": 1,
+      "prod": 3
+    },
+    "eventTypes": [
+      "GL_DAY_CLOSED v1",
+      "GL_DAY_CERTIFIED v1",
+      "GL_PERIOD_STATUS_CHANGED v1",
+      "GL_JOURNAL_POSTED v1",
+      "GL_ACCOUNT_UPSERTED v1",
+      "GL_EXCEPTION_RAISED v1"
+    ]
+  }
+]

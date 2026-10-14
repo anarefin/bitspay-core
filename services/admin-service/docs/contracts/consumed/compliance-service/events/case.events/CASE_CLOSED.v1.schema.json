@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/CASE_CLOSED.v1.schema.json",
+  "title": "case.events CASE_CLOSED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "caseNo": {
+      "type": "string",
+      "pattern": "^CASE-[0-9]{4}-[0-9]{6}$",
+      "description": "`CASE-YYYY-NNNNNN`"
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "FRAUD",
+        "AML"
+      ]
+    },
+    "caseType": {
+      "type": "string",
+      "enum": [
+        "FRAUD",
+        "AML_MONITORING",
+        "SCREENING",
+        "EDD",
+        "REGULATORY_INSTRUCTION",
+        "PERIODIC_REVIEW",
+        "CUSTOMER_REPORT"
+      ]
+    },
+    "subjectType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "CUSTOMER",
+        "PARTNER",
+        null
+      ],
+      "description": "null only if the subject is unresolved (manual/external alert)"
+    },
+    "subjectId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "walletId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "primary wallet null for a pending partner / walletless subject"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "CONFIRMED_FRAUD",
+        "FALSE_POSITIVE",
+        "SUSPICIOUS",
+        "NOT_SUSPICIOUS",
+        "EDD_APPROVED",
+        "EDD_REJECTED",
+        "SCREENING_CLEAR",
+        "SCREENING_REJECT",
+        "INSTRUCTION_EXECUTED",
+        "REVIEW_COMPLETED"
+      ]
+    },
+    "recommendedActions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "FREEZE",
+          "DEBIT_BLOCK",
+          "LIEN",
+          "LIFT",
+          "SET_WATCH",
+          "CLEAR_WATCH",
+          "PROPOSE_BLACKLIST",
+          "STR_DRAFT",
+          "REGRADE",
+          "RECOMMEND_REVERSAL",
+          "SUSPEND_PARTNER"
+        ]
+      },
+      "description": "may be `[]`"
+    },
+    "closedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "caseId",
+    "caseNo",
+    "domain",
+    "caseType",
+    "subjectType",
+    "subjectId",
+    "walletId",
+    "decision",
+    "recommendedActions",
+    "closedAt"
+  ],
+  "additionalProperties": true
+}

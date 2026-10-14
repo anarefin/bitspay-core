@@ -1,0 +1,23 @@
+{
+  "name": "POST /v1/partners/{partnerId}/status-changes → 202",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/partners/[^/]+/status\\-changes(\\?.*)?$"
+  },
+  "response": {
+    "status": 202,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "approvalId": "0192f400-1111-7000-8000-00000000b001",
+      "status": "PENDING"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,36 @@
+service: finance-ops-service
+generatedAt: '2026-10-13T15:47:28Z'
+pins:
+- producer: admin-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: compliance-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: disbursement-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: general-ledger-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: ledger-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: limits-risk-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: pricing-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: support-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: transaction-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: treasury-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0
+- producer: wallet-service
+  pinnedContractVersion: 1.0.0
+  producerContractVersionAtSnapshot: 1.0.0

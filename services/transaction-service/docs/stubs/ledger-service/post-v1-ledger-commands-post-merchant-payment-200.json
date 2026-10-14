@@ -1,0 +1,31 @@
+{
+  "name": "POST /v1/ledger/commands/post-merchant-payment → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-merchant\\-payment(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "commandId": "0192f3d2-0000-7000-8000-000000000001",
+      "result": "OK",
+      "rejectionCode": null,
+      "detail": null,
+      "transferIds": [
+        "67d4ed29-7228-8ac1-b868-df912edc7d8b",
+        "d1279d70-33a5-bcdc-91c1-e5db21470bcd",
+        "fbefb4db-dd3a-f572-29da-f091e5e0cdfa"
+      ],
+      "postedAt": "2026-10-09T08:30:00.412Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

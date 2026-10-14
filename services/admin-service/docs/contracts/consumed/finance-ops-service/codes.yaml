@@ -1,0 +1,778 @@
+# finance-ops-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+codeSets:
+  reconRunType:
+    description: recon.events RECON_RUN_COMPLETED.type and GET /v1/recon/runs type
+    values:
+    - code: LEDGER_TXN
+      description: daily ledger ↔ business matching summary (completed at EOD)
+    - code: EOD
+      description: EOD close cycle (written last of the four EOD runs)
+    - code: TRIAL_BALANCE
+      description: trial-balance checks TB-1..TB-6
+    - code: EMONEY
+      description: e-money reconciliation (EOD or LIVE)
+    - code: FILE
+      description: counterparty statement matching run
+    - code: PROJECTION_VERIFY
+      description: projection vs ledger verification
+    - code: GL_TIEOUT
+      description: tie-out of the general ledger's control totals with reconciliation's own counters
+  reconRunCompletedStatus:
+    description: RECON_RUN_COMPLETED.status
+    values:
+    - code: COMPLETED
+    - code: COMPLETED_WITH_EXCEPTIONS
+    - code: FAILED
+    - code: RESTATED
+  reconRunStatus:
+    description: GET /v1/recon/runs/{runId} status
+    values:
+    - code: SCHEDULED
+    - code: WAITING_FOR_DATA
+    - code: RUNNING
+    - code: COMPLETED
+    - code: COMPLETED_WITH_EXCEPTIONS
+    - code: FAILED
+    - code: RESTATED
+  eodStatus:
+    description: EOD day status
+    values:
+    - code: OPEN
+    - code: AWAITING_WATERMARK
+    - code: CLOSING
+    - code: CLOSED
+    - code: CLOSED_WITH_BREAKS
+    - code: RESTATING
+    - code: FAILED
+  emoneyStatus:
+    description: e-money reconciliation status
+    values:
+    - code: MATCHED
+    - code: VARIANCE
+    - code: INCOMPLETE
+  trialBalanceResult:
+    description: summary.trialBalance
+    values:
+    - code: OK
+    - code: BREAK
+  glTieOutResult:
+    description: summary.glTieOut
+    values:
+    - code: MATCHED
+    - code: BREAK
+  reconExceptionCategory:
+    description: closed enum; GL_UNMAPPED reserved (never emitted)
+    values:
+    - code: MISSING_IN_LEDGER
+    - code: MISSING_IN_TXN
+    - code: MISSING_IN_SOURCE
+    - code: MISSING_AT_COUNTERPARTY
+    - code: AMOUNT_MISMATCH
+    - code: ACCOUNT_MISMATCH
+    - code: STATUS_MISMATCH
+    - code: DUPLICATE
+    - code: NEGATIVE_BALANCE
+    - code: TRIAL_BALANCE_BREAK
+    - code: EMONEY_VARIANCE
+    - code: PROJECTION_DRIFT
+    - code: LATE_LEDGER_EVENT
+    - code: STATEMENT_BALANCE_BREAK
+    - code: GL_UNMAPPED
+    - code: GL_TIEOUT_BREAK
+  reconExceptionSource:
+    description: RECON_EXCEPTION_RAISED.source
+    values:
+    - code: LEDGER_TXN
+    - code: FILE
+    - code: EMONEY
+    - code: EOD
+    - code: PROJECTION
+    - code: GL
+  reconExceptionPublishedSeverity:
+    description: only severity ≥ HIGH is published
+    values:
+    - code: CRITICAL
+    - code: HIGH
+  reconExceptionStatus:
+    description: staff API only
+    values:
+    - code: OPEN
+    - code: ASSIGNED
+    - code: INVESTIGATING
+    - code: ADJUSTMENT_PROPOSED
+    - code: ADJUSTMENT_PENDING_APPROVAL
+    - code: ADJUSTMENT_POSTED
+    - code: RESOLVED
+    - code: AUTO_RESOLVED
+    - code: CLOSED
+    - code: REOPENED
+  adjustmentReasonCode:
+    description: producer-local reasonCode sent on ledger post-adjustment (not governance REASON_CODE)
+    values:
+    - code: RECON_BANK_CHARGE
+    - code: RECON_BANK_INTEREST
+    - code: RECON_MISSING_CREDIT
+    - code: RECON_CORRECTION
+    - code: RECON_SUSPENSE_CLEARING
+  exceptionResolutionCode:
+    description: internal resolution codes
+    values:
+    - code: TIMING_DIFFERENCE
+    - code: COUNTERPARTY_ERROR_REPORTED
+    - code: DUPLICATE_CONFIRMED_NO_IMPACT
+    - code: OTHER
+    - code: LATE_ARRIVAL
+    - code: CONFIRMATION_ARRIVED
+  statementSource:
+    description: StatementLine.source / HistoryItem.source
+    values:
+    - code: TRANSACTION
+    - code: DISBURSEMENT
+    - code: CAMPAIGN
+    - code: COMMISSION
+    - code: TREASURY
+    - code: RECON
+      description: reconciliation adjustments (RCA- references)
+    - code: LEDGER
+      description: other ledger commands (holds; closure payout until OPEN D-51)
+  historyStatus:
+    description: HistoryItem.status
+    values:
+    - code: COMPLETED
+    - code: FAILED
+    - code: REVERSED
+    - code: PARTIALLY_REFUNDED
+    - code: REFUNDED
+  statementExportStatus:
+    description: statement export lifecycle
+    values:
+    - code: QUEUED
+    - code: RUNNING
+    - code: SUCCEEDED
+    - code: FAILED
+    - code: EXPIRED
+  reportRunStatus:
+    description: report run lifecycle
+    values:
+    - code: QUEUED
+    - code: RUNNING
+    - code: SUCCEEDED
+    - code: FAILED
+    - code: EXPIRED
+    - code: CANCELLED
+  regulatoryRunStatus:
+    description: regulatory run lifecycle
+    values:
+    - code: GENERATING
+    - code: GENERATED
+    - code: PENDING_REVIEW
+    - code: READY_FOR_SUBMISSION
+    - code: REJECTED
+    - code: SUBMITTED
+    - code: FAILED
+    - code: SUPERSEDED
+problemReasons:
+- code: VALIDATION_FAILED
+  reason: INVALID_CURSOR
+  operations:
+  - '*'
+  note: kernel-reserved (K3.6); used by every paged list
+- code: STATE_CONFLICT
+  reason: ADJUSTMENT_PENDING
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+- code: STATE_CONFLICT
+  reason: ALREADY_CLOSED
+  operations:
+  - POST /v1/recon/eod/{businessDate}:close
+- code: STATE_CONFLICT
+  reason: ALREADY_MATCHED
+  operations:
+  - POST /v1/recon/matches
+- code: STATE_CONFLICT
+  reason: CLOSED
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:assign
+  - POST /v1/recon/exceptions/{exceptionId}/notes
+  - POST /v1/recon/exceptions/{exceptionId}/evidence
+- code: STATE_CONFLICT
+  reason: CODE_EXISTS
+  operations:
+  - POST /v1/recon/counterparties
+- code: STATE_CONFLICT
+  reason: DATASET_DISABLED
+  operations:
+  - POST /v1/regulatory/datasets/{rrCode}/runs
+- code: STATE_CONFLICT
+  reason: DUPLICATE_STATEMENT_FILE
+  operations:
+  - POST /v1/recon/statements
+  extensions:
+  - existingFileId
+- code: STATE_CONFLICT
+  reason: EOD_NOT_CLOSED
+  operations:
+  - POST /v1/recon/runs
+- code: STATE_CONFLICT
+  reason: EXPIRED
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: STATE_CONFLICT
+  reason: EXPORT_EXPIRED
+  operations:
+  - GET /v1/statement-exports/{exportId}/file
+- code: STATE_CONFLICT
+  reason: EXPORT_NOT_READY
+  operations:
+  - GET /v1/statement-exports/{exportId}/file
+- code: STATE_CONFLICT
+  reason: FILE_EXPIRED
+  operations:
+  - GET /v1/report-runs/{runId}/file
+- code: STATE_CONFLICT
+  reason: FILE_REJECTED
+  operations:
+  - POST /v1/recon/statements/{fileId}:match
+- code: STATE_CONFLICT
+  reason: GATE_NOT_PASSED
+  operations:
+  - POST /v1/internal/reporting-jobs/{job}:run
+- code: STATE_CONFLICT
+  reason: INVALID_TRANSITION
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:resolve
+  - POST /v1/recon/exceptions/{exceptionId}:close
+- code: STATE_CONFLICT
+  reason: JOB_ALREADY_RUNNING
+  operations:
+  - POST /v1/internal/reporting-jobs/{job}:run
+- code: STATE_CONFLICT
+  reason: NOT_ACTIVE
+  operations:
+  - POST /v1/report-definitions/{code}:retire
+  - POST /v1/report-schedules/{scheduleId}:pause
+  - POST /v1/recon/matches/{groupId}:unmatch
+- code: STATE_CONFLICT
+  reason: NOT_CLOSED
+  operations:
+  - POST /v1/recon/eod/{businessDate}:restate
+  - POST /v1/recon/exceptions/{exceptionId}:reopen
+- code: STATE_CONFLICT
+  reason: NOT_DOWNLOADABLE
+  operations:
+  - GET /v1/regulatory/runs/{regulatoryRunId}/file
+- code: STATE_CONFLICT
+  reason: NOT_DRAFT
+  operations:
+  - POST /v1/report-definitions/{code}/versions/{version}:submit
+  - POST /v1/recon/counterparties/{counterpartyId}/file-profiles/{profileId}:submit
+  - POST /v1/recon/counterparties/{counterpartyId}/match-rules/{ruleId}:submit
+- code: STATE_CONFLICT
+  reason: NOT_GENERATED
+  operations:
+  - POST /v1/regulatory/runs/{regulatoryRunId}:submitForReview
+- code: STATE_CONFLICT
+  reason: NOT_INVESTIGATING
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+- code: STATE_CONFLICT
+  reason: NOT_PAUSED
+  operations:
+  - POST /v1/report-schedules/{scheduleId}:resume
+- code: STATE_CONFLICT
+  reason: NOT_PENDING
+  operations:
+  - POST /v1/approvals/{id}:approve
+  - POST /v1/approvals/{id}:reject
+- code: STATE_CONFLICT
+  reason: NOT_READY_FOR_SUBMISSION
+  operations:
+  - POST /v1/regulatory/runs/{regulatoryRunId}:markSubmitted
+- code: STATE_CONFLICT
+  reason: NOT_UNMATCHED
+  operations:
+  - POST /v1/recon/statements/lines/{lineId}:ignore
+- code: STATE_CONFLICT
+  reason: NOT_YET_CUTOFF
+  operations:
+  - POST /v1/recon/eod/{businessDate}:close
+- code: STATE_CONFLICT
+  reason: PENDING_APPROVAL
+  operations:
+  - PUT /v1/recon/counterparties/{counterpartyId}/file-profiles/{profileId}
+  - PUT /v1/recon/counterparties/{counterpartyId}/match-rules/{ruleId}
+- code: STATE_CONFLICT
+  reason: PERIOD_ALREADY_SUBMITTED
+  operations:
+  - POST /v1/regulatory/datasets/{rrCode}/runs
+- code: STATE_CONFLICT
+  reason: PREVIOUS_DAY_OPEN
+  operations:
+  - POST /v1/recon/eod/{businessDate}:close
+- code: STATE_CONFLICT
+  reason: REVALIDATION_FAILED
+  operations:
+  - POST /v1/approvals/{id}:approve
+- code: STATE_CONFLICT
+  reason: RUN_IN_PROGRESS
+  operations:
+  - POST /v1/recon/runs
+  - POST /v1/recon/statements/{fileId}:match
+- code: STATE_CONFLICT
+  reason: RUN_NOT_SUCCEEDED
+  operations:
+  - GET /v1/report-runs/{runId}/file
+- code: STATE_CONFLICT
+  reason: RUN_SUBMITTED
+  operations:
+  - POST /v1/regulatory/runs/{regulatoryRunId}:markSubmitted
+- code: STATE_CONFLICT
+  reason: SCHEDULE_RETIRED
+  operations:
+  - PATCH /v1/report-schedules/{scheduleId}
+- code: VALIDATION_FAILED
+  reason: ACCOUNT_PAIR_NOT_ALLOWED
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+- code: VALIDATION_FAILED
+  reason: AMOUNT_EXCEEDS_EXCEPTION
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+- code: VALIDATION_FAILED
+  reason: CONDITION_INVALID
+  operations:
+  - POST /v1/recon/auto-resolution-rules
+- code: VALIDATION_FAILED
+  reason: FILE_TOO_LARGE
+  operations:
+  - POST /v1/recon/statements
+  - POST /v1/recon/exceptions/{exceptionId}/evidence
+- code: VALIDATION_FAILED
+  reason: FORMAT_NOT_ALLOWED
+  operations:
+  - POST /v1/reports/{code}/runs
+- code: VALIDATION_FAILED
+  reason: INVALID_AMOUNT_RANGE
+  operations:
+  - GET /v1/history/wallets/{walletId}
+- code: VALIDATION_FAILED
+  reason: INVALID_CURSOR
+  operations:
+  - GET /v1/history/wallets/{walletId}
+- code: VALIDATION_FAILED
+  reason: INVALID_DATE_RANGE
+  operations:
+  - GET /v1/statements/wallets/{walletId}
+  - POST /v1/statements/wallets/{walletId}:export
+  - GET /v1/history/wallets/{walletId}
+  - POST /v1/recon/runs
+  - GET /v1/recon/emoney/history
+- code: VALIDATION_FAILED
+  reason: INVALID_PERIOD
+  operations:
+  - POST /v1/regulatory/datasets/{rrCode}/runs
+- code: VALIDATION_FAILED
+  reason: MAPPING_INVALID
+  operations:
+  - POST /v1/recon/counterparties/{counterpartyId}/file-profiles
+  - PUT /v1/recon/counterparties/{counterpartyId}/file-profiles/{profileId}
+- code: VALIDATION_FAILED
+  reason: MISSING_CONDITIONAL_FIELD
+  operations:
+  - POST /v1/recon/runs
+- code: VALIDATION_FAILED
+  reason: NO_ACTIVE_PROFILE
+  operations:
+  - POST /v1/recon/statements
+- code: VALIDATION_FAILED
+  reason: PARAMETER_INVALID
+  operations:
+  - POST /v1/reports/{code}/runs
+  - POST /v1/report-definitions/{code}/versions/{version}:dryRun
+- code: VALIDATION_FAILED
+  reason: PARAMETER_MISMATCH
+  operations:
+  - POST /v1/report-definitions
+- code: VALIDATION_FAILED
+  reason: PII_ALIAS_NOT_DECLARED
+  operations:
+  - POST /v1/report-definitions
+- code: VALIDATION_FAILED
+  reason: POINTER_INVALID
+  operations:
+  - PUT /v1/recon/config/source-mappings/{source}/{eventType}
+- code: VALIDATION_FAILED
+  reason: RANGE_TOO_LARGE
+  operations:
+  - GET /v1/statements/wallets/{walletId}
+  - POST /v1/statements/wallets/{walletId}:export
+  - POST /v1/reports/{code}/runs
+  - POST /v1/adhoc/queries
+  - GET /v1/recon/emoney/history
+- code: VALIDATION_FAILED
+  reason: RANGE_TOO_LARGE_FOR_PDF
+  operations:
+  - GET /v1/statements/wallets/{walletId}
+- code: VALIDATION_FAILED
+  reason: ROW_SCOPE_PARAMETER_MISSING
+  operations:
+  - POST /v1/report-definitions
+- code: VALIDATION_FAILED
+  reason: RULE_INVALID
+  operations:
+  - POST /v1/recon/counterparties/{counterpartyId}/match-rules
+  - PUT /v1/recon/counterparties/{counterpartyId}/match-rules/{ruleId}
+- code: VALIDATION_FAILED
+  reason: SAME_ACCOUNT
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+- code: VALIDATION_FAILED
+  reason: STATEMENT_BALANCE_BREAK
+  operations:
+  - POST /v1/recon/statements
+- code: VALIDATION_FAILED
+  reason: STATEMENT_PARSE_FAILED
+  operations:
+  - POST /v1/recon/statements
+- code: VALIDATION_FAILED
+  reason: TEMPLATE_FORBIDDEN_CONSTRUCT
+  operations:
+  - POST /v1/report-definitions
+- code: VALIDATION_FAILED
+  reason: TEMPLATE_INVALID
+  operations:
+  - POST /v1/report-definitions
+- code: VALIDATION_FAILED
+  reason: TOO_LARGE_FOR_SYNC
+  operations:
+  - POST /v1/reports/{code}/runs
+- code: VALIDATION_FAILED
+  reason: TOO_MANY_ROWS_FOR_PDF
+  operations:
+  - POST /v1/reports/{code}/runs
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_DIMENSION
+  operations:
+  - POST /v1/adhoc/queries
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_FILTER_FIELD
+  operations:
+  - POST /v1/adhoc/queries
+- code: VALIDATION_FAILED
+  reason: UNKNOWN_MEASURE
+  operations:
+  - POST /v1/adhoc/queries
+- code: VALIDATION_FAILED
+  reason: WALLET_DEBIT_NOT_ALLOWED
+  operations:
+  - POST /v1/recon/exceptions/{exceptionId}:propose-adjustment
+problemExtensions:
+- name: existingFileId
+  type: uuid
+  when: reason = DUPLICATE_STATEMENT_FILE (POST /v1/recon/statements)
+entityTypes:
+- module: reconciliation
+  values:
+  - ReconAdjustment
+  - EodForceClose
+  - EodRestatement
+  - ReconCounterparty
+  - ReconFileProfile
+  - ReconMatchRule
+  - ReconManualMatch
+  - ReconUnmatch
+  - StatementLineIgnore
+  - AutoResolutionRule
+  - ReconSourceRule
+  - ReconSourceMapping
+  checkerRoles:
+    ReconAdjustment: L1 FIN_CHECKER; amount ≥ 10,000,000 poisha or a wallet side → L2 CAMLCO | FIN_CHECKER (distinct users)
+    ReconSourceRule: FIN_CHECKER | ADMIN
+    ReconSourceMapping: FIN_CHECKER | ADMIN
+    '*': FIN_CHECKER
+- module: reporting
+  values:
+  - ReportDefinition
+  - ReportSchedule
+  - MaskingRule
+  - RegulatoryRun
+  - IngestionReplay
+  checkerRoles:
+    ReportDefinition: ADMIN
+    ReportSchedule: OPS_CHECKER | FIN_CHECKER
+    MaskingRule: ADMIN
+    RegulatoryRun: dataset checker roles
+    IngestionReplay: ADMIN
+notificationTemplates:
+- code: EMONEY_VARIANCE
+  module: reconciliation
+  category: INTERNAL
+  trigger: daily e-money reconciliation VARIANCE / INCOMPLETE
+  recipient: 'Finance + Compliance: configured staffUserIds, else recipient.role FIN_CHECKER and COMPLIANCE_OFFICER (one request per role)'
+  variables:
+  - name: businessDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: status
+    type: TEXT
+    req: true
+    notes: enum{VARIANCE,INCOMPLETE}
+  - name: variancePoisha
+    type: MONEY
+    req: false
+    notes: ''
+  - name: walletsTotalPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: trustMirrorPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: confirmedTrustPoisha
+    type: MONEY
+    req: false
+    notes: ''
+  - name: runId
+    type: TEXT
+    req: true
+    notes: ''
+- code: TRIAL_BALANCE_BREAK
+  module: reconciliation
+  category: INTERNAL
+  trigger: trial-balance check failed
+  recipient: 'Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER'
+  variables:
+  - name: businessDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: revision
+    type: INT
+    req: true
+    notes: ''
+  - name: failedChecks
+    type: TEXT
+    req: true
+    notes: comma list, e.g. TB-1,TB-3
+  - name: netCreditTotalPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: runId
+    type: TEXT
+    req: true
+    notes: ''
+- code: EOD_FAILED
+  module: reconciliation
+  category: INTERNAL
+  trigger: EOD failed / waiting for watermark
+  recipient: 'Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER'
+  variables:
+  - name: businessDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: status
+    type: TEXT
+    req: true
+    notes: enum{FAILED,AWAITING_WATERMARK}
+  - name: errorCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: blockedMinutes
+    type: INT
+    req: true
+    notes: ''
+- code: RECON_CRITICAL_EXCEPTION
+  module: reconciliation
+  category: INTERNAL
+  trigger: CRITICAL exception opened
+  recipient: 'Finance: configured staffUserIds (bitspay.recon.notify.finance), else recipient.role FIN_CHECKER'
+  variables:
+  - name: exceptionId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: category
+    type: TEXT
+    req: true
+    notes: ''
+  - name: businessDate
+    type: DATE
+    req: true
+    notes: ''
+  - name: amountPoisha
+    type: MONEY
+    req: false
+    notes: signed
+  - name: txnRef
+    type: TEXT
+    req: false
+    notes: ''
+  - name: dueAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: REPORT_READY
+  module: reporting
+  category: INTERNAL
+  trigger: report run completed (async or scheduled)
+  recipient: 'requesting staffUserId (schedules: notify_staff_ids)'
+  variables:
+  - name: code
+    type: TEXT
+    req: true
+    notes: report code
+  - name: runId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: format
+    type: TEXT
+    req: true
+    notes: ''
+  - name: businessDate
+    type: DATE
+    req: false
+    notes: ''
+- code: STATEMENT_READY
+  module: reporting
+  category: SERVICE
+  trigger: statement export ready
+  recipient: walletId (holder) or staffUserId (staff requester)
+  variables:
+  - name: exportId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: walletId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: from
+    type: DATE
+    req: true
+    notes: ''
+  - name: to
+    type: DATE
+    req: true
+    notes: ''
+  - name: format
+    type: TEXT
+    req: true
+    notes: ''
+- code: REGULATORY_REVIEW_PENDING
+  module: reporting
+  category: INTERNAL
+  trigger: regulatory run awaiting review
+  recipient: recipient.role = dataset checker role (one request per role)
+  variables:
+  - name: rrCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: regulatoryRunId
+    type: TEXT
+    req: true
+    notes: ''
+  - name: periodStart
+    type: DATE
+    req: true
+    notes: ''
+  - name: periodEnd
+    type: DATE
+    req: true
+    notes: ''
+reasonCodes: []
+txnRefPrefixes:
+- prefix: RCA-
+  meaning: reconciliation ledger adjustment (command 11, module reconciliation)
+  format: RCA-{yyyyMMdd}-{8 Crockford base32} (21 chars)
+productCodes: []
+metrics:
+- name: bitspay_reconciliation_items_total
+  type: counter
+  labels:
+  - status
+  - source
+- name: bitspay_reconciliation_open_items
+  type: gauge
+  labels: []
+- name: bitspay_reconciliation_exceptions_open
+  type: gauge
+  labels:
+  - category
+  - severity
+- name: bitspay_reconciliation_eod_duration_seconds
+  type: histogram
+  labels:
+  - step
+- name: bitspay_reconciliation_eod_status
+  type: gauge
+  labels:
+  - status
+- name: bitspay_reconciliation_run_last_success_timestamp_seconds
+  type: gauge
+  labels:
+  - type
+- name: bitspay_reconciliation_emoney_variance_poisha
+  type: gauge
+  labels:
+  - business_date
+- name: bitspay_reconciliation_ledger_identity_diff_poisha
+  type: gauge
+  labels: []
+- name: bitspay_reconciliation_projection_drift_total
+  type: counter
+  labels: []
+- name: bitspay_reconciliation_partition_watermark_lag_seconds
+  type: gauge
+  labels:
+  - partition
+- name: bitspay_reconciliation_late_ledger_events_total
+  type: counter
+  labels: []
+- name: bitspay_reconciliation_file_lines_total
+  type: counter
+  labels:
+  - status
+- name: bitspay_reconciliation_adjustments_total
+  type: counter
+  labels:
+  - status
+- name: bitspay_reconciliation_gl_tieout_breaks_total
+  type: counter
+  labels:
+  - bucket
+- name: bitspay_reporting_ingest_lag_seconds
+  type: gauge
+  labels:
+  - sink
+- name: bitspay_reporting_ingest_rows_total
+  type: counter
+  labels:
+  - sink
+- name: bitspay_reporting_ingest_batch_seconds
+  type: histogram
+  labels:
+  - sink
+- name: bitspay_reporting_statement_gap_total
+  type: counter
+  labels: []
+- name: bitspay_reporting_report_runs_total
+  type: counter
+  labels:
+  - code
+  - status
+- name: bitspay_reporting_report_run_seconds
+  type: histogram
+  labels:
+  - code
+- name: bitspay_reporting_marts_last_success_timestamp_seconds
+  type: gauge
+  labels:
+  - job

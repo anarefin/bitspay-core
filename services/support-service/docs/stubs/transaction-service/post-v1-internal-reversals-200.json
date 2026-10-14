@@ -1,0 +1,36 @@
+{
+  "name": "POST /v1/internal/reversals → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/internal/reversals(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "txnRef": "RV26100900Q2D5M8XT",
+      "txnId": "0192f4a0-0000-7000-8000-000000000001",
+      "txnType": "REVERSAL",
+      "status": "COMPLETED",
+      "failureCode": null,
+      "amountPoisha": 50000,
+      "feePoisha": 500,
+      "vatPoisha": 75,
+      "totalDebitPoisha": 50000,
+      "feeBearer": "PAYER",
+      "currency": "BDT",
+      "fromWalletId": "0192f2bb-0002-7000-8000-00000000b002",
+      "toWalletId": "0192f2aa-0001-7000-8000-00000000a001",
+      "createdAt": "2026-10-09T09:30:00.000Z",
+      "completedAt": "2026-10-09T09:30:00.040Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "transaction-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

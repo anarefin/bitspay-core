@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/wallet-service/wallet.events/WALLET_UPSERTED.v1.schema.json",
+  "title": "WALLET_UPSERTED v1 — envelope.data (wallet.events)",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "walletId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= key"
+    },
+    "version": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "strictly +1 per emitted change; = status-cache version"
+    },
+    "ownerType": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER",
+        "AGENT",
+        "MERCHANT",
+        "DISTRIBUTOR",
+        "INSTITUTION"
+      ]
+    },
+    "ownerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "customerId or partnerId"
+    },
+    "walletType": {
+      "type": "string",
+      "enum": [
+        "C",
+        "A",
+        "D",
+        "M",
+        "I"
+      ]
+    },
+    "msisdn": {
+      "type": "string",
+      "pattern": "^8801[3-9][0-9]{8}$",
+      "description": "canonical; contact source of truth for wallets"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "P",
+        "A",
+        "D",
+        "X",
+        "C",
+        "F",
+        "Q",
+        "Z"
+      ],
+      "description": "effective status"
+    },
+    "kycTier": {
+      "type": "integer",
+      "format": "int32",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "partner wallets 2"
+    },
+    "categoryCode": {
+      "type": "integer",
+      "format": "int32",
+      "minimum": 0,
+      "maximum": 99999,
+      "description": "codes.yaml categoryCode; 0 for C"
+    },
+    "flags": {
+      "type": "integer",
+      "format": "int32",
+      "minimum": 0,
+      "maximum": 31,
+      "description": "bitmask codes.yaml walletFlag"
+    },
+    "previousStatus": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "P",
+        "A",
+        "D",
+        "X",
+        "C",
+        "F",
+        "Q",
+        "Z",
+        null
+      ],
+      "description": "effective status of the previous version; null only on the first (READY) event"
+    },
+    "statusReasonCode": {
+      "type": "string",
+      "pattern": "^[A-Z_]{3,40}$",
+      "description": "one of WALLET_CREATED, PRE_REGISTRATION, KYC_APPROVED, KYC_UPGRADE, KYC_EXPIRED, DORMANCY, REACTIVATION, CUSTOMER_REQUEST, FRAUD_FREEZE, AML_FREEZE, COURT_ORDER, REGULATORY_INSTRUCTION, CLOSURE, RISK_REGRADE, SCREENING_REJECT, PARTNER_SUSPENDED, PARTNER_REACTIVATED, PARTNER_TERMINATED; reason of the last status/restriction change; kept on flag/category/tier/contact/language changes"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "bn",
+        "en"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  },
+  "required": [
+    "walletId",
+    "version",
+    "ownerType",
+    "ownerId",
+    "walletType",
+    "msisdn",
+    "status",
+    "kycTier",
+    "categoryCode",
+    "flags",
+    "previousStatus",
+    "statusReasonCode",
+    "displayName",
+    "language",
+    "createdAt",
+    "updatedAt"
+  ]
+}

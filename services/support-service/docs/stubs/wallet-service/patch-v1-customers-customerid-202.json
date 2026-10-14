@@ -1,0 +1,25 @@
+{
+  "name": "PATCH /v1/customers/{customerId} → 202",
+  "priority": 5,
+  "request": {
+    "method": "PATCH",
+    "urlPattern": "^/v1/customers/[^/]+(\\?.*)?$"
+  },
+  "response": {
+    "status": 202,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "changeRequestId": "0192f450-0000-7000-8000-000000000001",
+      "customerId": "0192f2a0-5b1c-7d10-8e11-0a1b2c3d4e01",
+      "outcome": "PENDING_APPROVAL",
+      "approvalId": "0192f451-0000-7000-8000-000000000001"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/REVERSAL_RECOMMENDED.v1.schema.json",
+  "title": "case.events REVERSAL_RECOMMENDED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "= key"
+    },
+    "caseNo": {
+      "type": "string",
+      "pattern": "^CASE-[0-9]{4}-[0-9]{6}$",
+      "description": "`CASE-YYYY-NNNNNN`"
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "FRAUD",
+        "AML"
+      ]
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "opaque, 1..32 `[A-Z0-9-]` transaction recommended for reversal"
+    },
+    "walletIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "from/to wallets of the transaction"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "description": "> 0 original principal (informational)"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "FRAUD_CONFIRMED"
+      ],
+      "description": "closed enum"
+    },
+    "recommendedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "caseId",
+    "caseNo",
+    "domain",
+    "txnRef",
+    "walletIds",
+    "amountPoisha",
+    "reasonCode",
+    "recommendedAt"
+  ],
+  "additionalProperties": true
+}

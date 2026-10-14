@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/admin-service/audit.events/AUDIT_RECORDED.v1.schema.json",
+  "title": "audit.events AUDIT_RECORDED data (inbound topic owned by admin-service)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "auditId",
+    "service",
+    "actorType",
+    "actorId",
+    "actorRoles",
+    "action",
+    "entityType",
+    "entityId",
+    "before",
+    "after",
+    "channel",
+    "ip",
+    "deviceId",
+    "outcome",
+    "correlationId",
+    "occurredAt"
+  ],
+  "properties": {
+    "auditId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "service": {
+      "type": "string",
+      "pattern": "^([a-z][a-z-]*-service|archiver)$"
+    },
+    "module": {
+      "type": "string",
+      "enum": [
+        "wallet",
+        "partner",
+        "pricing",
+        "campaign",
+        "reconciliation",
+        "reporting",
+        "governance",
+        "notification"
+      ]
+    },
+    "actorType": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER",
+        "AGENT",
+        "MERCHANT",
+        "DISTRIBUTOR",
+        "INSTITUTION",
+        "STAFF",
+        "SYSTEM",
+        "SERVICE"
+      ]
+    },
+    "actorId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actorUserId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "actorRoles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OPS_MAKER",
+          "OPS_CHECKER",
+          "FIN_MAKER",
+          "FIN_CHECKER",
+          "SUP_AGENT",
+          "SUP_MAKER",
+          "SUP_CHECKER",
+          "RISK_ANALYST",
+          "RISK_CHECKER",
+          "COMPLIANCE_OFFICER",
+          "CAMLCO",
+          "PARTNER_OPS_MAKER",
+          "PARTNER_OPS_CHECKER",
+          "PRICING_MAKER",
+          "PRICING_CHECKER",
+          "ADMIN",
+          "AUDITOR",
+          "READ_ONLY"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "action": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+    },
+    "entityType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "entityId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "before": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "after": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "channel": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "APP",
+        "USSD",
+        "PARTNER_APP",
+        "PORTAL",
+        "BACKOFFICE",
+        "API",
+        "SYSTEM",
+        null
+      ]
+    },
+    "ip": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "deviceId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "SUCCESS",
+        "FAILURE",
+        "DENIED"
+      ]
+    },
+    "correlationId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "occurredAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "service": {
+            "enum": [
+              "wallet-service",
+              "pricing-service",
+              "finance-ops-service",
+              "admin-service"
+            ]
+          }
+        },
+        "required": [
+          "service"
+        ]
+      },
+      "then": {
+        "required": [
+          "module"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,337 @@
+# pricing-service — owned code lists (CONTRACT-MODEL §4). contractVersion 1.0.0, kernel 1.0.
+# Adding a value is additive (minor); removing or renaming one is breaking for consumers that list it.
+
+codeSets:
+  # ---------------- plan matching and PlanJson (fee.rules, quote, pricing-algorithm v1) ----------------
+  planTxnType:
+    description: "Transaction types a pricing plan, quote or share rule may name (PlanJson.txnType, PricingQuoteRequest.txnType). Values mirror the transaction types of the payment orchestrator."
+    values:
+      - {code: P2P, name: P2P, description: "customer to customer"}
+      - {code: CASH_IN, name: CASH_IN, description: "agent to customer"}
+      - {code: CASH_OUT, name: CASH_OUT, description: "customer to agent"}
+      - {code: MERCHANT_PAYMENT, name: MERCHANT_PAYMENT, description: "customer to merchant (MDR plans, bearer PAYEE)"}
+      - {code: MERCHANT_REFUND, name: MERCHANT_REFUND, description: "merchant to customer"}
+      - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "distributor/agent float"}
+      - {code: REVERSAL, name: REVERSAL, description: "accepted in plans; no seed plan uses it"}
+  planWalletType:
+    description: "Wallet-type letters used in PlanJson.match.payerWalletType / payeeWalletType and quote parties"
+    values:
+      - {code: C, name: CUSTOMER}
+      - {code: A, name: AGENT}
+      - {code: D, name: DISTRIBUTOR}
+      - {code: M, name: MERCHANT}
+      - {code: I, name: INSTITUTION}
+  planStatus:
+    description: "PlanJson.status on fee.rules (consumers keep only ACTIVE)"
+    values:
+      - {code: ACTIVE, name: ACTIVE, description: "current version of the plan"}
+      - {code: EXPIRED, name: EXPIRED, description: "ACTIVE version reached effectiveTo with no successor; drop from candidates"}
+  planVersionStatus:
+    description: "Lifecycle of a plan / share-rule / incentive-rule version (staff APIs; GET /v1/pricing/plans?status=)"
+    values:
+      - {code: DRAFT, name: DRAFT}
+      - {code: PENDING_APPROVAL, name: PENDING_APPROVAL}
+      - {code: SCHEDULED, name: SCHEDULED}
+      - {code: ACTIVE, name: ACTIVE}
+      - {code: SUPERSEDED, name: SUPERSEDED}
+      - {code: EXPIRED, name: EXPIRED}
+      - {code: REJECTED, name: REJECTED}
+      - {code: WITHDRAWN, name: WITHDRAWN}
+      - {code: RETIRED, name: RETIRED}
+  feeType:
+    description: "PlanJson.fee.type"
+    values:
+      - {code: FIXED, name: FIXED}
+      - {code: PERCENT, name: PERCENT}
+      - {code: SLAB, name: SLAB}
+      - {code: NONE, name: NONE, description: "fee always 0, never clamped; plan validation requires minPoisha = maxPoisha = 0"}
+  feeBearer:
+    description: "PlanJson.feeBearer and PricingQuoteResult.feeBearer"
+    values:
+      - {code: PAYER, name: PAYER}
+      - {code: PAYEE, name: PAYEE}
+      - {code: OPERATOR, name: OPERATOR, description: "fee waived; evaluator outputs fee = vat = 0"}
+      - {code: SHARED, name: SHARED, description: "RESERVED, never emitted, rejected by plan validation (OPEN D-03); consumers must accept it in their enums"}
+  commissionType:
+    description: "PlanJson.commission.type"
+    values:
+      - {code: NONE, name: NONE}
+      - {code: FIXED, name: FIXED}
+      - {code: PERCENT_OF_AMOUNT, name: PERCENT_OF_AMOUNT}
+      - {code: PERCENT_OF_FEE, name: PERCENT_OF_FEE}
+  commissionSource:
+    description: "PlanJson.commission.source / PricingQuoteResult.commissionSource (ledger account funding the in-line commission)"
+    values:
+      - {code: FEE_INCOME, name: FEE_INCOME}
+      - {code: COMMISSION_PAYABLE, name: COMMISSION_PAYABLE}
+  commissionBeneficiary:
+    description: "PlanJson.commission.beneficiary — the agent side of cash-in / cash-out"
+    values:
+      - {code: PAYER, name: PAYER}
+      - {code: PAYEE, name: PAYEE}
+  # ---------------- commission.events ----------------
+  accrualKind:
+    description: "COMMISSION_ACCRUED.kind"
+    values:
+      - {code: INLINE, name: INLINE, description: "statement record of commission already paid in the payment's ledger chain"}
+      - {code: SHARE, name: SHARE, description: "hierarchical share of an operator-funded pool, settled later"}
+      - {code: CLAWBACK, name: CLAWBACK, description: "negative mirror of an INLINE or SHARE accrual"}
+      - {code: ADJUSTMENT, name: ADJUSTMENT, description: "approved manual adjustment (signed)"}
+      - {code: BONUS, name: BONUS, description: "incentive / target bonus"}
+  accrualLevel:
+    description: "COMMISSION_ACCRUED.level"
+    values:
+      - {code: "0", name: INLINE_AGENT}
+      - {code: "1", name: ANCESTOR_1}
+      - {code: "2", name: ANCESTOR_2}
+      - {code: "3", name: ANCESTOR_3}
+      - {code: "4", name: ANCESTOR_4}
+      - {code: "5", name: ANCESTOR_5}
+      - {code: "8", name: ADJUSTMENT}
+      - {code: "9", name: BONUS}
+  settlementStatus:
+    description: "Commission settlement status (staff APIs)"
+    values:
+      - {code: PLANNED, name: PLANNED}
+      - {code: PENDING_APPROVAL, name: PENDING_APPROVAL}
+      - {code: POSTING, name: POSTING}
+      - {code: SETTLED, name: SETTLED}
+      - {code: FAILED, name: FAILED}
+      - {code: SKIPPED, name: SKIPPED}
+      - {code: HELD, name: HELD}
+      - {code: CANCELLED, name: CANCELLED}
+  # ---------------- campaign.events ----------------
+  rewardType:
+    description: "REWARD_GRANTED.rewardType"
+    values:
+      - {code: CASHBACK, name: CASHBACK}
+      - {code: BONUS, name: BONUS}
+      - {code: REFERRAL, name: REFERRAL}
+      - {code: DRAW_PRIZE, name: DRAW_PRIZE}
+  beneficiaryRole:
+    description: "REWARD_GRANTED.beneficiaryRole"
+    values:
+      - {code: SELF, name: SELF}
+      - {code: REFERRER, name: REFERRER}
+      - {code: REFEREE, name: REFEREE}
+      - {code: WINNER, name: WINNER}
+  clawbackMode:
+    description: "REWARD_CLAWED_BACK.clawbackMode"
+    values:
+      - {code: LEDGER_REVERSAL, name: LEDGER_REVERSAL, description: "clawbackCommandId is a post-reversal (type 7) command"}
+      - {code: MANUAL, name: MANUAL, description: "recovered by a manual journal; informational for ledger matching"}
+  campaignStatus:
+    description: "Campaign lifecycle (staff APIs)"
+    values:
+      - {code: DRAFT, name: DRAFT}
+      - {code: PENDING_APPROVAL, name: PENDING_APPROVAL}
+      - {code: REJECTED, name: REJECTED}
+      - {code: SCHEDULED, name: SCHEDULED}
+      - {code: ACTIVE, name: ACTIVE}
+      - {code: PAUSED, name: PAUSED}
+      - {code: BUDGET_EXHAUSTED, name: BUDGET_EXHAUSTED}
+      - {code: ENDED, name: ENDED}
+      - {code: CLOSED, name: CLOSED}
+      - {code: CANCELLED, name: CANCELLED}
+  rewardStatus:
+    description: "Reward lifecycle (staff and wallet APIs)"
+    values:
+      - {code: PENDING, name: PENDING}
+      - {code: PENDING_FUNDING, name: PENDING_FUNDING}
+      - {code: GRANTED, name: GRANTED}
+      - {code: FAILED, name: FAILED}
+      - {code: CANCELLED, name: CANCELLED}
+      - {code: CLAWBACK_PENDING, name: CLAWBACK_PENDING}
+      - {code: CLAWBACK_PENDING_MANUAL, name: CLAWBACK_PENDING_MANUAL}
+      - {code: CLAWED_BACK, name: CLAWED_BACK}
+      - {code: CLAWBACK_FAILED, name: CLAWBACK_FAILED}
+      - {code: WRITTEN_OFF, name: WRITTEN_OFF}
+  rewardFailureCode:
+    description: "Reward.failureCode / evaluation outcome reasons shown in staff APIs (producer-local)"
+    values:
+      - {code: WALLET_NOT_ELIGIBLE, name: WALLET_NOT_ELIGIBLE}
+      - {code: WALLET_UNKNOWN, name: WALLET_UNKNOWN}
+      - {code: WALLET_TYPE_NOT_ALLOWED, name: WALLET_TYPE_NOT_ALLOWED}
+      - {code: LIMIT_EXCEEDED, name: LIMIT_EXCEEDED}
+      - {code: MAX_BALANCE_EXCEEDED, name: MAX_BALANCE_EXCEEDED}
+      - {code: ACCOUNT_CLOSED, name: ACCOUNT_CLOSED}
+      - {code: ACCOUNT_NOT_FOUND, name: ACCOUNT_NOT_FOUND}
+      - {code: LEDGER_OTHER, name: LEDGER_OTHER}
+
+problemReasons:
+  # 400 VALIDATION_FAILED
+  - {code: VALIDATION_FAILED, reason: INVALID_CURSOR, operations: ["GET /v1/pricing/plans", "GET /v1/commissions/accruals", "GET /v1/commissions/settlements", "GET /v1/approvals", "GET /v1/campaigns", "GET /v1/rewards", "GET /v1/segments"]}
+  - {code: VALIDATION_FAILED, reason: RESERVED_VALUE, operations: ["POST /v1/pricing/plans", "POST /v1/pricing/plans/{planId}/versions", "PUT /v1/pricing/plans/{planId}/versions/{version}"]}
+  - {code: VALIDATION_FAILED, reason: PLAN_VALIDATION_FAILED, operations: ["POST /v1/pricing/plans/{planId}/versions/{version}:submit"]}
+  - {code: VALIDATION_FAILED, reason: RULE_VALIDATION_FAILED, operations: ["POST /v1/commissions/share-rules/{ruleId}/versions/{version}:submit", "POST /v1/commissions/incentive-rules/{ruleId}/versions/{version}:submit"]}
+  - {code: VALIDATION_FAILED, reason: CAMPAIGN_VALIDATION_FAILED, operations: ["POST /v1/campaigns/{campaignId}:submit"]}
+  - {code: VALIDATION_FAILED, reason: SEED_COMMITMENT_MISMATCH, operations: ["POST /v1/campaigns/{campaignId}/draws/{drawId}:reveal"]}
+  # 409 STATE_CONFLICT — pricing module
+  - {code: STATE_CONFLICT, reason: PLAN_EXISTS, operations: ["POST /v1/pricing/plans"]}
+  - {code: STATE_CONFLICT, reason: PLAN_ID_RETIRED, operations: ["POST /v1/pricing/plans"]}
+  - {code: STATE_CONFLICT, reason: PLAN_RETIRED, operations: ["POST /v1/pricing/plans/{planId}/versions", "POST /v1/pricing/plans/{planId}:retire"]}
+  - {code: STATE_CONFLICT, reason: INFLIGHT_VERSION_EXISTS, operations: ["POST /v1/pricing/plans/{planId}/versions", "POST /v1/commissions/share-rules/{ruleId}/versions", "POST /v1/commissions/incentive-rules/{ruleId}/versions"]}
+  - {code: STATE_CONFLICT, reason: NOT_DRAFT, operations: ["PUT /v1/pricing/plans/{planId}/versions/{version}", "POST /v1/pricing/plans/{planId}/versions/{version}:submit", "PUT /v1/commissions/share-rules/{ruleId}/versions/{version}", "POST /v1/commissions/share-rules/{ruleId}/versions/{version}:submit", "PUT /v1/commissions/incentive-rules/{ruleId}/versions/{version}", "POST /v1/commissions/incentive-rules/{ruleId}/versions/{version}:submit"]}
+  - {code: STATE_CONFLICT, reason: ROW_VERSION_MISMATCH, operations: ["PUT /v1/pricing/plans/{planId}/versions/{version}", "PUT /v1/commissions/share-rules/{ruleId}/versions/{version}", "PUT /v1/commissions/incentive-rules/{ruleId}/versions/{version}", "PATCH /v1/campaigns/{campaignId}", "PATCH /v1/segments/{segmentId}"]}
+  - {code: STATE_CONFLICT, reason: NOT_WITHDRAWABLE, operations: ["POST /v1/pricing/plans/{planId}/versions/{version}:withdraw", "POST /v1/commissions/share-rules/{ruleId}/versions/{version}:withdraw", "POST /v1/commissions/incentive-rules/{ruleId}/versions/{version}:withdraw"]}
+  - {code: STATE_CONFLICT, reason: RETIRE_PENDING, operations: ["POST /v1/pricing/plans/{planId}:retire", "POST /v1/commissions/share-rules/{ruleId}:retire", "POST /v1/commissions/incentive-rules/{ruleId}:retire"]}
+  - {code: STATE_CONFLICT, reason: RULE_EXISTS, operations: ["POST /v1/commissions/share-rules", "POST /v1/commissions/incentive-rules"]}
+  - {code: STATE_CONFLICT, reason: RULE_RETIRED, operations: ["POST /v1/commissions/share-rules/{ruleId}/versions", "POST /v1/commissions/share-rules/{ruleId}:retire", "POST /v1/commissions/incentive-rules/{ruleId}/versions", "POST /v1/commissions/incentive-rules/{ruleId}:retire"]}
+  - {code: STATE_CONFLICT, reason: GOLDEN_SELF_CHECK_FAILED, operations: ["POST /v1/pricing/plans/{planId}/versions/{version}:submit", "POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: BACKDATING_NOT_ALLOWED, operations: ["POST /v1/approvals/{id}:approve"]}
+  - {code: STATE_CONFLICT, reason: PROFILE_CHANGE_PENDING, operations: ["PUT /v1/commissions/settlement-profiles/{walletId}"]}
+  - {code: STATE_CONFLICT, reason: ALREADY_ON_HOLD, operations: ["POST /v1/commissions/settlement-profiles/{walletId}:hold"]}
+  - {code: STATE_CONFLICT, reason: NOT_ON_HOLD, operations: ["POST /v1/commissions/settlement-profiles/{walletId}:unhold"]}
+  - {code: STATE_CONFLICT, reason: RUN_IN_PROGRESS, operations: ["POST /v1/commissions/settlements:run"]}
+  - {code: STATE_CONFLICT, reason: NOT_FAILED, operations: ["POST /v1/commissions/settlements/{settlementId}:retry"]}
+  - {code: STATE_CONFLICT, reason: ACCRUAL_NOT_DISPUTABLE, operations: ["POST /v1/commissions/disputes"]}
+  - {code: STATE_CONFLICT, reason: DISPUTE_NOT_OPEN, operations: ["POST /v1/commissions/disputes/{disputeId}:resolve"]}
+  # 409 STATE_CONFLICT — approvals engine (both modules)
+  - {code: STATE_CONFLICT, reason: NOT_PENDING, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: STATE_CONFLICT, reason: APPROVAL_EXPIRED, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: STATE_CONFLICT, reason: REVALIDATION_FAILED, operations: ["POST /v1/approvals/{id}:approve"]}
+  # 409 STATE_CONFLICT — campaign module
+  - {code: STATE_CONFLICT, reason: CAMPAIGN_CODE_EXISTS, operations: ["POST /v1/campaigns"]}
+  - {code: STATE_CONFLICT, reason: NOT_EDITABLE, operations: ["PATCH /v1/campaigns/{campaignId}"]}
+  - {code: STATE_CONFLICT, reason: MAX_ACTIVE_CAMPAIGNS, operations: ["POST /v1/campaigns/{campaignId}:submit"]}
+  - {code: STATE_CONFLICT, reason: START_IN_PAST, operations: ["POST /v1/campaigns/{campaignId}:submit"]}
+  - {code: STATE_CONFLICT, reason: INVALID_CAMPAIGN_STATE, operations: ["POST /v1/campaigns/{campaignId}:pause", "POST /v1/campaigns/{campaignId}:resume", "POST /v1/campaigns/{campaignId}:end", "POST /v1/campaigns/{campaignId}:cancel", "POST /v1/campaigns/{campaignId}/budget-increases", "POST /v1/campaigns/{campaignId}/draws"]}
+  - {code: STATE_CONFLICT, reason: MAX_DURATION_EXCEEDED, operations: ["POST /v1/campaigns/{campaignId}/budget-increases"]}
+  - {code: STATE_CONFLICT, reason: SEGMENT_CODE_EXISTS, operations: ["POST /v1/segments"]}
+  - {code: STATE_CONFLICT, reason: SEGMENT_IN_USE, operations: ["PATCH /v1/segments/{segmentId}"]}
+  - {code: STATE_CONFLICT, reason: DUPLICATE_UPLOAD, operations: ["POST /v1/segments/{segmentId}/uploads"]}
+  - {code: STATE_CONFLICT, reason: NOT_LIST_SEGMENT, operations: ["POST /v1/segments/{segmentId}/uploads"]}
+  - {code: STATE_CONFLICT, reason: REWARD_NOT_GRANTED, operations: ["POST /v1/rewards/{rewardId}:clawback"]}
+  - {code: STATE_CONFLICT, reason: REWARD_NOT_RETRYABLE, operations: ["POST /v1/rewards/{rewardId}:retry"]}
+  - {code: STATE_CONFLICT, reason: NOT_PENDING_MANUAL, operations: ["POST /v1/rewards/{rewardId}:record-manual-clawback"]}
+  - {code: STATE_CONFLICT, reason: NOT_WRITE_OFFABLE, operations: ["POST /v1/rewards/{rewardId}:write-off"]}
+  - {code: STATE_CONFLICT, reason: REFERRAL_ALREADY_CLAIMED, operations: ["POST /v1/referrals/claims"]}
+  - {code: STATE_CONFLICT, reason: CLAIM_WINDOW_PASSED, operations: ["POST /v1/referrals/claims"]}
+  - {code: STATE_CONFLICT, reason: SELF_REFERRAL, operations: ["POST /v1/referrals/claims"]}
+  - {code: STATE_CONFLICT, reason: NO_ACTIVE_REFERRAL_CAMPAIGN, operations: ["POST /v1/referrals/claims"]}
+  - {code: STATE_CONFLICT, reason: REFERRER_LIMIT_REACHED, operations: ["POST /v1/referrals/claims"]}
+  - {code: STATE_CONFLICT, reason: NOT_LUCKY_DRAW, operations: ["POST /v1/campaigns/{campaignId}/draws"]}
+  - {code: STATE_CONFLICT, reason: DRAW_NOT_APPROVED, operations: ["POST /v1/campaigns/{campaignId}/draws/{drawId}:reveal"]}
+  - {code: STATE_CONFLICT, reason: DRAW_ALREADY_EXECUTED, operations: ["POST /v1/campaigns/{campaignId}/draws/{drawId}:reveal"]}
+  # 422
+  - {code: MAKER_CHECKER_VIOLATION, reason: CHECKER_IS_MAKER, operations: ["POST /v1/approvals/{id}:approve", "POST /v1/approvals/{id}:reject"]}
+  - {code: MAKER_CHECKER_VIOLATION, reason: CHECKER_ALREADY_DECIDED, operations: ["POST /v1/approvals/{id}:approve"]}
+  - {code: INSUFFICIENT_FUNDS, reason: CAMPAIGN_FUNDING_INSUFFICIENT, operations: ["POST /v1/approvals/{id}:approve"]}
+  - {code: SERVICE_DISABLED, reason: BANK_SETTLEMENT_NOT_SUPPORTED, operations: ["PUT /v1/commissions/settlement-profiles/{walletId}"]}
+  - {code: SERVICE_DISABLED, reason: CAMPAIGN_DISABLED, operations: ["POST /v1/campaigns", "POST /v1/campaigns/{campaignId}:submit", "POST /v1/campaigns/{campaignId}:resume", "GET /v1/wallets/{walletId}/offers", "GET /v1/referrals/codes/{walletId}", "POST /v1/referrals/claims"]}
+  - {code: SERVICE_DISABLED, reason: POINTS_DISABLED, operations: ["GET /v1/wallets/{walletId}/points"]}
+  # 503
+  - {code: DEPENDENCY_UNAVAILABLE, reason: PLAN_SNAPSHOT_STALE, operations: ["POST /v1/pricing/quote"]}
+
+problemExtensions: []   # pricing-service defines no problem+json extension members
+
+entityTypes:
+  - module: pricing
+    values: [PricingPlanVersion, PricingPlanRetire, CommissionShareRule, IncentiveRule, CommissionAdjustment, CommissionSettlement, SettlementProfile]
+  - module: campaign
+    values: [Campaign, CampaignCancel, CampaignBudgetIncrease, RewardClawback, RewardWriteOff, LuckyDraw]
+
+notificationTemplates:      # group C6 — sent on notification.requests; variables exactly as declared
+  - code: COMMISSION_NEGATIVE_BALANCE
+    module: pricing
+    category: INTERNAL
+    recipient: "recipient.role = FIN_MAKER"
+    trigger: "carried negative commission of a beneficiary above bitspay.pricing.clawback.alert-threshold-poisha or older than 90 days"
+    dedupeKey: "CNB:{walletId}:{businessDate}"
+    variables:
+      - {name: walletId, type: TEXT, req: true, notes: "uuid text"}
+      - {name: partnerId, type: TEXT, req: false, notes: "uuid text"}
+      - {name: partnerName, type: TEXT, req: false, notes: ""}
+      - {name: carriedNegativePoisha, type: MONEY, req: true, notes: "positive magnitude"}
+      - {name: oldestAccrualDate, type: DATE, req: true, notes: ""}
+      - {name: thresholdPoisha, type: MONEY, req: true, notes: ""}
+  - code: CAMPAIGN_FUNDING_LOW
+    module: campaign
+    category: INTERNAL
+    recipient: "recipient.role = FIN_MAKER"
+    trigger: "ledger rejected a reward with INSUFFICIENT_FUNDS (CAMPAIGN_FUNDING empty); monetary campaigns auto-paused"
+    dedupeKey: "CFL:{businessDate}"
+    variables:
+      - {name: availablePoisha, type: MONEY, req: false, notes: ""}
+      - {name: pendingFundingCount, type: INT, req: true, notes: ""}
+      - {name: pendingFundingPoisha, type: MONEY, req: true, notes: ""}
+      - {name: pausedCampaignCount, type: INT, req: true, notes: ""}
+      - {name: detectedAt, type: DATETIME, req: true, notes: ""}
+  - code: CAMPAIGN_BUDGET_EXHAUSTED
+    module: campaign
+    category: INTERNAL
+    recipient: "recipient.staffUserId = campaign maker, plus one request to recipient.role = OPS_MAKER"
+    trigger: "campaign moved to BUDGET_EXHAUSTED"
+    dedupeKey: "CBE:{campaignId}"
+    variables:
+      - {name: campaignId, type: TEXT, req: true, notes: ""}
+      - {name: campaignCode, type: TEXT, req: true, notes: ""}
+      - {name: campaignName, type: TEXT, req: true, notes: ""}
+      - {name: totalPoisha, type: MONEY, req: true, notes: ""}
+      - {name: grantedPoisha, type: MONEY, req: true, notes: ""}
+      - {name: reservedPoisha, type: MONEY, req: true, notes: ""}
+      - {name: remainingPoisha, type: MONEY, req: true, notes: ""}
+      - {name: exhaustedAt, type: DATETIME, req: true, notes: ""}
+  - code: REWARD_CLAWBACK_MANUAL_REQUIRED
+    module: campaign
+    category: INTERNAL
+    recipient: "recipient.role = FIN_MAKER"
+    trigger: "clawback needs manual handling (manual adapter in use)"
+    dedupeKey: "RCM:{rewardId}"
+    variables:
+      - {name: rewardId, type: TEXT, req: true, notes: ""}
+      - {name: campaignId, type: TEXT, req: true, notes: ""}
+      - {name: campaignCode, type: TEXT, req: true, notes: ""}
+      - {name: walletId, type: TEXT, req: true, notes: ""}
+      - {name: rewardPoisha, type: MONEY, req: true, notes: ""}
+      - {name: rewardTxnRef, type: TEXT, req: true, notes: ""}
+      - {name: rewardCommandId, type: TEXT, req: true, notes: ""}
+      - {name: reasonCode, type: TEXT, req: true, notes: "TRANSACTION_REVERSED | TRANSACTION_REFUNDED | FRAUD_CONFIRMED"}
+  - code: "EDU_<CODE>"
+    module: campaign
+    category: MARKETING
+    recipient: "recipient.walletId (each wallet of the segment snapshot)"
+    trigger: "educational campaign send at notificationSpec.sendAt (priority null)"
+    dedupeKey: null
+    pattern: "^EDU_[A-Z0-9_]{1,60}$"
+    variables:
+      - {name: campaignName, type: TEXT, req: true, notes: ""}
+      - {name: "(declared)", type: "per template", req: true, notes: "variables declared when the EDU_ template is created; template must be ACTIVE before sendAt"}
+
+reasonCodes:                # producer-local lists, not governance REASON_CODE items
+  - {group: "Commission adjustment", values: [MISSED_ACCRUAL, WRONG_RATE, DISPUTE_UPHELD, CLAWBACK_RECOVERY_WAIVED, FRAUD_RECOVERY, OTHER], governance: false}
+  - {group: "Reward clawback", values: [TRANSACTION_REVERSED, TRANSACTION_REFUNDED, FRAUD_CONFIRMED], governance: false}
+
+txnRefPrefixes:
+  - {prefix: CR, meaning: "campaign reward (ledger post-campaign-reward)", format: "CR{yyMMdd}00{8 Crockford}", length: 18, carriedOn: "REWARD_GRANTED.txnRef"}
+  - {prefix: CC, meaning: "campaign clawback (ledger post-reversal of an own reward)", format: "CC{yyMMdd}00{8 Crockford}", length: 18, carriedOn: "REWARD_CLAWED_BACK.clawbackTxnRef"}
+  - {prefix: "CMS-", meaning: "commission settlement (ledger post-commission-settlement)", format: "CMS-{yyyyMMdd(periodEnd)}-{8 Crockford}", length: 21, carriedOn: "COMMISSION_SETTLED.txnRef"}
+
+productCodes: [CAMPAIGN]
+
+metrics:
+  - {name: bitspay_pricing_quote_seconds, type: histogram, labels: []}
+  - {name: bitspay_pricing_plans_active, type: gauge, labels: []}
+  - {name: bitspay_pricing_activation_lag_seconds, type: histogram, labels: []}
+  - {name: bitspay_pricing_operator_fee_forced_total, type: counter, labels: [plan_id]}
+  - {name: bitspay_pricing_accruals_total, type: counter, labels: [kind]}
+  - {name: bitspay_pricing_accrued_poisha_total, type: counter, labels: [kind]}
+  - {name: bitspay_pricing_settlements_total, type: counter, labels: [status]}
+  - {name: bitspay_pricing_settlement_posting_age_seconds, type: gauge, labels: []}
+  - {name: bitspay_pricing_parked_txn, type: gauge, labels: [reason]}
+  - {name: bitspay_pricing_inline_unresolved_total, type: counter, labels: []}
+  - {name: bitspay_pricing_share_retained_poisha_total, type: counter, labels: [txn_type]}
+  - {name: bitspay_pricing_negative_carry_poisha, type: gauge, labels: []}
+  - {name: bitspay_pricing_golden_selfcheck_failures_total, type: counter, labels: []}
+  - {name: bitspay_pricing_plan_snapshot_age_seconds, type: gauge, labels: []}
+  - {name: bitspay_campaign_evaluations_total, type: counter, labels: [campaign, outcome]}
+  - {name: bitspay_campaign_rewards_total, type: counter, labels: [campaign, status]}
+  - {name: bitspay_campaign_reward_poisha_total, type: counter, labels: [campaign]}
+  - {name: bitspay_campaign_budget_remaining_poisha, type: gauge, labels: [campaign]}
+  - {name: bitspay_campaign_reward_pending, type: gauge, labels: []}
+  - {name: bitspay_campaign_reward_latency_seconds, type: histogram, labels: []}
+  - {name: bitspay_campaign_clawbacks_total, type: counter, labels: [mode, status]}
+  - {name: bitspay_campaign_ledger_calls_total, type: counter, labels: [command, result]}
+  - {name: bitspay_campaign_limits_release_pending, type: gauge, labels: []}
+  - {name: bitspay_campaign_txn_consumer_batch_seconds, type: histogram, labels: []}
+  - {name: bitspay_campaign_budget_invariant_violations, type: gauge, labels: []}

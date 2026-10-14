@@ -1,0 +1,20 @@
+{
+  "eventId": "0192fb7a-0000-7000-8000-00000000007a",
+  "eventType": "SCHEDULED_TRANSFER_EXECUTED",
+  "eventVersion": 1,
+  "occurredAt": "2026-11-01T04:00:01.250Z",
+  "producer": "disbursement-service",
+  "aggregateType": "ScheduledTransfer",
+  "aggregateId": "0192fb01-0000-7000-8000-000000000001",
+  "correlationId": "sched-0192fb01-0000-7000-8000-000000000001-2026-11-01",
+  "data": {
+    "scheduleId": "0192fb01-0000-7000-8000-000000000001",
+    "occurrenceDate": "2026-11-01",
+    "payerWalletId": "0192f2aa-0001-7000-8000-00000000a001",
+    "payeeWalletId": "0192f2c9-0000-7000-8000-00000000c009",
+    "amountPoisha": 200000,
+    "outcome": "COMPLETED",
+    "txnRef": "PP26110100M4K7Q2XB",
+    "failureCode": null
+  }
+}

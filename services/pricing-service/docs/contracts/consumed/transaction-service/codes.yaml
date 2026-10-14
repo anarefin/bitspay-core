@@ -1,0 +1,186 @@
+# transaction-service (SVC-02) — owned code lists. contractVersion 1.0.0, kernel 1.0.
+# Mirror: SPEC.md §5.3. This file wins over the SPEC.md table on any conflict (kernel precedence rule 3).
+
+codeSets:
+  txnType:
+    description: "Transaction type. Closed list owned by transaction-service. Used in PaymentResult, TransactionView, txn.events data.txnType, quote requests and ledger txnRef prefixes."
+    values:
+      - {code: P2P, name: P2P, description: "Customer to customer (C -> C). Prefix PP. Ledger command post-p2p (type 1)."}
+      - {code: CASH_IN, name: CASH_IN, description: "Agent to customer (A -> C). Prefix CI. Ledger command post-cash-in (type 2)."}
+      - {code: CASH_OUT, name: CASH_OUT, description: "Customer to agent (C -> A). Prefix CO. Ledger command post-cash-out (type 3)."}
+      - {code: MERCHANT_PAYMENT, name: MERCHANT_PAYMENT, description: "Customer to merchant (C -> M). Prefix MP. Ledger command post-merchant-payment (type 4)."}
+      - {code: MERCHANT_REFUND, name: MERCHANT_REFUND, description: "Merchant to customer (M -> C), refund of a MERCHANT_PAYMENT. Prefix MR. Ledger command post-merchant-refund (type 5)."}
+      - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "Distributor/agent float top-up or return (D<->A, A<->A super-agent; D<->D only when enabled). Prefix FT. Ledger command post-float-transfer (type 6)."}
+      - {code: REVERSAL, name: REVERSAL, description: "Mirror of an original transaction (original.to -> original.from). Prefix RV. Ledger command post-reversal (type 7)."}
+
+  paymentResultStatus:
+    description: "PaymentResult.status — the outcome of THAT request. INITIATED appears only inside a 503 problem's `transaction` member."
+    values:
+      - {code: COMPLETED, name: COMPLETED, description: "Ledger posted (OK or EXISTS); outcome and outbox committed."}
+      - {code: FAILED, name: FAILED, description: "Business refusal persisted (pre-ledger or ledger REJECTED or sweeper not-posted). failureCode is set."}
+      - {code: INITIATED, name: INITIATED, description: "Intent persisted, ledger outcome unknown. Only inside a 503 DEPENDENCY_UNAVAILABLE problem."}
+
+  transactionStatus:
+    description: "Lifecycle status of a transaction (TransactionView.status, txn.events data.status). INITIATED never appears on txn.events."
+    values:
+      - {code: INITIATED, name: INITIATED, description: "Intent committed; ledger outcome not yet recorded."}
+      - {code: COMPLETED, name: COMPLETED, description: "Posted."}
+      - {code: FAILED, name: FAILED, description: "Refused; final."}
+      - {code: REVERSED, name: REVERSED, description: "Original reversed by a REVERSAL transaction (full or partial); final."}
+      - {code: PARTIALLY_REFUNDED, name: PARTIALLY_REFUNDED, description: "MERCHANT_PAYMENT with refunds totalling less than its amount."}
+      - {code: REFUNDED, name: REFUNDED, description: "MERCHANT_PAYMENT fully refunded; final."}
+
+  failureCode:
+    description: "PaymentResult.failureCode / txn.events data.failureCode. Closed list; non-null only when status = FAILED. A new value is additive. Ledger ACCOUNT_NOT_FOUND / ACCOUNT_CLOSED map to WALLET_NOT_TRANSACTABLE."
+    values:
+      - {code: WALLET_NOT_TRANSACTABLE, name: WALLET_NOT_TRANSACTABLE, description: "Wallet status blocks the direction, or ledger ACCOUNT_NOT_FOUND / ACCOUNT_CLOSED."}
+      - {code: LIMIT_EXCEEDED, name: LIMIT_EXCEEDED, description: "limits-risk decision LIMIT_EXCEEDED."}
+      - {code: RISK_BLOCKED, name: RISK_BLOCKED, description: "limits-risk decision BLOCK."}
+      - {code: RISK_HELD_FOR_REVIEW, name: RISK_HELD_FOR_REVIEW, description: "limits-risk decision HOLD (terminal decline in R1, OPEN D-04)."}
+      - {code: RISK_STEP_UP_REQUIRED, name: RISK_STEP_UP_REQUIRED, description: "limits-risk decision STEP_UP (terminal decline in R1, OPEN D-04)."}
+      - {code: SERVICE_DISABLED, name: SERVICE_DISABLED, description: "limits-risk decision SERVICE_DISABLED (emergency control) after the intent was persisted."}
+      - {code: INSUFFICIENT_FUNDS, name: INSUFFICIENT_FUNDS, description: "Ledger REJECTED INSUFFICIENT_FUNDS."}
+      - {code: MAX_BALANCE_EXCEEDED, name: MAX_BALANCE_EXCEEDED, description: "Ledger REJECTED MAX_BALANCE_EXCEEDED."}
+      - {code: LEDGER_ORIGINAL_NOT_FOUND, name: LEDGER_ORIGINAL_NOT_FOUND, description: "Ledger REJECTED ORIGINAL_NOT_FOUND (reversal)."}
+      - {code: LEDGER_ALREADY_REVERSED, name: LEDGER_ALREADY_REVERSED, description: "Ledger REJECTED ALREADY_REVERSED (reversal)."}
+      - {code: LEDGER_HOLD_NOT_FOUND, name: LEDGER_HOLD_NOT_FOUND, description: "Ledger REJECTED HOLD_NOT_FOUND (reversal with releaseHoldCommandId)."}
+      - {code: LEDGER_INVALID_AMOUNT, name: LEDGER_INVALID_AMOUNT, description: "Ledger REJECTED INVALID_AMOUNT."}
+      - {code: LEDGER_OTHER, name: LEDGER_OTHER, description: "Ledger REJECTED OTHER (incl. ACCOUNT_TYPE_MISMATCH, NOT_REVERSIBLE) or ledger HTTP 400/403."}
+      - {code: LEDGER_NOT_POSTED, name: LEDGER_NOT_POSTED, description: "Sweeper: command not found in the ledger after two checks >= 60 s apart."}
+
+  transactionDirection:
+    description: "Direction of a list item relative to the queried walletId (GET /v1/transactions)."
+    values:
+      - {code: DEBIT, name: DEBIT, description: "walletId = fromWalletId."}
+      - {code: CREDIT, name: CREDIT, description: "walletId = toWalletId."}
+
+  merchantRefundRequestStatus:
+    description: "Status of a merchant refund request (maker-checker path)."
+    values:
+      - {code: PENDING, name: PENDING, description: "Awaiting checker decision (any level)."}
+      - {code: APPROVED, name: APPROVED, description: "Final level approved; execution in progress (transient inside the approve call)."}
+      - {code: REJECTED, name: REJECTED, description: "Checker rejected."}
+      - {code: EXPIRED, name: EXPIRED, description: "Not decided within the approval expiry (default 72 h)."}
+      - {code: EXECUTED, name: EXECUTED, description: "Refund COMPLETED; resultTxnRef set."}
+      - {code: EXECUTION_FAILED, name: EXECUTION_FAILED, description: "Refund refused or FAILED at execution; resultCode set."}
+
+  quoteTxnType:
+    description: "txnType values accepted by POST /v1/payments/quote (MERCHANT_REFUND and REVERSAL are refused with 400)."
+    values:
+      - {code: P2P, name: P2P, description: "Quote for P2P."}
+      - {code: CASH_IN, name: CASH_IN, description: "Quote for cash-in."}
+      - {code: CASH_OUT, name: CASH_OUT, description: "Quote for cash-out."}
+      - {code: MERCHANT_PAYMENT, name: MERCHANT_PAYMENT, description: "Quote for merchant payment."}
+      - {code: FLOAT_TRANSFER, name: FLOAT_TRANSFER, description: "Quote for float transfer."}
+
+  auditAction:
+    description: "Values of audit.events data.action written by transaction-service. Customer payment outcomes of P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT and FLOAT_TRANSFER are NOT audited here (their trail is txn.events chained by governance, OPEN D-05)."
+    values:
+      - {code: TRANSACTION_REVERSED, name: TRANSACTION_REVERSED, description: "Reversal completed; entityType Transaction, entityId = original txnId."}
+      - {code: REVERSAL_FAILED, name: REVERSAL_FAILED, description: "Reversal persisted FAILED; entityType Transaction, entityId = original txnId."}
+      - {code: REFUND_COMPLETED, name: REFUND_COMPLETED, description: "Merchant refund completed; entityType Transaction, entityId = original txnId."}
+      - {code: REFUND_FAILED, name: REFUND_FAILED, description: "Merchant refund persisted FAILED; entityType Transaction, entityId = original txnId."}
+      - {code: REFUND_REQUESTED, name: REFUND_REQUESTED, description: "Refund request created; entityType MerchantRefund, entityId = requestId."}
+      - {code: REFUND_APPROVED, name: REFUND_APPROVED, description: "Refund request level approved; entityType MerchantRefund."}
+      - {code: REFUND_REJECTED, name: REFUND_REJECTED, description: "Refund request rejected; entityType MerchantRefund."}
+      - {code: REFUND_EXPIRED, name: REFUND_EXPIRED, description: "Refund request expired; entityType MerchantRefund."}
+      - {code: FLOAT_HIERARCHY_OVERRIDE, name: FLOAT_HIERARCHY_OVERRIDE, description: "STAFF float transfer bypassing the hierarchy check; entityType Transaction, entityId = txnId."}
+      - {code: BENEFICIARY_CREATED, name: BENEFICIARY_CREATED, description: "Saved beneficiary created; entityType Beneficiary."}
+      - {code: BENEFICIARY_UPDATED, name: BENEFICIARY_UPDATED, description: "Saved beneficiary updated; entityType Beneficiary."}
+      - {code: BENEFICIARY_DELETED, name: BENEFICIARY_DELETED, description: "Saved beneficiary deleted; entityType Beneficiary."}
+      - {code: ANOMALY_RESOLVED, name: ANOMALY_RESOLVED, description: "Exception-queue item resolved by staff; entityType TxnAnomaly."}
+
+  anomalyKind:
+    description: "Kinds of items in the local exception queue (txn_anomaly), shown by GET /v1/internal/admin/anomalies."
+    values:
+      - {code: LATE_POST_DETECTED, name: LATE_POST_DETECTED, description: "Ledger shows a posting for an intent the sweeper marked FAILED LEDGER_NOT_POSTED."}
+      - {code: STUCK_INITIATED, name: STUCK_INITIATED, description: "Intent INITIATED for longer than stuckAlertAfter (5 min)."}
+      - {code: LEDGER_STATE_MISMATCH, name: LEDGER_STATE_MISMATCH, description: "Ledger answer inconsistent with local state (409 conflict, 400/403, INVALID_AMOUNT/OTHER, ALREADY_REVERSED for an original not REVERSED locally)."}
+
+problemReasons:
+  - code: VALIDATION_FAILED
+    reason: INVALID_CURSOR
+    operations:
+      - "GET /v1/transactions"
+      - "GET /v1/merchant-refund-requests"
+      - "GET /v1/approvals"
+      - "GET /v1/internal/admin/anomalies"
+    extensions: []
+
+problemExtensions:
+  - name: transaction
+    type: "object (PaymentResult, see openapi components.schemas.PaymentResult)"
+    when: "the request's payment intent was persisted: 422 money decisions (WALLET_NOT_TRANSACTABLE, LIMIT_EXCEEDED, RISK_*, SERVICE_DISABLED from risk, INSUFFICIENT_FUNDS, MAX_BALANCE_EXCEEDED), 409 STATE_CONFLICT from a ledger refusal, 503 DEPENDENCY_UNAVAILABLE after intent (status INITIATED). Absent on every refusal decided before persistence."
+    operations:
+      - "POST /v1/payments/p2p"
+      - "POST /v1/payments/cash-in"
+      - "POST /v1/payments/cash-out"
+      - "POST /v1/payments/merchant"
+      - "POST /v1/payments/merchant-refund"
+      - "POST /v1/payments/float-transfer"
+      - "POST /v1/internal/reversals"
+      - "POST /v1/approvals/{id}:approve"
+  - name: limitCode
+    type: string
+    when: "code = LIMIT_EXCEEDED. = limits-risk violatedLimit.limitCode, format <SCOPE>_<SEND|RECEIVE|ANY>_<DIMENSION>. Never null."
+  - name: limitParty
+    type: "enum{FROM, TO}"
+    when: "code = LIMIT_EXCEEDED. = violatedLimit.party. Never null."
+  - name: remainingPoisha
+    type: "int64 (poisha), nullable"
+    when: "code = LIMIT_EXCEEDED: violatedLimit.remainingValue when dimension is *_AMOUNT or MAX_BALANCE, else null. code = REFUND_EXCEEDS_ORIGINAL: refundable remainder of the original (original.amount - refunded - pending), never null, >= 0."
+  - name: remainingCount
+    type: "int32, nullable"
+    when: "code = LIMIT_EXCEEDED: violatedLimit.remainingValue when dimension is *_COUNT, else null."
+  - name: resetsAt
+    type: "timestamp, nullable"
+    when: "code = LIMIT_EXCEEDED: violatedLimit.resetsAt (null for per-transaction, TXN_ALLOWED and MAX_BALANCE dimensions)."
+  - name: walletId
+    type: uuid
+    when: "code = WALLET_NOT_TRANSACTABLE: the wallet whose status blocks the direction (or the ledger-rejected account). Never null."
+  - name: walletStatus
+    type: "string (wallet status NAME, e.g. DEBIT_BLOCKED, CLOSED)"
+    when: "code = WALLET_NOT_TRANSACTABLE. Status name, never the single-letter code. Ledger ACCOUNT_NOT_FOUND / ACCOUNT_CLOSED -> CLOSED."
+
+entityTypes:
+  - values: [MerchantRefund]
+
+reasonCodes:
+  - group: "Reversal"
+    description: "reasonCode of POST /v1/internal/reversals and of REVERSAL rows on txn.events. A value outside this list -> 400 VALIDATION_FAILED."
+    values: [WRONG_TRANSFER, DISPUTE_UPHELD, SYSTEM_ERROR, FRAUD_CONFIRMED]
+  - group: "Merchant refund"
+    description: "reasonCode of POST /v1/payments/merchant-refund and /v1/merchant-refund-requests, and of MERCHANT_REFUND rows on txn.events. Validated against the REASON_CODE projection once it is non-empty. Seed pending governance sign-off (OPEN D-32)."
+    values: [CUSTOMER_RETURN, DUPLICATE_PAYMENT, ORDER_CANCELLED, PRICE_ADJUSTMENT, OTHER]
+
+txnRefPrefixes:
+  - {prefix: PP, meaning: "P2P payment", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: CI, meaning: "Cash-in", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: CO, meaning: "Cash-out", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: MP, meaning: "Merchant payment", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: MR, meaning: "Merchant refund", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: FT, meaning: "Float transfer", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+  - {prefix: RV, meaning: "Reversal", format: "{prefix}{yyMMdd}00{8 Crockford base32}", length: 18}
+
+productCodes: [P2P, CASH_IN, CASH_OUT, MERCHANT_PAYMENT, MERCHANT_REFUND, FLOAT_TRANSFER, REVERSAL]
+
+metrics:
+  - {name: bitspay_transaction_requests_total, type: counter, labels: [txn_type, outcome, code]}
+  - {name: bitspay_transaction_step_seconds, type: histogram, labels: [step, txn_type]}
+  - {name: bitspay_transaction_end_to_end_seconds, type: histogram, labels: [txn_type]}
+  - {name: bitspay_transaction_idempotency_hits_total, type: counter, labels: [kind]}
+  - {name: bitspay_transaction_wallet_cache_miss_total, type: counter, labels: []}
+  - {name: bitspay_transaction_wallet_cache_corrupt_total, type: counter, labels: []}
+  - {name: bitspay_transaction_wallet_fallback_errors_total, type: counter, labels: []}
+  - {name: bitspay_transaction_ledger_unknown_total, type: counter, labels: [txn_type]}
+  - {name: bitspay_transaction_initiated_oldest_age_seconds, type: gauge, labels: [shard]}
+  - {name: bitspay_transaction_sweeper_resolved_total, type: counter, labels: [outcome]}
+  - {name: bitspay_transaction_late_post_detected_total, type: counter, labels: []}
+  - {name: bitspay_transaction_pricing_plans_loaded, type: gauge, labels: []}
+  - {name: bitspay_transaction_pricing_snapshot_age_seconds, type: gauge, labels: []}
+  - {name: bitspay_transaction_pricing_inconsistent_total, type: counter, labels: [plan_id]}
+  - {name: bitspay_transaction_reservation_release_failures_total, type: counter, labels: []}
+  - {name: bitspay_transaction_risk_contract_errors_total, type: counter, labels: [status]}
+  - {name: bitspay_transaction_purpose_unvalidated_total, type: counter, labels: []}
+  - {name: bitspay_transaction_quote_usage_unavailable_total, type: counter, labels: []}
+  - {name: bitspay_transaction_anomalies_open, type: gauge, labels: [kind]}

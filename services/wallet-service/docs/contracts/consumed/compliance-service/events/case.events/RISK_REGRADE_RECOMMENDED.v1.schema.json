@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/RISK_REGRADE_RECOMMENDED.v1.schema.json",
+  "title": "case.events RISK_REGRADE_RECOMMENDED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "subjectType": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER"
+      ]
+    },
+    "subjectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "customerId"
+    },
+    "currentGrade": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        null
+      ],
+      "description": "null if unknown"
+    },
+    "recommendedGrade": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ]
+    },
+    "caseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "AML_CASE_SUSPICIOUS",
+        "FRAUD_CONFIRMED",
+        "PERIODIC_REVIEW"
+      ],
+      "description": "codes.yaml reasonCodes `Risk regrade` (OPEN D-32)"
+    }
+  },
+  "required": [
+    "subjectType",
+    "subjectId",
+    "currentGrade",
+    "recommendedGrade",
+    "caseId",
+    "reasonCode"
+  ],
+  "additionalProperties": true
+}

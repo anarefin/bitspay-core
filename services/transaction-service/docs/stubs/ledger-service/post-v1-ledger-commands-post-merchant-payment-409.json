@@ -1,0 +1,34 @@
+{
+  "name": "POST /v1/ledger/commands/post-merchant-payment → 409",
+  "priority": 9,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/ledger/commands/post\\-merchant\\-payment(\\?.*)?$",
+    "headers": {
+      "X-Stub-Scenario": {
+        "equalTo": "409"
+      }
+    }
+  },
+  "response": {
+    "status": 409,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "jsonBody": {
+      "type": "about:blank",
+      "title": "Idempotency conflict",
+      "status": 409,
+      "code": "IDEMPOTENCY_CONFLICT",
+      "detail": null,
+      "instance": "/v1/ledger/commands/post-p2p",
+      "correlationId": "c-0f3e9a",
+      "reason": null
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "ledger-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

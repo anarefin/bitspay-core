@@ -1,0 +1,649 @@
+# treasury-service owned codes (CONTRACT-MODEL §4). SPEC.md §5.3 mirrors this file.
+service: treasury-service
+contractVersion: 1.0.0
+codeSets:
+  trustAccountStatus:
+    description: Trust account status
+    values:
+    - code: PENDING_APPROVAL
+    - code: PENDING_LEDGER
+    - code: ACTIVE
+    - code: INACTIVE
+    - code: REJECTED
+    - code: EXPIRED
+  confirmationStatus:
+    description: Trust balance confirmation status
+    values:
+    - code: PENDING_APPROVAL
+    - code: CONFIRMED
+    - code: REJECTED
+    - code: EXPIRED
+  confirmationSource:
+    description: '`TRUST_BALANCE_CONFIRMED.source` (closed)'
+    values:
+    - code: MANUAL
+    - code: CSV
+    - code: MT940
+    - code: CAMT053
+  balanceKind:
+    description: '`TRUST_BALANCE_CONFIRMED.balanceKind`'
+    values:
+    - code: CLOSING
+    - code: INTRADAY
+  issuanceStatus:
+    description: E-money issuance status (also trust rebalance)
+    values:
+    - code: PENDING_APPROVAL
+    - code: APPROVED
+    - code: POSTING
+    - code: POSTING_UNKNOWN
+    - code: POSTED
+    - code: CONTROL_FAILED
+    - code: REJECTED_BY_LEDGER
+    - code: REJECTED
+    - code: EXPIRED
+    - code: CANCELLED
+  redemptionStatus:
+    description: E-money redemption status
+    values:
+    - code: PENDING_APPROVAL
+    - code: APPROVED
+    - code: POSTING
+    - code: POSTING_UNKNOWN
+    - code: POSTED
+    - code: PAID_OUT
+    - code: REJECTED_BY_LEDGER
+    - code: REJECTED
+    - code: EXPIRED
+    - code: CANCELLED
+  manualJournalStatus:
+    description: Manual journal status
+    values:
+    - code: PENDING_APPROVAL
+    - code: APPROVED
+    - code: POSTING
+    - code: POSTING_UNKNOWN
+    - code: POSTED
+    - code: REJECTED_BY_LEDGER
+    - code: REJECTED
+    - code: EXPIRED
+    - code: CANCELLED
+  issuanceDestinationType:
+    description: '`EMONEY_ISSUED.destinationType`'
+    values:
+    - code: WALLET
+    - code: CAMPAIGN_FUNDING
+  issuanceDestinationWalletType:
+    description: '`EMONEY_ISSUED.destinationWalletType` (wallet type codes)'
+    values:
+    - code: A
+    - code: D
+    - code: I
+  redemptionSourceType:
+    description: '`EMONEY_REDEEMED.sourceType`'
+    values:
+    - code: WALLET
+    - code: SYSTEM_ACCOUNT
+  redemptionSourceAccountType:
+    description: '`EMONEY_REDEEMED.sourceAccountType` (ledger account-type names)'
+    values:
+    - code: AGENT_WALLET
+    - code: DISTRIBUTOR_WALLET
+    - code: MERCHANT_WALLET
+    - code: INSTITUTION_WALLET
+    - code: FEE_INCOME
+    - code: VAT_PAYABLE
+    - code: AIT_PAYABLE
+    - code: CAMPAIGN_FUNDING
+  journalAccountType:
+    description: Manual-journal account types (`MANUAL_JOURNAL_POSTED.debitAccountType/creditAccountType`)
+    values:
+    - code: FEE_INCOME
+    - code: VAT_PAYABLE
+    - code: COMMISSION_PAYABLE
+    - code: AIT_PAYABLE
+    - code: CAMPAIGN_FUNDING
+    - code: SUSPENSE
+    - code: ADJUSTMENT_CLEARING
+  floatRequestStatus:
+    description: '`FLOAT_REQUEST_UPDATED.status` / `previousStatus`'
+    values:
+    - code: REQUESTED
+    - code: APPROVED
+    - code: EXECUTING
+    - code: AWAITING_ISSUANCE
+    - code: AWAITING_REDEMPTION
+    - code: COMPLETED
+    - code: FAILED
+    - code: REJECTED
+    - code: CANCELLED
+    - code: EXPIRED
+    - code: STUCK
+  floatDirection:
+    description: '`FLOAT_REQUEST_UPDATED.direction`'
+    values:
+    - code: TOP_UP
+    - code: RETURN
+  floatCounterparty:
+    description: '`FLOAT_REQUEST_UPDATED.counterparty` (LIQUIDITY_POINT reserved, OPEN D-28)'
+    values:
+    - code: PARENT
+    - code: OPERATOR
+    - code: BANK
+    - code: LIQUIDITY_POINT
+  floatFailureCode:
+    description: '`FLOAT_REQUEST_UPDATED.failureCode` — open vocabulary `^[A-Z][A-Z0-9_]*$`; float-transfer problem `code` values pass through
+      unchanged'
+    values:
+    - code: ISSUANCE_CONTROL_FAILED
+    - code: ISSUANCE_REJECTED_BY_LEDGER
+    - code: ISSUANCE_REJECTED
+    - code: ISSUANCE_EXPIRED
+    - code: ISSUANCE_CANCELLED
+    - code: REDEMPTION_REJECTED_BY_LEDGER
+    - code: REDEMPTION_REJECTED
+    - code: REDEMPTION_EXPIRED
+    - code: REDEMPTION_CANCELLED
+    - code: EXECUTION_STUCK
+  thresholdType:
+    description: '`LIQUIDITY_THRESHOLD_BREACHED.thresholdType`'
+    values:
+    - code: LOW
+    - code: HIGH
+    - code: STOCK_OUT
+  thresholdState:
+    description: Float position threshold state
+    values:
+    - code: NORMAL
+    - code: LOW
+    - code: HIGH
+  thresholdScope:
+    description: 'Liquidity threshold rule scope (most specific wins: WALLET > TYPE_SUBTYPE_CATEGORY > TYPE_SUBTYPE > TYPE)'
+    values:
+    - code: WALLET
+    - code: TYPE_SUBTYPE_CATEGORY
+    - code: TYPE_SUBTYPE
+    - code: TYPE
+  approvalAction:
+    description: '`approval.events.action` values sent by treasury'
+    values:
+    - code: CREATE
+    - code: DEACTIVATE
+    - code: CONFIRM
+    - code: ISSUE
+    - code: REDEEM
+    - code: REBALANCE
+    - code: POST
+    - code: UPSERT
+    - code: RETIRE
+    - code: RECORD
+  controlFailReason:
+    description: Hard-control failure reasons (`controlSnapshot.failReason`)
+    values:
+    - code: EXCEEDS_CONFIRMED
+    - code: CONFIRMATION_STALE
+    - code: NO_CONFIRMATION
+    - code: DESTINATION_NOT_CREDITABLE
+    - code: TRUST_INACTIVE
+problemReasons:
+- code: STATE_CONFLICT
+  reason: ACCOUNT_NO_EXISTS
+  description: bank account number already registered
+  operations:
+  - POST /v1/treasury/trust-accounts
+  extensions: []
+- code: STATE_CONFLICT
+  reason: BANK_REFERENCE_USED
+  description: bank reference already used by a live entity on the trust account
+  operations:
+  - POST /v1/treasury/emoney-issuances
+  - POST /v1/treasury/trust-rebalances
+  extensions: []
+- code: STATE_CONFLICT
+  reason: FLOAT_PAIR_NOT_ALLOWED
+  description: (requester, counterparty) pair not in float.allowed-pairs
+  operations:
+  - POST /v1/float-requests
+  extensions: []
+- code: STATE_CONFLICT
+  reason: FLOAT_REQUEST_MISMATCH
+  description: linked float request not in the expected status or amount differs
+  operations:
+  - POST /v1/treasury/emoney-issuances
+  extensions: []
+- code: STATE_CONFLICT
+  reason: NO_PARENT
+  description: requester has no parent partner
+  operations:
+  - POST /v1/float-requests
+  extensions: []
+- code: STATE_CONFLICT
+  reason: PARENT_NOT_ACTIVE
+  description: parent / counterparty partner not ACTIVE
+  operations:
+  - POST /v1/float-requests
+  extensions: []
+- code: STATE_CONFLICT
+  reason: PENDING_APPROVAL_EXISTS
+  description: an approval for the same entity and action is already pending
+  operations:
+  - POST /v1/liquidity/thresholds
+  - POST /v1/liquidity/thresholds/{id}:retire
+  - POST /v1/treasury/trust-accounts/{id}:deactivate
+  - PUT /v1/treasury/trust-accounts/{id}/interest/{month}
+  extensions: []
+- code: STATE_CONFLICT
+  reason: POSTING_UNKNOWN_PENDING
+  description: a posting on the same trust account has an unresolved outcome
+  operations:
+  - POST /v1/approvals/{id}:approve
+  extensions: []
+- code: STATE_CONFLICT
+  reason: STATEMENT_DUPLICATE
+  description: same statement file already uploaded for the trust account
+  operations:
+  - POST /v1/treasury/trust-statements
+  extensions: []
+- code: STATE_CONFLICT
+  reason: TOO_MANY_OPEN_REQUESTS
+  description: requester already has float.max-open-per-requester open requests
+  operations:
+  - POST /v1/float-requests
+  extensions: []
+- code: STATE_CONFLICT
+  reason: TRUST_INACTIVE
+  description: trust account not ACTIVE
+  operations:
+  - POST /v1/treasury/emoney-issuances
+  - POST /v1/treasury/emoney-redemptions
+  - POST /v1/treasury/trust-balance-confirmations
+  - POST /v1/treasury/trust-rebalances
+  - POST /v1/treasury/trust-statements
+  extensions: []
+- code: STATE_CONFLICT
+  reason: TRUST_INDEX_TAKEN
+  description: trust index already used by another trust account
+  operations:
+  - POST /v1/treasury/trust-accounts
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: ACCOUNT_MISMATCH
+  description: account number in the statement ≠ the trust account
+  operations:
+  - POST /v1/treasury/trust-statements
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: BANK_NOT_ELIGIBLE
+  description: bank code unknown, inactive or not trustEligible
+  operations:
+  - POST /v1/treasury/trust-accounts
+  extensions: []
+- code: VALIDATION_FAILED
+  reason: STATEMENT_INVALID
+  description: statement file unparseable, > 2 decimals or debit closing balance
+  operations:
+  - POST /v1/treasury/trust-statements
+  extensions: []
+problemExtensions: []
+entityTypes:
+- module: null
+  values:
+  - TrustAccount
+  - TrustBalanceConfirmation
+  - EmoneyIssuance
+  - EmoneyRedemption
+  - TrustRebalance
+  - ManualJournal
+  - LiquidityThreshold
+  - TrustInterest
+  actions:
+    TrustAccount:
+    - CREATE
+    - DEACTIVATE
+    TrustBalanceConfirmation:
+    - CONFIRM
+    EmoneyIssuance:
+    - ISSUE
+    EmoneyRedemption:
+    - REDEEM
+    TrustRebalance:
+    - REBALANCE
+    ManualJournal:
+    - POST
+    LiquidityThreshold:
+    - UPSERT
+    - RETIRE
+    TrustInterest:
+    - RECORD
+  checkerRoles:
+    TrustAccount: FIN_CHECKER
+    TrustBalanceConfirmation: FIN_CHECKER
+    EmoneyIssuance: FIN_CHECKER
+    EmoneyRedemption: FIN_CHECKER
+    TrustRebalance: FIN_CHECKER
+    ManualJournal: FIN_CHECKER (level 2 may be configured to ADMIN)
+    LiquidityThreshold: OPS_CHECKER
+    TrustInterest: FIN_CHECKER
+notificationTemplates:
+- code: FLOAT_LOW_BALANCE
+  category: SERVICE
+  trigger: LIQUIDITY_THRESHOLD_BREACHED LOW
+  recipient: partner walletId; parent walletId; each configured liquidity ops staffUserId
+  variables:
+  - name: partnerName
+    type: TEXT
+    req: true
+    notes: ''
+  - name: availablePoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: thresholdPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: detectedAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: FLOAT_HIGH_BALANCE
+  category: SERVICE
+  trigger: threshold breach HIGH
+  recipient: same as FLOAT_LOW_BALANCE
+  variables:
+  - name: partnerName
+    type: TEXT
+    req: true
+    notes: ''
+  - name: availablePoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: thresholdPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: detectedAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: FLOAT_STOCK_OUT
+  category: SERVICE
+  trigger: threshold breach STOCK_OUT
+  recipient: same as FLOAT_LOW_BALANCE
+  variables:
+  - name: partnerName
+    type: TEXT
+    req: true
+    notes: ''
+  - name: availablePoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: thresholdPoisha
+    type: MONEY
+    req: true
+    notes: = stock-out threshold
+  - name: detectedAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: FLOAT_REQUEST_RECEIVED
+  category: SERVICE
+  trigger: float request created
+  recipient: counterparty walletId; OPERATOR/BANK approver → recipient.role = OPS_CHECKER
+  variables:
+  - name: requesterName
+    type: TEXT
+    req: true
+    notes: ''
+  - name: direction
+    type: TEXT
+    req: true
+    notes: enum{TOP_UP,RETURN}
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: FLOAT_REQUEST_DECIDED
+  category: SERVICE
+  trigger: float request approved / rejected / completed
+  recipient: requester walletId
+  variables:
+  - name: status
+    type: TEXT
+    req: true
+    notes: enum{APPROVED,REJECTED,COMPLETED}
+  - name: direction
+    type: TEXT
+    req: true
+    notes: ''
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: reason
+    type: TEXT
+    req: false
+    notes: ''
+  - name: txnRef
+    type: TEXT
+    req: false
+    notes: FT… when executed
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: ''
+- code: FLOAT_REQUEST_FAILED
+  category: SERVICE
+  trigger: float request failed / stuck / expired
+  recipient: requester walletId; STUCK → recipient.role = OPS_CHECKER
+  variables:
+  - name: status
+    type: TEXT
+    req: true
+    notes: enum{FAILED,STUCK,EXPIRED}
+  - name: direction
+    type: TEXT
+    req: true
+    notes: ''
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: failureCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: requestId
+    type: TEXT
+    req: true
+    notes: ''
+- code: EMONEY_ISSUED_PARTNER
+  category: SERVICE
+  trigger: e-money issuance posted to a partner wallet
+  recipient: destination walletId
+  variables:
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: EI…
+  - name: postedAt
+    type: DATETIME
+    req: true
+    notes: ''
+- code: TRUST_CONFIRMATION_STALE
+  category: INTERNAL
+  trigger: latest trust-balance confirmation older than the staleness window (OPEN D-39)
+  recipient: recipient.role FIN_MAKER and FIN_CHECKER (one request per role)
+  variables:
+  - name: bankCode
+    type: TEXT
+    req: true
+    notes: BANK code
+  - name: trustIndex
+    type: INT
+    req: true
+    notes: 01..99
+  - name: lastConfirmedAt
+    type: DATETIME
+    req: false
+    notes: ''
+  - name: ageHours
+    type: INT
+    req: true
+    notes: ''
+- code: HARD_CONTROL_FAILED
+  category: INTERNAL
+  trigger: issuance hard control failed
+  recipient: recipient.role FIN_MAKER and FIN_CHECKER
+  variables:
+  - name: txnRef
+    type: TEXT
+    req: true
+    notes: ''
+  - name: bankCode
+    type: TEXT
+    req: true
+    notes: ''
+  - name: amountPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: mirrorPoisha
+    type: MONEY
+    req: true
+    notes: ''
+  - name: confirmedPoisha
+    type: MONEY
+    req: false
+    notes: ''
+  - name: reason
+    type: TEXT
+    req: true
+    notes: ''
+- code: APPROVAL_PENDING_AGEING
+  category: INTERNAL
+  trigger: treasury approval pending beyond ageing threshold
+  recipient: recipient.role = each of the approval's checkerRoles
+  variables:
+  - name: approvalId
+    type: TEXT
+    req: true
+    notes: uuid text
+  - name: entityType
+    type: TEXT
+    req: true
+    notes: registered entityType
+  - name: summary
+    type: TEXT
+    req: true
+    notes: ''
+  - name: ageHours
+    type: INT
+    req: true
+    notes: ''
+  - name: expiresAt
+    type: DATETIME
+    req: true
+    notes: ''
+reasonCodes:
+- group: E-money redemption
+  note: OPEN D-32 (seed pending governance sign-off); CLOSURE_PAYOUT only for a source wallet in Q
+  values:
+  - FLOAT_RETURN_TO_BANK
+  - MERCHANT_SETTLEMENT
+  - REVENUE_SWEEP
+  - VAT_REMITTANCE
+  - AIT_REMITTANCE
+  - CAMPAIGN_FUNDING_RETURN
+  - CLOSURE_PAYOUT
+  - OTHER
+- group: Manual journal
+  note: OPEN D-32; OTHER requires narrative ≥ 20 chars
+  values:
+  - FEE_CORRECTION
+  - VAT_RECLASS
+  - SUSPENSE_CLEARING
+  - COMMISSION_FUNDING
+  - CAMPAIGN_FUNDING_TRANSFER
+  - OTHER
+txnRefPrefixes:
+- prefix: EI
+  meaning: e-money issuance (ledger command post-emoney-issue)
+  format: '{prefix}{yyMMdd}{10 Crockford base32}'
+  length: 18
+- prefix: ER
+  meaning: e-money redemption (ledger command post-emoney-redeem)
+  format: '{prefix}{yyMMdd}{10 Crockford base32}'
+  length: 18
+- prefix: TR
+  meaning: trust rebalance (ledger command post-trust-rebalance)
+  format: '{prefix}{yyMMdd}{10 Crockford base32}'
+  length: 18
+- prefix: MJ
+  meaning: manual journal (ledger command post-adjustment)
+  format: '{prefix}{yyMMdd}{10 Crockford base32}'
+  length: 18
+productCodes: []
+metrics:
+- name: bitspay_treasury_issuance_total
+  type: counter
+  labels:
+  - status
+- name: bitspay_treasury_issued_poisha_total
+  type: counter
+  labels: []
+- name: bitspay_treasury_redeemed_poisha_total
+  type: counter
+  labels: []
+- name: bitspay_treasury_hard_control_failed_total
+  type: counter
+  labels:
+  - reason
+- name: bitspay_treasury_posting_unknown
+  type: gauge
+  labels:
+  - entity
+- name: bitspay_treasury_trust_headroom_poisha
+  type: gauge
+  labels:
+  - trust
+- name: bitspay_treasury_confirmation_age_hours
+  type: gauge
+  labels:
+  - trust
+- name: bitspay_treasury_float_requests_total
+  type: counter
+  labels:
+  - status
+- name: bitspay_treasury_liquidity_low_wallets
+  type: gauge
+  labels:
+  - state
+- name: bitspay_treasury_position_drift_total
+  type: counter
+  labels: []
+- name: bitspay_treasury_ledger_changes_lag_ms
+  type: gauge
+  labels: []
+- name: bitspay_treasury_approvals_pending
+  type: gauge
+  labels:
+  - entity
+- name: bitspay_treasury_snapshot_inconsistent_total
+  type: counter
+  labels:
+  - trust

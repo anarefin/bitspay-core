@@ -1,0 +1,25 @@
+{
+  "name": "GET /v1/wallets/lookup → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/wallets/lookup(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "walletId": "0192f2bb-4d5f-7c62-9b3e-6f1a4dac8b12",
+      "displayNameMasked": "Karim A***",
+      "walletType": "C",
+      "status": "A"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

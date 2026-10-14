@@ -1,0 +1,367 @@
+# compliance-service — contract manifest (CONTRACT-MODEL §3)
+service: compliance-service
+number: "11"
+modules: []
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-5
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # 74 operations. Every operation carries x-audience (staff | customer) and x-actors.
+      # Shared maker-checker endpoints (kernel K5): GET /v1/approvals, POST /v1/approvals/{id}:approve|:reject.
+  events:
+    - topic: case.events
+      key: "subjectId (SCREENING_COMPLETED, SCREENING_DECIDED, RISK_REGRADE_RECOMMENDED) · caseId (CASE_OPENED, CASE_CLOSED, REVERSAL_RECOMMENDED) · walletId (FREEZE_APPLIED, FREEZE_LIFTED)"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 6}
+      retention: 7d
+      transport: outbox
+      eventTypes:
+        - {type: SCREENING_COMPLETED, version: 1, aggregateType: Screening, schema: provided/events/case.events/SCREENING_COMPLETED.v1.schema.json}
+        - {type: SCREENING_DECIDED, version: 1, aggregateType: Screening, schema: provided/events/case.events/SCREENING_DECIDED.v1.schema.json}
+        - {type: CASE_OPENED, version: 1, aggregateType: Case, schema: provided/events/case.events/CASE_OPENED.v1.schema.json}
+        - {type: CASE_CLOSED, version: 1, aggregateType: Case, schema: provided/events/case.events/CASE_CLOSED.v1.schema.json}
+        - {type: FREEZE_APPLIED, version: 1, aggregateType: Freeze, schema: provided/events/case.events/FREEZE_APPLIED.v1.schema.json}
+        - {type: FREEZE_LIFTED, version: 1, aggregateType: Freeze, schema: provided/events/case.events/FREEZE_LIFTED.v1.schema.json}
+        - {type: RISK_REGRADE_RECOMMENDED, version: 1, aggregateType: RiskRegrade, schema: provided/events/case.events/RISK_REGRADE_RECOMMENDED.v1.schema.json}
+        - {type: REVERSAL_RECOMMENDED, version: 1, aggregateType: ReversalRecommendation, schema: provided/events/case.events/REVERSAL_RECOMMENDED.v1.schema.json}
+  inboundTopics: []
+  data: []
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    # ---------------- ledger-service ----------------
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/create-hold"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "LIEN freezes (AML_LIEN hold, ledger command type 14); attempt-derived commandId"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.accountId", "req.amountPoisha", "req.reasonCode",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed:
+        - {set: commandResult, values: [OK, EXISTS, REJECTED]}
+        - {set: rejectionCode, values: [INSUFFICIENT_FUNDS, ACCOUNT_NOT_FOUND, ACCOUNT_CLOSED, OTHER]}
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, retry: "503/timeout: same commandId and body, backoff 30 s -> 15 min, <= 20; REJECTED INSUFFICIENT_FUNDS: re-read balance, next attempt (<= 3)", onFailure: "freeze stays REQUESTED; FAILED after freeze.fail-after + FREEZE_FAILED staff notification"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/release-hold"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "lift of a LIEN freeze (ledger command type 15)"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.holdCommandId", "res.commandId", "res.result", "res.rejectionCode", "res.postedAt"]
+      codesUsed:
+        - {set: commandResult, values: [OK, EXISTS, REJECTED]}
+        - {set: rejectionCode, values: [HOLD_NOT_FOUND]}
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, retry: "503/timeout: same commandId and body", onFailure: "freeze stays LIFT_REQUESTED and is retried"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/commands/{commandId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "resolve an unknown create-hold / release-hold outcome before retrying a step whose first try is older than 24 h (kernel K3.3 rule 4)"
+      fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode"]
+      codesUsed:
+        - {set: rejectionCode, values: "*"}
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "step not retried until resolved"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "lien sizing: held = min(requested, available)"
+      fieldsUsed: ["path.id", "res.availableBalancePoisha", "res.closed"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "action stays APPROVED and is retried"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/holds"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "case view of open holds on the subject wallet"
+      fieldsUsed: ["query.accountId", "res.items[].holdCommandId", "res.items[].amountPoisha", "res.items[].reasonCode",
+                   "res.items[].createdBy", "res.items[].createdAt", "res.totalHeldPoisha"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "case view returned with holds = null"}
+    # ---------------- wallet-service (wallet module) ----------------
+    - producer: wallet-service
+      operation: "POST /v1/wallets/{walletId}/status-changes"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "apply (BLOCKED / DEBIT_BLOCKED) and lift (ACTIVE, same reasonCode + reference) compliance freezes; HTTP 200 APPLIED|NOOP is the confirmation"
+      fieldsUsed: ["path.walletId", "header.Idempotency-Key", "req.targetStatus", "req.reasonCode", "req.reference", "req.comment",
+                   "res.changeRequestId", "res.walletId", "res.outcome", "res.approvalId", "res.walletStatus", "res.walletVersion"]
+      codesUsed:
+        - {set: walletStatus, values: "*"}
+        - {set: statusChangeOutcome, values: [APPLIED, PENDING_APPROVAL, NOOP]}
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, retry: "503/timeout: same Idempotency-Key and body until freeze.fail-after (2 h)", onFailure: "202, 400, 403, 404, 409 -> freeze FAILED + FREEZE_FAILED staff notification"}
+    - producer: wallet-service
+      operation: "POST /v1/wallets/{walletId}/flags"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "AML_WATCH (bit 1) and HAS_OPEN_LIEN (bit 8) held by compliance-service"
+      fieldsUsed: ["path.walletId", "req.set", "req.clear", "req.reasonCode", "res.flags"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, retry: "idempotent bitmask; retried", onFailure: "action stays EXECUTING and is retried"}
+    - producer: wallet-service
+      operation: "GET /v1/wallets/{walletId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "case / STR enrichment and projection miss"
+      fieldsUsed: ["path.walletId", "res.walletId", "res.ownerType", "res.ownerId", "res.walletType", "res.status", "res.statusReasonCode",
+                   "res.msisdn", "res.displayName", "res.kycTier", "res.flags", "res.version", "res.createdAt"]
+      codesUsed:
+        - {set: walletStatus, values: "*"}
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "use wallet_projection"}
+    - producer: wallet-service
+      operation: "GET /v1/customers/{customerId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "STR party details and EDD; forwards the acting officer's X-Actor-Roles and X-Actor-User-Id (masking per those roles, OPEN D-20)"
+      fieldsUsed: ["path.customerId", "header.X-Actor-Roles", "header.X-Actor-User-Id",
+                   "res.customerId", "res.status", "res.msisdn", "res.email", "res.nameEn", "res.nameBn", "res.nidMasked", "res.dob", "res.gender",
+                   "res.occupation", "res.incomeBand", "res.sourceOfFunds", "res.purposeOfAccount", "res.presentAddress", "res.language",
+                   "res.kycTier", "res.kycStatus", "res.riskGrade", "res.eddRequired", "res.screeningStatus", "res.wallets[].walletId",
+                   "res.wallets[].walletType", "res.wallets[].status", "res.registrationChannel", "res.createdAt"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "STR draft built from projections; missing fields listed in validation_report"}
+    # ---------------- wallet-service (partner module) ----------------
+    - producer: wallet-service
+      operation: "POST /v1/partners/{partnerId}/status-changes"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "SUSPEND_PARTNER action and sanctions auto-freeze of a PARTNER subject (targetStatus SUSPENDED only)"
+      fieldsUsed: ["path.partnerId", "header.Idempotency-Key", "req.targetStatus", "req.reasonCode", "req.comment", "res.partnerId", "res.status", "res.version"]
+      codesUsed:
+        - {set: partnerStatus, values: [SUSPENDED]}
+      resilience: {timeoutMs: 2000, connectTimeoutMs: 300, circuitBreaker: true, retry: "503/timeout: same Idempotency-Key and body", onFailure: "403/404/409 -> action FAILED + staff alert"}
+    # ---------------- limits-risk-service ----------------
+    - producer: limits-risk-service
+      operation: "POST /v1/blacklist/entries"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "PROPOSE_BLACKLIST case action (source COMPLIANCE_CASE, hash only); maker-checked in limits-risk"
+      fieldsUsed: ["header.Idempotency-Key", "req.type", "req.valueHash", "req.valueMasked", "req.reasonCode", "req.expiresAt", "req.comment",
+                   "req.source", "req.reference", "res.entryId", "res.status", "res.approvalId", "res.valueMasked", "problem.entryId"]
+      codesUsed:
+        - {set: blacklistType, values: [NID, MSISDN, WALLET, DEVICE]}
+        - {set: "reason:Blacklist entry", values: [FRAUD_CONFIRMED, AML_SUSPICION, SANCTIONS]}
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, retry: "503/timeout: same Idempotency-Key and body", onFailure: "409 STATE_CONFLICT -> action DONE (existing entryId); 400/403 -> action FAILED"}
+    # ---------------- admin-service (governance module) ----------------
+    - producer: admin-service
+      operation: "GET /v1/refdata/{type}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "bootstrap GEO and SYSTEM_PARAM items before refdata.events has been read"
+      fieldsUsed: ["path.type", "query.cursor", "query.limit", "res.items[].type", "res.items[].code", "res.items[].parentCode",
+                   "res.items[].nameEn", "res.items[].nameBn", "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
+      codesUsed:
+        - {set: refdataType, values: [GEO, SYSTEM_PARAM]}
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "local defaults (CUTOFF.EOD 00:00; GEO names shown as codes)"}
+    - producer: admin-service
+      operation: "GET /v1/retention/legal-holds"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "(R2) checked before any purge of an AML case or its documents; skip while an ACTIVE hold exists"
+      fieldsUsed: ["query.subjectType", "query.subjectId", "query.category", "res.items[].holdId", "res.items[].category", "res.items[].subjectType",
+                   "res.items[].subjectId", "res.items[].status", "res.items[].placedAt"]
+      codesUsed:
+        - {set: retentionCategory, values: [AML_CASE]}
+      resilience: {timeoutMs: 1000, connectTimeoutMs: 300, circuitBreaker: true, onFailure: "purge skipped for the run"}
+
+  events:
+    # ---------------- wallet-service: customer.events ----------------
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_SUBMITTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "upsert CUSTOMER subject from the submitted values; onboarding screening; answer with SCREENING_COMPLETED (sourceEventId = envelope eventId)"
+      fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
+                   "district", "upazila", "gender", "submissionId", "targetTier"]
+      codesUsed:
+        - {set: riskGrade, values: [HIGH]}
+    - producer: wallet-service
+      topic: customer.events
+      eventType: CUSTOMER_REGISTERED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "upsert CUSTOMER subject"
+      fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
+                   "district", "upazila", "gender"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: CUSTOMER_PROFILE_UPDATED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "upsert subject; name/DOB change of an active customer -> PROFILE_CHANGE screening"
+      fieldsUsed: ["customerId", "walletIds", "msisdn", "nameEn", "nameBn", "nidHash", "dob", "kycTier", "riskGrade", "occupation", "incomeBand",
+                   "district", "upazila", "gender"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_APPROVED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "subject KYC status, tier and review baseline (R2 review schedule)"
+      fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_REJECTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "subject KYC status"
+      fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: KYC_TIER_CHANGED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "subject tier"
+      fieldsUsed: ["customerId", "kycTier", "riskGrade", "kycExpiryDate", "submissionId"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: customer.events
+      eventType: RISK_GRADE_CHANGED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "subject grade; HIGH -> EDD case if none open; review schedule (R2)"
+      fieldsUsed: ["customerId", "riskGrade", "reasonCode"]
+      codesUsed:
+        - {set: riskGrade, values: [LOW, MEDIUM, HIGH]}
+    # ---------------- wallet-service (partner module): partner.events ----------------
+    - producer: wallet-service
+      topic: partner.events
+      eventType: PARTNER_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "PARTNER + key-person subjects; screen every new version in PENDING_SCREENING (legalName, displayName, key persons) -> partner-level SCREENING_COMPLETED"
+      fieldsUsed: ["partnerId", "partnerType", "status", "displayName", "legalName", "msisdn", "walletId", "territory.district", "riskGrade",
+                   "keyPersons[].personId", "keyPersons[].role", "keyPersons[].nameEn", "keyPersons[].nameBn", "keyPersons[].nidHash",
+                   "keyPersons[].dob", "version"]
+      codesUsed:
+        - {set: partnerStatus, values: [PENDING_SCREENING]}
+    # ---------------- wallet-service: wallet.events ----------------
+    - producer: wallet-service
+      topic: wallet.events
+      eventType: WALLET_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "wallet_projection (subject resolution, status_before, reactivation date for AML-SC-07); never a freeze confirmation"
+      fieldsUsed: ["walletId", "version", "ownerType", "ownerId", "walletType", "msisdn", "status", "previousStatus", "statusReasonCode",
+                   "kycTier", "categoryCode", "flags", "displayName", "createdAt"]
+      codesUsed:
+        - {set: walletStatus, values: "*"}
+    # ---------------- transaction-service: txn.events ----------------
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_COMPLETED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service.txn-ingest
+      purpose: "monitoring detail (aml_txn) + daily rollups; batched, idempotent by ON CONFLICT DO NOTHING (no inbox)"
+      fieldsUsed: ["txnId", "txnRef", "txnType", "channel", "completedAt", "fromWalletId", "fromWalletType", "toWalletId", "toWalletType",
+                   "amountPoisha", "feePoisha", "deviceId", "riskDecision", "originalTxnRef"]
+      codesUsed:
+        - {set: txnType, values: "*"}
+    - producer: transaction-service
+      topic: txn.events
+      eventType: TRANSACTION_REVERSED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service.txn-ingest
+      purpose: "mark the original aml_txn row reversed (correlate by txnId/txnRef, never originalTxnRef)"
+      fieldsUsed: ["txnId", "txnRef", "completedAt", "reversalTxnRef", "reversedAmountPoisha"]
+      codesUsed: []
+    # ---------------- limits-risk-service ----------------
+    - producer: limits-risk-service
+      topic: risk.alerts
+      eventType: RISK_ALERT_RAISED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "FRAUD alert (dedupe RISK:<alertId>) -> case grouping"
+      fieldsUsed: ["alertId", "txnId", "walletId", "decision", "ruleIds", "riskScore", "details.txnType", "details.channel", "details.amountPoisha",
+                   "details.deviceId", "details.counterpartyWalletId", "details.blacklistHits[].type", "details.blacklistHits[].party",
+                   "details.blacklistHits[].entryId", "details.evaluatedAt"]
+      codesUsed:
+        - {set: riskDecision, values: [ALLOW_AND_ALERT, STEP_UP, HOLD, BLOCK, LIMIT_EXCEEDED]}
+        - {set: limitParty, values: [FROM, TO]}
+    - producer: limits-risk-service
+      topic: blacklist.events
+      eventType: BLACKLIST_ENTRY_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "internal_blacklist (NID, MSISDN only); newly active entry -> RESCREEN of matching subjects"
+      fieldsUsed: ["entryId", "type", "valueHash", "active", "expiresAt", "reasonCode"]
+      codesUsed:
+        - {set: blacklistType, values: [NID, MSISDN]}
+    # ---------------- admin-service: refdata.events ----------------
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: compliance-service
+      purpose: "GEO names (MIS), CUTOFF.EOD (business date), RETENTION.AML_CASE (R2 purge); other types/codes ignored"
+      fieldsUsed: ["type", "code", "parentCode", "nameEn", "nameBn", "attributes", "version", "active"]
+      codesUsed:
+        - {set: refdataType, values: [GEO, SYSTEM_PARAM]}
+
+  inboundTopics:
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: [CASE_ASSIGNED, CASE_SLA_WARNING, CASE_SLA_BREACHED, CASE_UNASSIGNED, SANCTIONS_AUTO_FREEZE, FREEZE_FAILED, WALLET_RESTRICTED_NOTICE]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_EXPIRED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: audit.events
+      eventType: AUDIT_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+
+  data: []
+
+  codes:
+    - {producer: admin-service, set: refdataType, values: [GEO, SYSTEM_PARAM]}
+
+  refdata:
+    - {type: GEO, codes: "*"}
+    - {type: SYSTEM_PARAM, codes: ["CUTOFF.EOD", "RETENTION.AML_CASE"]}
+
+# Not consumed in R1 (recorded, not pinned): disbursement.events BATCH_ROW_PAID and campaign.events REWARD_GRANTED
+# for AML monitoring / CTR — OPEN D-25 (SPEC §13).

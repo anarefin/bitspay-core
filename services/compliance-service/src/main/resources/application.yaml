@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: compliance-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bitspay?currentSchema=svc_compliance
+    username: svc_compliance
+    password: ${PG_SERVICE_PASSWORD:local-dev-only}
+    hikari:
+      maximum-pool-size: 8
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks entities against it
+    properties:
+      hibernate:
+        default_schema: svc_compliance
+  flyway:
+    schemas: svc_compliance
+    default-schema: svc_compliance
+    create-schemas: false
+    # the stack pre-creates svc_<name>.outbox (docker/postgres/init), so baseline an existing schema at 0
+    baseline-on-migrate: true
+    baseline-version: "0"
+  kafka:
+    bootstrap-servers: localhost:19092
+
+server:
+  port: 8111
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+management:
+  server:
+    port: 9111
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service: ${spring.application.name}
+
+bitspay:
+  security:
+    mode: trusted-headers
+  outbox:
+    relay: debezium
+  redis:
+    critical:
+      url: redis://localhost:6379
+    cache:
+      url: redis://localhost:6380
+  crypto:
+    platform-hmac-key: ${BITSPAY_PLATFORM_HMAC_KEY:}
+    field-cipher-key: ${BITSPAY_FIELD_CIPHER_KEY:}
+  clients:
+    ledger:          { base-url: http://localhost:8101 }
+    transaction:     { base-url: http://localhost:8102 }
+    wallet:          { base-url: http://localhost:8103 }
+    limitsrisk:      { base-url: http://localhost:8105 }
+    pricing:         { base-url: http://localhost:8106 }
+    treasury:        { base-url: http://localhost:8107 }
+    financeops:      { base-url: http://localhost:8112 }
+    admin:           { base-url: http://localhost:8115 }
+    generalledger:   { base-url: http://localhost:8116 }

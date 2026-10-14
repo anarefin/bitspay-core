@@ -1,0 +1,103 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/v1/ledger/accounts/balances:batchGet",
+    "headers": {
+      "X-Actor-Id": {
+        "equalTo": "general-ledger-service"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "items": [
+        {
+          "accountId": "00000000-0000-0000-0000-000000000200",
+          "ledgerBalancePoisha": 85,
+          "availableBalancePoisha": 85,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "FEE_INCOME",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000210",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "VAT_PAYABLE",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000220",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "COMMISSION_PAYABLE",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000230",
+          "ledgerBalancePoisha": 64,
+          "availableBalancePoisha": 64,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "AIT_PAYABLE",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000240",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "CAMPAIGN_FUNDING",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000400",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "SUSPENSE",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000410",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "ADJUSTMENT_CLEARING",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000000420",
+          "ledgerBalancePoisha": 0,
+          "availableBalancePoisha": 0,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "HOLD_CONTROL",
+          "closed": false
+        },
+        {
+          "accountId": "00000000-0000-0000-0000-000000030001",
+          "ledgerBalancePoisha": 99998856,
+          "availableBalancePoisha": 99998856,
+          "heldPoisha": 0,
+          "asOf": "2026-10-10T18:05:00.000Z",
+          "accountType": "TRUST_SETTLEMENT",
+          "closed": false
+        }
+      ],
+      "notFound": []
+    }
+  }
+}

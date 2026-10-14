@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/EMONEY_ISSUED.v1.schema.json",
+  "title": "treasury.events EMONEY_ISSUED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType EmoneyIssuance; Kafka key = aggregateId = data.trustAccountId. Trigger: issuance POSTED (ledger OK/EXISTS), same DB transaction.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "issuanceId",
+    "txnRef",
+    "trustAccountId",
+    "ledgerTrustAccountId",
+    "bankCode",
+    "destinationType",
+    "destinationAccountId",
+    "destinationWalletType",
+    "amountPoisha",
+    "bankReference",
+    "makerId",
+    "checkerIds",
+    "ledgerCommandId",
+    "ledgerTransferIds",
+    "floatRequestId",
+    "businessDate",
+    "postedAt"
+  ],
+  "properties": {
+    "issuanceId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= ledgerCommandId"
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "EI{yyMMdd}{10 Crockford} (18); opaque 1..32 for consumers"
+    },
+    "trustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "treasury trust account id"
+    },
+    "ledgerTrustAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "…0000000300nn debit side of the ledger transfer"
+    },
+    "bankCode": {
+      "type": "string",
+      "description": "refdata BANK code"
+    },
+    "destinationType": {
+      "type": "string",
+      "enum": [
+        "WALLET",
+        "CAMPAIGN_FUNDING"
+      ]
+    },
+    "destinationAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "wallet id, or 00000000-0000-0000-0000-000000000240 (CAMPAIGN_FUNDING) credit side"
+    },
+    "destinationWalletType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "A",
+        "D",
+        "I",
+        null
+      ],
+      "description": "null iff destinationType = CAMPAIGN_FUNDING"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "1 … 10^13"
+    },
+    "bankReference": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "deposit reference, ≤ 64"
+    },
+    "makerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "STAFF user id"
+    },
+    "checkerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 3,
+      "description": "1–3 items, level order"
+    },
+    "ledgerCommandId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ledgerTransferIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "1 item"
+    },
+    "floatRequestId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "set when the issuance completes a float request (counterparty OPERATOR)"
+    },
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "localDate(postedAt@Asia/Dhaka − CUTOFF.EOD)"
+    },
+    "postedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$",
+      "description": "ledger postedAt"
+    }
+  }
+}

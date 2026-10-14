@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/treasury-service/treasury.events/MANUAL_JOURNAL_POSTED.v1.schema.json",
+  "title": "treasury.events MANUAL_JOURNAL_POSTED v1 — envelope.data",
+  "description": "Producer treasury-service; aggregateType ManualJournal; Kafka key = aggregateId = data.debitAccountId. Trigger: journal POSTED (ledger command post-adjustment).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "journalId",
+    "txnRef",
+    "debitAccountType",
+    "debitAccountId",
+    "creditAccountType",
+    "creditAccountId",
+    "amountPoisha",
+    "reasonCode",
+    "makerId",
+    "checkerIds",
+    "ledgerCommandId",
+    "ledgerTransferIds",
+    "businessDate",
+    "postedAt"
+  ],
+  "properties": {
+    "journalId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "= ledgerCommandId"
+    },
+    "txnRef": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{1,32}$",
+      "description": "MJ{yyMMdd}{10 Crockford} (18); opaque 1..32 for consumers"
+    },
+    "debitAccountType": {
+      "type": "string",
+      "enum": [
+        "FEE_INCOME",
+        "VAT_PAYABLE",
+        "COMMISSION_PAYABLE",
+        "AIT_PAYABLE",
+        "CAMPAIGN_FUNDING",
+        "SUSPENSE",
+        "ADJUSTMENT_CLEARING"
+      ],
+      "description": "ledger account-type names"
+    },
+    "debitAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "fixed system account id"
+    },
+    "creditAccountType": {
+      "type": "string",
+      "enum": [
+        "FEE_INCOME",
+        "VAT_PAYABLE",
+        "COMMISSION_PAYABLE",
+        "AIT_PAYABLE",
+        "CAMPAIGN_FUNDING",
+        "SUSPENSE",
+        "ADJUSTMENT_CLEARING"
+      ],
+      "description": "≠ debit"
+    },
+    "creditAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "amountPoisha": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1,
+      "maximum": 10000000000000,
+      "description": "1 … 10^13"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "FEE_CORRECTION",
+        "VAT_RECLASS",
+        "SUSPENSE_CLEARING",
+        "COMMISSION_FUNDING",
+        "CAMPAIGN_FUNDING_TRANSFER",
+        "OTHER"
+      ],
+      "description": "Manual journal reason group"
+    },
+    "makerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "checkerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "2 items"
+    },
+    "ledgerCommandId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "ledgerTransferIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "1 item"
+    },
+    "businessDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "always present"
+    },
+    "postedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

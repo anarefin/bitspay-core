@@ -1,0 +1,36 @@
+{
+  "name": "POST /v1/payments/float-transfer → 200",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPattern": "^/v1/payments/float\\-transfer(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "txnRef": "FT26100900P3X8K2NM",
+      "txnId": "0192f6a1-0000-7000-8000-000000000001",
+      "txnType": "FLOAT_TRANSFER",
+      "status": "COMPLETED",
+      "failureCode": null,
+      "amountPoisha": 5000000,
+      "feePoisha": 0,
+      "vatPoisha": 0,
+      "totalDebitPoisha": 5000000,
+      "feeBearer": "PAYER",
+      "currency": "BDT",
+      "fromWalletId": "0192f4a1-0d03-7c00-8a00-00000000d003",
+      "toWalletId": "0192f2cc-0003-7000-8000-00000000c003",
+      "createdAt": "2026-10-09T13:00:00.010Z",
+      "completedAt": "2026-10-09T13:00:00.060Z"
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "transaction-service",
+    "producerContractVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,249 @@
+# treasury-service — contract manifest (CONTRACT-MODEL §3). SPEC.md §5 mirrors `provides`, §6 mirrors `consumes`.
+service: treasury-service
+number: "07"
+modules: []
+contractVersion: 1.0.0
+kernel: "1.0"
+owner: Dev-1
+
+provides:
+  apis:
+    - openapi: provided/openapi.yaml
+      major: 1
+      # 56 operations; audiences staff | partner (x-audience). No service-to-service operation.
+  events:
+    - topic: treasury.events
+      key: "trustAccountId (EMONEY_ISSUED, EMONEY_REDEEMED, EMONEY_REDEMPTION_PAID_OUT, TRUST_BALANCE_CONFIRMED, TRUST_INTEREST_RECORDED); fromTrustAccountId (TRUST_REBALANCED); requesterWalletId (FLOAT_REQUEST_UPDATED); walletId (LIQUIDITY_THRESHOLD_BREACHED); debitAccountId (MANUAL_JOURNAL_POSTED)"
+      compacted: false
+      tombstones: false
+      partitions: {dev: 3, prod: 6}
+      retention: 7d
+      transport: outbox
+      eventTypes:
+        - {type: EMONEY_ISSUED, version: 1, aggregateType: EmoneyIssuance,
+           schema: provided/events/treasury.events/EMONEY_ISSUED.v1.schema.json}
+        - {type: EMONEY_REDEEMED, version: 1, aggregateType: EmoneyRedemption,
+           schema: provided/events/treasury.events/EMONEY_REDEEMED.v1.schema.json}
+        - {type: EMONEY_REDEMPTION_PAID_OUT, version: 1, aggregateType: EmoneyRedemption, open: D-22,
+           schema: provided/events/treasury.events/EMONEY_REDEMPTION_PAID_OUT.v1.schema.json}
+        - {type: TRUST_BALANCE_CONFIRMED, version: 1, aggregateType: TrustBalanceConfirmation,
+           schema: provided/events/treasury.events/TRUST_BALANCE_CONFIRMED.v1.schema.json}
+        - {type: FLOAT_REQUEST_UPDATED, version: 1, aggregateType: FloatRequest,
+           schema: provided/events/treasury.events/FLOAT_REQUEST_UPDATED.v1.schema.json}
+        - {type: LIQUIDITY_THRESHOLD_BREACHED, version: 1, aggregateType: FloatPosition,
+           schema: provided/events/treasury.events/LIQUIDITY_THRESHOLD_BREACHED.v1.schema.json}
+        - {type: MANUAL_JOURNAL_POSTED, version: 1, aggregateType: ManualJournal,
+           schema: provided/events/treasury.events/MANUAL_JOURNAL_POSTED.v1.schema.json}
+        - {type: TRUST_REBALANCED, version: 1, aggregateType: TrustRebalance,
+           schema: provided/events/treasury.events/TRUST_REBALANCED.v1.schema.json}
+        - {type: TRUST_INTEREST_RECORDED, version: 1, aggregateType: TrustInterest, open: D-23,
+           schema: provided/events/treasury.events/TRUST_INTEREST_RECORDED.v1.schema.json}
+  inboundTopics: []
+  data: []
+  codes: provided/codes.yaml
+
+consumes:
+  apis:
+    # ---------------- ledger-service ----------------
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "create the TRUST_SETTLEMENT ledger account (…0300nn) when a trust account is approved"
+      fieldsUsed: ["req.accountId", "req.accountType", "req.ownerType", "res.accountId", "res.result", "res.createdAt"]
+      codesUsed: []
+      resilience: {timeoutMs: 1000, circuitBreaker: true, onFailure: "stay PENDING_LEDGER; retry job every 60 s (503) or alert (400/403/409)"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/accounts/{id}/balance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "trust mirror for the EMY-009 hard control, issuance preview, confirmation info, positions; redemption source pre-check"
+      fieldsUsed: ["path.id", "res.ledgerBalancePoisha", "res.availableBalancePoisha", "res.heldPoisha", "res.asOf"]
+      codesUsed: []
+      resilience: {timeoutMs: 500, circuitBreaker: true, onFailure: "hard control: 503 DEPENDENCY_UNAVAILABLE, entity stays APPROVED; preview/info: null"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/accounts/balances:batchGet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "position bootstrap of new partner wallets, drift correction, trust positions"
+      fieldsUsed: ["req.accountIds", "res.items[].accountId", "res.items[].ledgerBalancePoisha", "res.items[].availableBalancePoisha", "res.items[].heldPoisha", "res.notFound"]
+      codesUsed: []
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "skip the cycle; positions endpoint shows null mirrors"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/system-balance-sheet"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "daily e-money snapshot (closing trust mirrors, wallets total)"
+      fieldsUsed: ["res.asOf", "res.trustAccounts[].accountId", "res.trustAccounts[].trustIndex", "res.trustAccounts[].mirrorBalancePoisha", "res.walletsTotalPoisha"]
+      codesUsed: []
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "retry every 5 min until cut-off + 6 h, then alert"}
+    - producer: ledger-service
+      operation: "GET /v1/ledger/commands/{commandId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "resolve POSTING_UNKNOWN (found / journaled rejection / not posted)"
+      fieldsUsed: ["path.commandId", "res.found", "res.result", "res.rejectionCode", "res.transfers[].transferId", "res.transfers[].postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
+      resilience: {timeoutMs: 1000, circuitBreaker: true, onFailure: "retry next resolver cycle; alert after 5 min"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-emoney-issue"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "e-money issuance (command 9); commandId = issuanceId"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.trustAccountId", "req.toAccountId", "req.amountPoisha",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "timeout/503 -> POSTING_UNKNOWN, resolver; 400/409 -> REJECTED_BY_LEDGER + alert; 403 -> stay APPROVED + alert"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-emoney-redeem"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "e-money redemption (command 10); commandId = redemptionId"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.fromAccountId", "req.trustAccountId", "req.amountPoisha",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "as post-emoney-issue"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-adjustment"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "manual journal between system accounts (command 11); commandId = journalId"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.debitAccountId", "req.creditAccountId", "req.amountPoisha", "req.reasonCode",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "as post-emoney-issue"}
+    - producer: ledger-service
+      operation: "POST /v1/ledger/commands/post-trust-rebalance"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "trust rebalance (command 16, R2); commandId = rebalanceId; ledger debits to, credits from"
+      fieldsUsed: ["header.Idempotency-Key", "req.commandId", "req.txnRef", "req.fromTrustAccountId", "req.toTrustAccountId", "req.amountPoisha",
+                   "res.commandId", "res.result", "res.rejectionCode", "res.detail", "res.transferIds", "res.postedAt"]
+      codesUsed: [{set: commandResult, values: [OK, EXISTS, REJECTED]}, {set: rejectionCode, values: "*"}]
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "as post-emoney-issue"}
+    # ---------------- transaction-service ----------------
+    - producer: transaction-service
+      operation: "POST /v1/payments/float-transfer"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "execute float requests (TOP_UP from PARENT / LIQUIDITY_POINT, RETURN to PARENT). Forwarded actor context (kernel K3.2): the owner of fromWalletId (approving parent for TOP_UP, requester for an unapproved RETURN) or the STAFF approver (OPS_CHECKER); Idempotency-Key = float request id ({id}-r{n} after 72 h); requestId = float request id"
+      forwardedActor: true
+      fieldsUsed: ["header.Idempotency-Key", "req.fromWalletId", "req.toWalletId", "req.amountPoisha", "req.requestId",
+                   "res.txnRef", "res.txnId", "res.status", "res.failureCode", "problem.transaction.txnRef", "problem.transaction.status"]
+      codesUsed: [{set: paymentResultStatus, values: [COMPLETED, FAILED, INITIATED]}, {set: failureCode, values: "*"}]
+      resilience: {timeoutMs: 3000, circuitBreaker: true, onFailure: "any 4xx -> FAILED (failureCode = problem code); 503/timeout/5xx -> stay EXECUTING, backoff 30 s x attempt (max 5 min), same key; 20 attempts -> STUCK"}
+    - producer: transaction-service
+      operation: "GET /v1/transactions"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "kernel K3.3 rule 4: resolve the outcome of a float transfer by clientReference (= Idempotency-Key) before retrying an attempt older than 24 h"
+      fieldsUsed: ["query.walletId", "query.clientReference", "res.items[].txnRef", "res.items[].status", "res.items[].failureCode"]
+      codesUsed: [{set: transactionStatus, values: [INITIATED, COMPLETED, FAILED, REVERSED, PARTIALLY_REFUNDED, REFUNDED]}]
+      resilience: {timeoutMs: 1000, circuitBreaker: true, onFailure: "retry next job cycle"}
+    # ---------------- wallet-service ----------------
+    - producer: wallet-service
+      operation: "GET /v1/wallets/{walletId}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "issuance destination (create + execution), redemption source, float requester sanity"
+      fieldsUsed: ["path.walletId", "res.walletType", "res.status", "res.displayName"]
+      codesUsed: [{set: walletType, values: [A, D, M, I, C]}, {set: walletStatus, values: "*"}]
+      resilience: {timeoutMs: 500, circuitBreaker: true, onFailure: "503 DEPENDENCY_UNAVAILABLE (creation refused; execution stays APPROVED)"}
+    - producer: wallet-service
+      operation: "GET /v1/wallets/lookup"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "maker convenience lookup behind GET /v1/treasury/wallet-lookup"
+      fieldsUsed: ["query.msisdn", "query.walletType", "res.walletId", "res.displayNameMasked", "res.walletType", "res.status"]
+      codesUsed: []
+      resilience: {timeoutMs: 500, circuitBreaker: true, onFailure: "503 DEPENDENCY_UNAVAILABLE"}
+    # ---------------- admin-service ----------------
+    - producer: admin-service
+      operation: "GET /v1/refdata/{type}"
+      major: 1
+      pinnedContractVersion: 1.0.0
+      purpose: "bootstrap of BANK, HOLIDAY and SYSTEM_PARAM items before refdata.events catches up"
+      fieldsUsed: ["path.type", "query.limit", "query.cursor", "res.items[].type", "res.items[].code", "res.items[].nameEn",
+                   "res.items[].attributes", "res.items[].version", "res.items[].active", "res.nextCursor"]
+      codesUsed: [{set: refdataType, values: [BANK, HOLIDAY, SYSTEM_PARAM]}]
+      resilience: {timeoutMs: 2000, circuitBreaker: true, onFailure: "keep fallbacks; retry every 60 s; never blocks readiness"}
+
+  events:
+    - producer: ledger-service
+      topic: ledger.changes
+      eventType: LEDGER_TRANSFER_POSTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: treasury-service.ledger-changes
+      purpose: "partner float positions, daily stats, threshold evaluation (idempotent by TB-timestamp guard per wallet, no inbox)"
+      fieldsUsed: ["debitAccountId", "creditAccountId", "amountPoisha", "timestamp",
+                   "debitAccountBalanceAfter.debitsPosted", "debitAccountBalanceAfter.creditsPosted", "debitAccountBalanceAfter.debitsPending",
+                   "creditAccountBalanceAfter.debitsPosted", "creditAccountBalanceAfter.creditsPosted", "creditAccountBalanceAfter.debitsPending"]
+      codesUsed: []
+    - producer: wallet-service
+      topic: partner.events
+      eventType: PARTNER_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: treasury-service.partner-projection
+      purpose: "partner projection: float requester / parent resolution, hierarchy roll-ups, thresholds, partnerWalletSet"
+      fieldsUsed: ["partnerId", "partnerType", "subType", "categoryCode", "walletId", "parentPartnerId", "ancestorPartnerIds", "ancestorWalletIds",
+                   "territory.division", "territory.district", "territory.upazila", "territory.union", "status", "displayName", "msisdn",
+                   "version", "effectiveFrom"]
+      codesUsed: [{set: partnerType, values: [AGENT, MERCHANT, DISTRIBUTOR, INSTITUTION]},
+                  {set: partnerStatus, values: [ACTIVE, SUSPENDED, PENDING_TERMINATION, TERMINATED]},
+                  {set: partnerSubType, values: [SUPER_AGENT]}]
+    - producer: admin-service
+      topic: refdata.events
+      eventType: REFDATA_UPSERTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      groupId: treasury-service.refdata
+      purpose: "BANK and HOLIDAY items, SYSTEM_PARAM CUTOFF.EOD, CALENDAR.WEEKEND_DAYS, CALENDAR.TIMEZONE (businessDate, business-day rule)"
+      fieldsUsed: ["type", "code", "nameEn", "attributes", "version", "active"]
+      codesUsed: [{set: refdataType, values: [BANK, HOLIDAY, SYSTEM_PARAM]}]
+
+  inboundTopics:
+    - owner: admin-service
+      topic: notification.requests
+      eventType: NOTIFICATION_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+      templates: [FLOAT_LOW_BALANCE, FLOAT_HIGH_BALANCE, FLOAT_STOCK_OUT, FLOAT_REQUEST_RECEIVED, FLOAT_REQUEST_DECIDED,
+                  FLOAT_REQUEST_FAILED, EMONEY_ISSUED_PARTNER, TRUST_CONFIRMATION_STALE, HARD_CONTROL_FAILED, APPROVAL_PENDING_AGEING]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_REQUESTED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_DECIDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: approval.events
+      eventType: APPROVAL_EXPIRED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+    - owner: admin-service
+      topic: audit.events
+      eventType: AUDIT_RECORDED
+      version: 1
+      pinnedContractVersion: 1.0.0
+      fieldsUsed: ["*"]
+
+  data: []
+
+  codes:
+    - {producer: admin-service, set: refdataType, values: [BANK, HOLIDAY, SYSTEM_PARAM]}
+
+  refdata:
+    - {type: BANK, codes: "*"}
+    - {type: HOLIDAY, codes: "*"}
+    - {type: SYSTEM_PARAM, codes: ["CUTOFF.EOD", "CALENDAR.WEEKEND_DAYS", "CALENDAR.TIMEZONE"]}
+    # CUTOFF.SETTLEMENT_BANK deliberately not read (OPEN D-49)

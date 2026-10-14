@@ -1,0 +1,23 @@
+{
+  "eventId": "0192f104-2000-7000-8000-000000000e02",
+  "eventType": "EMONEY_REDEMPTION_PAID_OUT",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-09T11:31:00.120Z",
+  "producer": "treasury-service",
+  "aggregateType": "EmoneyRedemption",
+  "aggregateId": "0192f100-0000-7000-8000-000000000001",
+  "correlationId": "c-7e2a01",
+  "data": {
+    "redemptionId": "0192f104-0000-7000-8000-000000000001",
+    "txnRef": "ER2610090K3M9QX2AC",
+    "trustAccountId": "0192f100-0000-7000-8000-000000000001",
+    "ledgerTrustAccountId": "00000000-0000-0000-0000-000000030001",
+    "ledgerCommandId": "0192f104-0000-7000-8000-000000000001",
+    "amountPoisha": 1000000,
+    "payoutReference": "PAY-20261009-000045",
+    "bankReference": "PAY-20261009-000045",
+    "payoutAccountMasked": "****4321",
+    "paidOutAt": "2026-10-09T11:30:00.000Z",
+    "businessDate": "2026-10-09"
+  }
+}

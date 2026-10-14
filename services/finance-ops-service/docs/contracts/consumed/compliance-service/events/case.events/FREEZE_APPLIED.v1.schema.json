@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitspay.local/schemas/compliance-service/case.events/FREEZE_APPLIED.v1.schema.json",
+  "title": "case.events FREEZE_APPLIED v1 — envelope.data",
+  "type": "object",
+  "properties": {
+    "freezeId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "exactly one APPLIED and one LIFTED per freezeId"
+    },
+    "walletId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "= key"
+    },
+    "freezeType": {
+      "type": "string",
+      "enum": [
+        "FULL_BLOCK",
+        "DEBIT_BLOCK",
+        "LIEN"
+      ]
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "AML_FREEZE",
+        "FRAUD_FREEZE",
+        "AML_LIEN"
+      ],
+      "description": "regulatory instructions use `AML_FREEZE` + `reference`"
+    },
+    "reference": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "<= 64 caseNo or instruction referenceNo; exactly the `reference` sent on the wallet restriction"
+    },
+    "caseId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "instructionId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "heldAmountPoisha": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int64",
+      "description": "LIEN only"
+    },
+    "holdCommandId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "LIEN only the create-hold commandId that actually posted (attempt-derived)"
+    },
+    "appliedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "freezeId",
+    "walletId",
+    "freezeType",
+    "reasonCode",
+    "reference",
+    "caseId",
+    "instructionId",
+    "heldAmountPoisha",
+    "holdCommandId",
+    "appliedAt"
+  ],
+  "additionalProperties": true
+}

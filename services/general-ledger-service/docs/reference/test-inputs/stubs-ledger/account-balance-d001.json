@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/v1/ledger/accounts/0192f2dd-0000-7000-8000-00000000d001/balance"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "accountId": "0192f2dd-0000-7000-8000-00000000d001",
+      "ledgerBalancePoisha": 90000000,
+      "availableBalancePoisha": 90000000,
+      "heldPoisha": 0,
+      "asOf": "2026-10-10T18:05:00.000Z",
+      "accountType": "DISTRIBUTOR_WALLET",
+      "closed": false
+    }
+  }
+}

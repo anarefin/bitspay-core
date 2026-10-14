@@ -1,0 +1,28 @@
+{
+  "name": "GET /v1/wallets/{walletId}/status → 200",
+  "priority": 5,
+  "request": {
+    "method": "GET",
+    "urlPattern": "^/v1/wallets/[^/]+/status(\\?.*)?$"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "walletId": "0192f2aa-1c3e-7b51-8a2d-5e0f3c9b7a01",
+      "version": 8813,
+      "status": "A",
+      "kycTier": 2,
+      "walletType": "C",
+      "categoryCode": 0,
+      "flags": 0
+    }
+  },
+  "metadata": {
+    "generatedBy": "contracts.py snapshot",
+    "producer": "wallet-service",
+    "producerContractVersion": "1.0.0"
+  }
+}
