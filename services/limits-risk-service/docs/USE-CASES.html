@@ -1,0 +1,2048 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limits-Risk Use Cases</title>
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1f2933;
+  --muted: #5b6876;
+  --border: #e3e7ec;
+  --accent: #0b6e4f;
+  --accent-soft: #e6f4ee;
+  --code-bg: #f3f5f8;
+  --code-text: #24292f;
+  --quote-bg: #f0f6ff;
+  --quote-border: #3b82f6;
+  --th-bg: #f1f4f7;
+  --row-alt: #fafbfc;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15.5px/1.65 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+nav.toc {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 28px 18px 28px 22px; border-right: 1px solid var(--border); background: var(--surface);
+}
+nav.toc .brand { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+nav.toc .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 18px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; }
+nav.toc li a {
+  display: block; padding: 5px 10px; border-radius: 6px; color: var(--muted);
+  text-decoration: none; font-size: 13.5px; line-height: 1.4;
+}
+nav.toc li a:hover, nav.toc li a.active { background: var(--accent-soft); color: var(--accent); }
+main { padding: 36px 48px 80px; min-width: 0; }
+article { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 40px 48px; }
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 18px; letter-spacing: -0.01em; }
+h2 { font-size: 23px; margin: 56px 0 14px; padding-top: 18px; border-top: 1px solid var(--border); letter-spacing: -0.01em; }
+h3 { font-size: 18px; margin: 34px 0 10px; }
+h4 { font-size: 16px; margin: 26px 0 8px; color: var(--accent); }
+h1, h2, h3, h4 { position: relative; scroll-margin-top: 16px; }
+.anchor { position: absolute; left: -22px; color: var(--border); text-decoration: none; font-weight: 400; opacity: 0; }
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; color: var(--muted); }
+h1 .anchor { display: none; }
+a { color: var(--accent); }
+p, ul, ol { margin: 0 0 14px; }
+li { margin: 3px 0; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+blockquote {
+  margin: 0 0 22px; padding: 14px 18px; background: var(--quote-bg);
+  border-left: 4px solid var(--quote-border); border-radius: 0 8px 8px 0;
+}
+blockquote p { margin: 4px 0; }
+code { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.86em; }
+:not(pre) > code { background: var(--code-bg); padding: 1.5px 5px; border-radius: 4px; border: 1px solid var(--border); overflow-wrap: anywhere; }
+pre.code {
+  background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.5; margin: 0 0 18px;
+}
+pre.code code { font-size: 12.8px; }
+.table-wrap { overflow-x: auto; margin: 0 0 20px; border: 1px solid var(--border); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+th { background: var(--th-bg); font-weight: 600; white-space: nowrap; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+tbody tr:last-child td { border-bottom: 0; }
+.diagram {
+  margin: 4px 0 22px; padding: 18px; background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; overflow-x: auto; text-align: center;
+}
+pre.mermaid { margin: 0; background: transparent; font-size: 13px; }
+.top { position: fixed; right: 20px; bottom: 20px; background: var(--accent); color: #fff; border-radius: 999px;
+  padding: 8px 14px; font-size: 13px; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 18px 16px; }
+  main { padding: 16px; }
+  article { padding: 22px 16px; border-radius: 10px; }
+  h1 { font-size: 24px; } h2 { font-size: 20px; }
+  .anchor { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <div class="brand">limits-risk-service</div>
+    <div class="sub">Use cases, features &amp; workflows</div>
+    <ol>
+<li><a href="#1-the-service-in-one-minute">1. The service in one minute</a></li>
+<li><a href="#2-glossary-words-you-will-see-everywhere">2. Glossary: words you will see everywhere</a></li>
+<li><a href="#3-use-case-1--evaluate-a-payment-the-hot-path">3. Use case 1 — Evaluate a payment (the hot path)</a></li>
+<li><a href="#4-use-case-2--reservation-lifecycle">4. Use case 2 — Reservation lifecycle</a></li>
+<li><a href="#5-use-case-3--usage--headroom">5. Use case 3 — Usage / headroom</a></li>
+<li><a href="#6-use-case-4--batch-evaluate-for-bulk-credits">6. Use case 4 — Batch evaluate for bulk credits</a></li>
+<li><a href="#7-use-case-5--configure-limits">7. Use case 5 — Configure limits</a></li>
+<li><a href="#8-use-case-6--emergency-controls">8. Use case 6 — Emergency controls</a></li>
+<li><a href="#9-use-case-7--blacklist-and-whitelist">9. Use case 7 — Blacklist and whitelist</a></li>
+<li><a href="#10-use-case-8--fraud-rules-engine">10. Use case 8 — Fraud rules engine</a></li>
+<li><a href="#11-use-case-9--simulation-and-history--r2">11. Use case 9 — Simulation and history 🕒 R2</a></li>
+<li><a href="#12-use-case-10--maker-checker-approvals">12. Use case 10 — Maker-checker approvals</a></li>
+<li><a href="#13-events-in-and-out">13. Events in and out</a></li>
+<li><a href="#14-internal-endpoints-jobs-and-failure-behaviour">14. Internal endpoints, jobs and failure behaviour</a></li>
+<li><a href="#15-where-it-will-live-in-code">15. Where it will live in code</a></li>
+<li><a href="#16-open-decisions-and-not-yet-built-items">16. Open decisions and not-yet-built items</a></li>
+    </ol>
+  </nav>
+  <main>
+    <article>
+<h1 id="limits-risk-service--use-cases-features-and-workflows"><a class="anchor" href="#limits-risk-service--use-cases-features-and-workflows">#</a>limits-risk-service — Use Cases, Features and Workflows</h1>
+<blockquote>
+<p><strong>Who this is for:</strong> backend developers new to Bits Pay who will build or call this service.
+<strong>What it is based on:</strong> <a href="SPEC.md"><code>SPEC.md</code></a> and the binding contracts in <a href="contracts/"><code>contracts/</code></a>. If this guide and those files ever disagree, <strong>the spec and contracts win</strong>. Each section ends with a <em>Spec ref</em> that points to the source.
+<strong>Status:</strong> the code is still a skeleton (WP-1 not done yet), so this guide describes the <em>intended</em> behaviour.
+Items marked <strong>🕒 R2</strong> belong to a later release and are off by default.</p>
+</blockquote>
+<hr>
+<h2 id="table-of-contents"><a class="anchor" href="#table-of-contents">#</a>Table of contents</h2>
+<ol>
+<li><a href="#1-the-service-in-one-minute">The service in one minute</a></li>
+<li><a href="#2-glossary-words-you-will-see-everywhere">Glossary: words you will see everywhere</a></li>
+<li><a href="#3-use-case-1--evaluate-a-payment-the-hot-path">Use case 1: Evaluate a payment (the hot path)</a></li>
+<li><a href="#4-use-case-2--reservation-lifecycle">Use case 2: Reservation lifecycle (commit, release, expire, re-apply)</a></li>
+<li><a href="#5-use-case-3--usage--headroom">Use case 3: &quot;How much can I still send?&quot; (usage / headroom)</a></li>
+<li><a href="#6-use-case-4--batch-evaluate-for-bulk-credits">Use case 4: Batch evaluate for bulk credits (salary, cashback)</a></li>
+<li><a href="#7-use-case-5--configure-limits">Use case 5: Configure limits (tiers, overrides, change sets)</a></li>
+<li><a href="#8-use-case-6--emergency-controls">Use case 6: Emergency controls (freeze / reduce)</a></li>
+<li><a href="#9-use-case-7--blacklist-and-whitelist">Use case 7: Blacklist and whitelist</a></li>
+<li><a href="#10-use-case-8--fraud-rules-engine">Use case 8: Fraud rules engine</a></li>
+<li><a href="#11-use-case-9--simulation-and-history--r2">Use case 9: Simulation and history 🕒 R2</a></li>
+<li><a href="#12-use-case-10--maker-checker-approvals">Use case 10: Maker-checker approvals</a></li>
+<li><a href="#13-events-in-and-out">Events in and out</a></li>
+<li><a href="#14-internal-endpoints-jobs-and-failure-behaviour">Internal endpoints, jobs and failure behaviour</a></li>
+<li><a href="#15-where-it-will-live-in-code">Where it will live in code</a></li>
+<li><a href="#16-open-decisions-and-not-yet-built-items">Open decisions and not-yet-built items</a></li>
+</ol>
+<hr>
+<h2 id="1-the-service-in-one-minute"><a class="anchor" href="#1-the-service-in-one-minute">#</a>1. The service in one minute</h2>
+<p>For <strong>every</strong> payment in Bits Pay, limits-risk-service (SVC-05) answers one question within <strong>50 ms (p95)</strong>:</p>
+<blockquote>
+<p><strong>&quot;May this money move? If so, reserve the usage.&quot;</strong></p>
+</blockquote>
+<p>It does three jobs:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Job</th>
+<th>Plain words</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>Limits engine</strong></td>
+<td>&quot;Rahim may send at most 50,000 Tk per day by P2P.&quot; It keeps per-wallet counters (day / week / month) and reserves usage atomically so two parallel payments can never both squeeze past the limit.</td>
+</tr>
+<tr>
+<td><strong>Fraud engine</strong></td>
+<td>&quot;A new phone plus a large amount to a stranger looks suspicious.&quot; Rules are <strong>data</strong> (a JSON DSL), not Java code. Each matching rule adds a score, and the score maps to a decision.</td>
+</tr>
+<tr>
+<td><strong>Lists</strong></td>
+<td>Blacklist and whitelist of wallets, devices, phone numbers, NIDs, bank accounts, IPs and partners. Values are stored as <strong>hashes</strong>, never in clear text.</td>
+</tr>
+</tbody></table></div>
+<p>All configuration (limits, rules, lists, emergency switches) is changed through <strong>maker-checker</strong>: one person proposes and a <em>different</em> person approves.</p>
+<h3 id="who-talks-to-it"><a class="anchor" href="#who-talks-to-it">#</a>Who talks to it</h3>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  TX[transaction-service]
+  DS[disbursement-service]
+  PR[pricing-service campaign]
+  WS[wallet-service]
+  SU[support-service]
+  CO[compliance-service]
+  STAFF[Back-office staff]
+  AD[admin-service]
+  LR((limits-risk-service))
+  TX -- "evaluate / release / usage" --&gt; LR
+  DS -- "evaluate:batch / release" --&gt; LR
+  PR -- "evaluate:batch / release" --&gt; LR
+  WS -- "blacklist check, usage" --&gt; LR
+  SU -- "usage" --&gt; LR
+  CO -- "propose blacklist entry" --&gt; LR
+  STAFF -- "config, rules, lists, approvals" --&gt; LR
+  TX -. "txn.events" .-&gt; LR
+  WS -. "wallet / customer / partner events" .-&gt; LR
+  DS -. "disbursement.events" .-&gt; LR
+  LR -. "risk.alerts" .-&gt; CO
+  LR -. "blacklist.events" .-&gt; WS
+  LR -. "approval.events, audit.events" .-&gt; AD</pre></div>
+<p>Solid arrows are HTTP calls <em>into</em> this service. Dotted arrows are Kafka topics.</p>
+<h3 id="things-it-must-never-do-memorise-these"><a class="anchor" href="#things-it-must-never-do-memorise-these">#</a>Things it must NEVER do (memorise these)</h3>
+<ol>
+<li>Call any other service synchronously, touch the ledger or TigerBeetle, or read another service&#39;s DB schema.</li>
+<li>Return <code>ALLOW</code> without a successful reservation. If Redis is down it returns <code>503</code>; it never guesses.</li>
+<li>Change a limit counter anywhere other than the three Lua scripts (<code>limit_reserve.lua</code>, <code>limit_release.lua</code>, <code>limit_reapply.lua</code>).</li>
+<li>Release a reservation twice, or release one whose transaction completed.</li>
+<li>Store or log a clear NID, bank account number or full phone number.</li>
+<li>Hard-code a fraud rule in Java.</li>
+<li>Apply any config, rule, list or emergency change without maker-checker and an audit event in the same DB transaction. The only exceptions are the <code>EMERGENCY_SINGLE</code> path and a customer lowering their own self-limit.</li>
+</ol>
+<p><em>Spec ref: §1, §3.1</em></p>
+<hr>
+<h2 id="2-glossary-words-you-will-see-everywhere"><a class="anchor" href="#2-glossary-words-you-will-see-everywhere">#</a>2. Glossary: words you will see everywhere</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>Poisha</strong></td>
+<td>1 Tk = 100 poisha. <strong>All money is a <code>long</code> in poisha</strong>, never <code>double</code>/<code>float</code>.</td>
+<td>500 Tk = <code>50000</code></td>
+</tr>
+<tr>
+<td><strong>txnType</strong></td>
+<td>Kind of payment</td>
+<td><code>P2P</code>, <code>CASH_IN</code>, <code>CASH_OUT</code>, <code>MERCHANT_PAYMENT</code>, <code>MERCHANT_REFUND</code>, <code>FLOAT_TRANSFER</code>, <code>REVERSAL</code> (reserved); batch only: <code>DISBURSEMENT</code>, <code>CAMPAIGN_REWARD</code></td>
+</tr>
+<tr>
+<td><strong>Party</strong></td>
+<td><code>from</code> (always direction <strong>SEND</strong>) and <code>to</code> (always <strong>RECEIVE</strong>)</td>
+<td>In CASH_IN the <em>agent</em> sends and the customer receives</td>
+</tr>
+<tr>
+<td><strong>walletType</strong></td>
+<td><code>C</code> customer, <code>A</code> agent, <code>D</code> distributor, <code>M</code> merchant, <code>I</code> institution, <code>S</code> system (batch campaign <code>from</code> only)</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>categoryCode</strong></td>
+<td>Sub-type number</td>
+<td>0 customer, 101–104 agents, 201–203 distributors, 3xxx merchants, 401–404 institutions</td>
+</tr>
+<tr>
+<td><strong>userCategory</strong></td>
+<td>Derived from walletType + categoryCode</td>
+<td><code>CUSTOMER</code>, <code>RETAIL_AGENT</code>, <code>SMALL_MERCHANT</code>, …</td>
+</tr>
+<tr>
+<td><strong>KYC tier</strong></td>
+<td>0, 1 or 2. A higher tier means more verified and gets higher limits</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Risk grade</strong></td>
+<td><code>LOW</code> / <code>MEDIUM</code> / <code>HIGH</code></td>
+<td><code>AML_WATCH</code> flag ⇒ HIGH</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>What a limit applies to: a txnType, a <strong>scope group</strong> (e.g. <code>CICO</code> = CASH_IN + CASH_OUT) or <code>ALL</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Direction</strong></td>
+<td><code>SEND</code>, <code>RECEIVE</code> or <code>ANY</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Dimension</strong></td>
+<td>What is measured</td>
+<td><code>PER_TXN_MIN</code>, <code>PER_TXN_MAX</code>, <code>DAILY_COUNT</code>, <code>DAILY_AMOUNT</code>, <code>WEEKLY_*</code>, <code>MONTHLY_*</code>, <code>TXN_ALLOWED</code>, <code>MAX_BALANCE</code></td>
+</tr>
+<tr>
+<td><strong>limitCode</strong></td>
+<td><code>&lt;SCOPE&gt;_&lt;SEND|RECEIVE|ANY&gt;_&lt;DIMENSION&gt;</code></td>
+<td><code>P2P_SEND_DAILY_AMOUNT</code></td>
+</tr>
+<tr>
+<td><strong>Layer</strong></td>
+<td>Where a limit value comes from</td>
+<td><code>REGULATORY_CAP</code>, <code>TIER</code>, <code>PRODUCT_CHANNEL</code>, <code>OVERRIDE</code>, <code>SELF</code></td>
+</tr>
+<tr>
+<td><strong>Reservation</strong></td>
+<td>Usage that is &quot;booked&quot; in the counters at evaluate time and later committed or released</td>
+<td><code>reservationId</code> = <code>txnId</code></td>
+</tr>
+<tr>
+<td><strong>Calendar periods</strong></td>
+<td>Day, week and month in <strong>Asia/Dhaka</strong> (UTC+6). Weeks start on <strong>Saturday</strong> (provisional)</td>
+<td>Dhaka midnight = <code>18:00:00Z</code> of the previous UTC day</td>
+</tr>
+<tr>
+<td><strong>Maker / checker</strong></td>
+<td>Proposer / approver; they must be different people</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>DSL</strong></td>
+<td>The JSON language fraud rules are written in</td>
+<td>§10</td>
+</tr>
+<tr>
+<td><strong>ENFORCE / SHADOW</strong></td>
+<td>A rule that affects decisions / a rule that is only measured</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Watermark</strong></td>
+<td>&quot;How far have we processed <code>txn.events</code>?&quot; per partition. It guards the expiry of orphan reservations</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Books</strong></td>
+<td>In-memory compiled snapshots of config (LimitBook, RuleBook, ListBook, RiskGradeBook). Evaluate reads <strong>no DB</strong></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p><em>Spec ref: §5.1.1, §5.3, §7.1</em></p>
+<hr>
+<h2 id="3-use-case-1--evaluate-a-payment-the-hot-path"><a class="anchor" href="#3-use-case-1--evaluate-a-payment-the-hot-path">#</a>3. Use case 1 — Evaluate a payment (the hot path)</h2>
+<p><strong>Endpoint:</strong> <code>POST /v1/risk/evaluate</code> · <strong>Caller:</strong> <code>transaction-service</code> only · <strong>Budget:</strong> p95 ≤ 50 ms (limits part ≤ 10 ms)</p>
+<h3 id="31-the-story"><a class="anchor" href="#31-the-story">#</a>3.1 The story</h3>
+<p>Rahim (customer, KYC Tier 2) sends <strong>500 Tk</strong> to Karim (customer, Tier 1) from the app.</p>
+<ol>
+<li>transaction-service calls evaluate with <code>txnId</code>, <code>txnType = P2P</code>, <code>amountPoisha = 50000</code>, and both party snapshots.</li>
+<li>limits-risk checks, <strong>in memory</strong>: emergency controls, the wallet/device blacklist, and per-transaction min/max.</li>
+<li>In <strong>one atomic Redis Lua call</strong> it checks and increments Rahim&#39;s <em>send</em> counters and Karim&#39;s <em>receive</em> counters for day, week and month. In parallel it reads and updates the fraud aggregates.</li>
+<li>It scores the fraud rules (score 12, below every threshold) and returns <code>ALLOW</code> with <code>reservationId = txnId</code>.</li>
+<li>Later the ledger posts the payment and <code>TRANSACTION_COMPLETED</code> arrives, so the reservation is <strong>committed</strong>. If the ledger refuses, <code>TRANSACTION_FAILED</code> arrives and the counters are <strong>released</strong>.</li>
+</ol>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant T as transaction-service
+  participant R as limits-risk api
+  participant RC as Redis critical
+  participant RA as Redis aggregate
+  T-&gt;&gt;R: POST /v1/risk/evaluate
+  R-&gt;&gt;R: emergency controls, blacklist (wallet, device), per-txn min/max, resolve limits (memory)
+  par limits
+    R-&gt;&gt;RC: EVALSHA limit_reserve.lua (FROM D/W/M + TO D/W/M)
+    RC--&gt;&gt;R: OK, usageBefore = 7
+  and fraud aggregates
+    R-&gt;&gt;RA: agg_touch(from), agg_touch(to), device set
+    RA--&gt;&gt;R: aggregates, profiles, device facts, beneficiary flag
+  end
+  R-&gt;&gt;R: blacklist MSISDN/NID/PARTNER from profiles, rules, score 12, combine
+  R--&gt;&gt;T: 200 ALLOW, reservationId = txnId
+  Note over R: ALLOW writes nothing to Postgres (metrics only)</pre></div>
+<h3 id="32-request"><a class="anchor" href="#32-request">#</a>3.2 Request</h3>
+<pre class="code"><code class="lang-json">{ "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11", "txnType": "P2P", "channel": "APP", "deviceId": "d-123",
+  "amountPoisha": 50000,
+  "from": { "walletId": "0192f2aa-0000-7000-8000-00000000a001", "walletType": "C", "kycTier": 2, "categoryCode": 0, "flags": 0 },
+  "to":   { "walletId": "0192f2bb-0000-7000-8000-00000000b002", "walletType": "C", "kycTier": 1, "categoryCode": 0, "flags": 0 },
+  "at": "2026-10-09T08:03:22.000Z", "context": null }</code></pre>
+<p>Things to notice:</p>
+<ul>
+<li><code>txnId</code> is a UUIDv7. It equals the reservation id and the ledger <code>commandId</code>, and it is <strong>never re-used</strong>.</li>
+<li>The service <strong>trusts the party snapshot</strong> (walletType, kycTier, flags) from the caller, so it never has to call wallet-service on the hot path.</li>
+<li><code>flags</code> is a bitmask: <code>1</code> AML_WATCH, <code>2</code> PIN_RESET_COOLING, <code>4</code> PRE_REGISTERED, <code>8</code> HAS_OPEN_LIEN, <code>16</code> NEW_DEVICE_COOLING.</li>
+<li><code>at</code> is the transaction creation time. If it is more than 5 minutes off server time, server time is used.</li>
+<li><code>context</code> (IP, geo, SIM, failed auth) is <code>null</code> in R1 because the edge layer does not exist yet.</li>
+</ul>
+<h3 id="33-response-allow"><a class="anchor" href="#33-response-allow">#</a>3.3 Response: ALLOW</h3>
+<pre class="code"><code class="lang-json">{ "decision": "ALLOW", "reasonCodes": [], "riskScore": 12, "reservationId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11",
+  "receiverMaxBalancePoisha": 10000000, "usage": { "senderMonthlyCountForTxnType": 7 }, "violatedLimit": null }</code></pre>
+<ul>
+<li><code>receiverMaxBalancePoisha = 10000000</code> is Karim&#39;s Tier 1 max balance (100,000 Tk). This service <strong>does not enforce max balance</strong>. The caller passes the value to the ledger, which enforces it atomically.</li>
+<li><code>usage.senderMonthlyCountForTxnType = 7</code> means Rahim made 7 P2P sends this month <em>before</em> this one. pricing-service uses it for &quot;first N free&quot; allowances.</li>
+<li><strong>Every decision returns HTTP 200.</strong> The caller maps decisions to its own 422 errors.</li>
+</ul>
+<h3 id="34-the-seven-decisions-and-their-precedence"><a class="anchor" href="#34-the-seven-decisions-and-their-precedence">#</a>3.4 The seven decisions and their precedence</h3>
+<p>When several things go wrong at once, the <strong>strongest</strong> decision wins:</p>
+<pre class="code"><code>SERVICE_DISABLED  &gt;  BLOCK  &gt;  LIMIT_EXCEEDED  &gt;  HOLD  &gt;  STEP_UP  &gt;  ALLOW_AND_ALERT  &gt;  ALLOW
+   (emergency)   (blacklist     (a limit)        (fraud score / rule action)     (alert,     (clean)
+                  or rule)                                                     still pays)</code></pre>
+<div class="table-wrap"><table><thead><tr>
+<th>Decision</th>
+<th>Money moves?</th>
+<th>Reservation kept?</th>
+<th>Alert on <code>risk.alerts</code>?</th>
+<th>Saved in <code>risk_decision</code>?</th>
+</tr>
+</thead><tbody><tr>
+<td><code>ALLOW</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no (metrics only)</td>
+</tr>
+<tr>
+<td><code>ALLOW_AND_ALERT</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>STEP_UP</code></td>
+<td>no (terminal decline in R1)</td>
+<td>released</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>HOLD</code></td>
+<td>no (terminal decline in R1)</td>
+<td>released</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>LIMIT_EXCEEDED</code></td>
+<td>no</td>
+<td>never made / released</td>
+<td>only if <code>alertOnLimitExceeded</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>BLOCK</code></td>
+<td>no</td>
+<td>released / never made</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>SERVICE_DISABLED</code></td>
+<td>no</td>
+<td>never made</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+</tbody></table></div>
+<p><code>reasonCodes</code> uses this vocabulary: <code>LIMIT:&lt;limitCode&gt;</code>, <code>BLACKLIST:&lt;type&gt;:&lt;FROM|TO&gt;</code>, <code>EMERGENCY:&lt;controlCode&gt;</code>, <code>&lt;ruleId&gt;</code> (e.g. <code>FR-BEN-001</code>), and <code>STEP_UP_UNSUPPORTED_CHANNEL</code>.</p>
+<h3 id="35-worked-examples-one-per-decision"><a class="anchor" href="#35-worked-examples-one-per-decision">#</a>3.5 Worked examples, one per decision</h3>
+<h4 id="a-limit_exceeded-karims-daily-receive-limit"><a class="anchor" href="#a-limit_exceeded-karims-daily-receive-limit">#</a>A. LIMIT_EXCEEDED: Karim&#39;s daily receive limit</h4>
+<p>Seed: Tier 1 customer, P2P RECEIVE daily amount = <strong>50,000 Tk = 5,000,000 poisha</strong>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th></th>
+<th>poisha</th>
+<th>Tk</th>
+</tr>
+</thead><tbody><tr>
+<td>Karim already received today (incl. outstanding reservations)</td>
+<td>4,980,000</td>
+<td>49,800</td>
+</tr>
+<tr>
+<td>This payment</td>
+<td>50,000</td>
+<td>500</td>
+</tr>
+<tr>
+<td>Would become</td>
+<td>5,030,000</td>
+<td>50,300</td>
+</tr>
+<tr>
+<td>Limit</td>
+<td>5,000,000</td>
+<td>50,000</td>
+</tr>
+</tbody></table></div>
+<p>5,030,000 &gt; 5,000,000, so the payment is rejected. Remaining headroom = max(0, 5,000,000 − 4,980,000) = <strong>20,000 poisha (200 Tk)</strong>.</p>
+<pre class="code"><code class="lang-json">{ "decision": "LIMIT_EXCEEDED", "reasonCodes": ["LIMIT:P2P_RECEIVE_DAILY_AMOUNT"], "riskScore": 0, "reservationId": null,
+  "receiverMaxBalancePoisha": 10000000, "usage": { "senderMonthlyCountForTxnType": 7 },
+  "violatedLimit": { "limitCode": "P2P_RECEIVE_DAILY_AMOUNT", "party": "TO", "walletId": "0192f2bb-0000-7000-8000-00000000b002",
+    "scope": "P2P", "direction": "RECEIVE", "dimension": "DAILY_AMOUNT", "layer": "TIER",
+    "limitValue": 5000000, "currentValue": 4980000, "attemptedValue": 50000, "remainingValue": 20000,
+    "resetsAt": "2026-10-09T18:00:00.000Z" } }</code></pre>
+<p><code>resetsAt</code> is Dhaka midnight (00:00 on 10 Oct in Dhaka = 18:00Z on 9 Oct).</p>
+<p>The order of checks matters, because only the <strong>first</strong> violation is reported:</p>
+<ul>
+<li>Party FROM before TO.</li>
+<li>Then by dimension: DAILY_COUNT → DAILY_AMOUNT → WEEKLY_COUNT → WEEKLY_AMOUNT → MONTHLY_COUNT → MONTHLY_AMOUNT.</li>
+<li>Then by scope: txnType → groups (alphabetical) → <code>ALL</code>.</li>
+</ul>
+<h4 id="b-limit_exceeded-per-transaction-checks-memory-only-no-redis"><a class="anchor" href="#b-limit_exceeded-per-transaction-checks-memory-only-no-redis">#</a>B. LIMIT_EXCEEDED: per-transaction checks (memory only, no Redis)</h4>
+<p>Rahim (Tier 2) tries to send <strong>30,000 Tk</strong> by P2P. The Tier 2 P2P per-txn range is 10–25,000 Tk, so <code>3000000 &gt; 2500000</code> and the result is <code>P2P_SEND_PER_TXN_MAX</code>. For these checks <code>currentValue</code>, <code>remainingValue</code> and <code>resetsAt</code> are <code>null</code>, and no reservation is attempted.</p>
+<p>A <strong>Tier 0</strong> customer tries any P2P send. Tier 0 P2P SEND has <code>TXN_ALLOWED = 0</code>, so the result is <code>LIMIT_EXCEEDED</code> with code <code>P2P_SEND_TXN_ALLOWED</code>, <code>limitValue 0</code> and <code>attemptedValue 1</code>.</p>
+<h4 id="c-hold-fraud-score"><a class="anchor" href="#c-hold-fraud-score">#</a>C. HOLD: fraud score</h4>
+<p>Rahim sends <strong>25,000 Tk</strong> to Karim from a phone first seen 2 hours ago, and he has never paid Karim before.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Rule</th>
+<th>Why it fires</th>
+<th>Weight</th>
+</tr>
+</thead><tbody><tr>
+<td>FR-NEWDEV-001</td>
+<td>device first seen &lt; 1440 min ago <strong>and</strong> amount ≥ 1,000,000 poisha</td>
+<td>45</td>
+</tr>
+<tr>
+<td>FR-BEN-001</td>
+<td>first-time beneficiary <strong>and</strong> amount ≥ 1,000,000 poisha</td>
+<td>30</td>
+</tr>
+<tr>
+<td><strong>Score</strong></td>
+<td></td>
+<td><strong>75</strong></td>
+</tr>
+</tbody></table></div>
+<p>Thresholds: ALLOW_AND_ALERT ≥ 30, STEP_UP ≥ 50, <strong>HOLD ≥ 70</strong>, BLOCK ≥ 90. A score of 75 gives <strong>HOLD</strong>.</p>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant T as transaction-service
+  participant R as limits-risk api
+  participant RC as Redis critical
+  participant PG as Postgres
+  T-&gt;&gt;R: POST /v1/risk/evaluate (25,000 Tk, new device, first-time beneficiary)
+  R-&gt;&gt;RC: limit_reserve.lua
+  RC--&gt;&gt;R: OK (counters incremented)
+  R-&gt;&gt;R: FR-NEWDEV-001 (45) + FR-BEN-001 (30) = 75 &gt;= HOLD 70
+  R-&gt;&gt;RC: limit_release.lua (FROM), limit_release.lua (TO), state X
+  R-&gt;&gt;PG: one txn: INSERT risk_decision + outbox RISK_ALERT_RAISED
+  R--&gt;&gt;T: 200 HOLD, reasonCodes [FR-NEWDEV-001, FR-BEN-001], reservationId null</pre></div>
+<p>The counters were incremented by the Lua call, so the service <strong>compensates</strong> (releases) them synchronously before replying. A declined payment must never eat into anyone&#39;s limit.</p>
+<h4 id="d-allow_and_alert-the-payment-goes-through-but-someone-should-look-at-it"><a class="anchor" href="#d-allow_and_alert-the-payment-goes-through-but-someone-should-look-at-it">#</a>D. ALLOW_AND_ALERT: the payment goes through, but someone should look at it</h4>
+<p>Rahim has already made 5 sends in the last 10 minutes. FR-VEL-001 (<code>agg.from.sendCount.10m ≥ 5</code>, weight 30) fires, giving a score of 30, which is ≥ 30, so the decision is <strong>ALLOW_AND_ALERT</strong>. The reservation is <strong>kept</strong>, the payment proceeds, and a <code>RISK_ALERT_RAISED</code> is published.</p>
+<h4 id="e-step_up-and-its-fallback"><a class="anchor" href="#e-step_up-and-its-fallback">#</a>E. STEP_UP and its fallback</h4>
+<p>Rahim&#39;s PIN was just reset (<code>flags &amp; 2</code>) and he sends ≥ 5,000 Tk, so FR-SIM-002 fires with <code>action: STEP_UP</code>. If the channel is <code>APP</code>, the decision is <strong>STEP_UP</strong>. If the channel is <code>API</code> or <code>SYSTEM</code> (they cannot do a step-up challenge), the decision falls back to <strong>HOLD</strong> and <code>STEP_UP_UNSUPPORTED_CHANNEL</code> is added. In R1 both STEP_UP and HOLD are terminal declines.</p>
+<h4 id="f-block-blacklist"><a class="anchor" href="#f-block-blacklist">#</a>F. BLOCK: blacklist</h4>
+<p>The sending device <code>d-999</code> is on the blacklist. It is caught <strong>in memory before Redis</strong>, so nothing is reserved:</p>
+<pre class="code"><code class="lang-json">{"decision":"BLOCK","reasonCodes":["BLACKLIST:DEVICE:FROM"],"riskScore":100,"reservationId":null,
+ "receiverMaxBalancePoisha":null,"usage":{"senderMonthlyCountForTxnType":null},"violatedLimit":null}</code></pre>
+<p><code>riskScore</code> is set to <code>maxScore</code> (100). Note that <code>usage</code> is still an object; it is <strong>never null</strong>, though its field can be.</p>
+<p>A rule can also BLOCK. FR-CICO-001 (agent and customer share the same MSISDN hash, i.e. agent self-dealing) has <code>action: BLOCK</code>.</p>
+<h4 id="g-service_disabled-emergency-freeze"><a class="anchor" href="#g-service_disabled-emergency-freeze">#</a>G. SERVICE_DISABLED: emergency freeze</h4>
+<p>Ops froze USSD cash-out for Tier 0 customers (control <code>EC-000017</code>). The response is <code>&quot;decision&quot;: &quot;SERVICE_DISABLED&quot;, &quot;reasonCodes&quot;: [&quot;EMERGENCY:EC-000017&quot;]</code>, with no Redis calls and no alert. See §8.</p>
+<h4 id="h-503-redis-is-down"><a class="anchor" href="#h-503-redis-is-down">#</a>H. 503: Redis is down</h4>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant T as transaction-service
+  participant R as limits-risk api
+  participant RC as Redis critical
+  T-&gt;&gt;R: POST /v1/risk/evaluate
+  R-&gt;&gt;RC: limit_reserve.lua
+  RC--xR: timeout 30 ms / circuit open
+  R--&gt;&gt;T: 503 DEPENDENCY_UNAVAILABLE (retryable)
+  Note over T,R: the caller never moves money; it releases asynchronously
+  T-&gt;&gt;R: POST /v1/limits/reservations/{txnId}:release
+  R--&gt;&gt;T: 200 state RELEASED or NOT_FOUND</pre></div>
+<p>The service <strong>never</strong> says ALLOW when it could not reserve. The caller treats 503 as &quot;do not move money&quot; and sends a release in case the reservation partly happened.</p>
+<h3 id="36-the-full-algorithm-13-steps"><a class="anchor" href="#36-the-full-algorithm-13-steps">#</a>3.6 The full algorithm (13 steps)</h3>
+<ol>
+<li><strong>Validate</strong> the body, headers and caller. A <code>walletType: &quot;S&quot;</code> gets <code>400 SYSTEM_PARTY_NOT_ALLOWED</code>.</li>
+<li><strong>Resolve</strong> for both parties, in memory: user category, risk grade, applicable limits, emergency controls.</li>
+<li><strong>Freeze?</strong> If so, <code>SERVICE_DISABLED</code>. Stop.</li>
+<li><strong>Blacklist from memory</strong> (WALLET of both parties, DEVICE). A hit gives <code>BLOCK</code>. Stop.</li>
+<li><strong>Per-txn checks</strong> (TXN_ALLOWED, MIN, MAX). A failure marks <code>LIMIT_EXCEEDED</code> and skips the reservation; fraud still runs.</li>
+<li><strong>In parallel:</strong> (a) <code>limit_reserve.lua</code>, (b) fraud aggregates, device set, geo.</li>
+<li><strong>Blacklist from profiles</strong> (MSISDN, NID, PARTNER hashes of both parties).</li>
+<li><strong>Fraud rules</strong> (skipped for <code>bypassTxnTypes</code>; whitelist suppression applies).</li>
+<li><strong>Combine</strong> using precedence, then apply the STEP_UP fallback.</li>
+<li><strong>Compensate:</strong> if something was reserved but the decision is not ALLOW / ALLOW_AND_ALERT, release it now.</li>
+<li><strong>Persist</strong> non-ALLOW decisions to <code>risk_decision</code> (plus the alert) in one DB transaction. If Postgres is down, the decision is still returned and the write retries from an in-memory queue (10,000 entries, 5 min).</li>
+<li><strong>Remember</strong> the first decision and score on the Redis index (async) so that a retry returns the same answer.</li>
+<li><strong>Metrics:</strong> <code>bitspay_risk_decisions_total{decision}</code>.</li>
+</ol>
+<h3 id="37-idempotency-calling-twice-with-the-same-txnid"><a class="anchor" href="#37-idempotency-calling-twice-with-the-same-txnid">#</a>3.7 Idempotency: calling twice with the same <code>txnId</code></h3>
+<ul>
+<li><strong>Still reserved:</strong> the Lua script sees the records already exist and returns <code>DUP</code> plus the stored decision and score. The response repeats the same <code>ALLOW</code> / <code>ALLOW_AND_ALERT</code>, score and <code>reservationId</code>. <strong>Nothing is counted twice</strong>, and there is no second alert.</li>
+<li><strong>Already released or expired:</strong> the response is <code>409 STATE_CONFLICT</code>, reason <code>TXN_ID_RELEASED</code>. A <code>txnId</code> is never re-used.</li>
+</ul>
+<h3 id="38-latency-budget-p95"><a class="anchor" href="#38-latency-budget-p95">#</a>3.8 Latency budget (p95)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Step</th>
+<th>Budget</th>
+</tr>
+</thead><tbody><tr>
+<td>Deserialize, validate</td>
+<td>1 ms</td>
+</tr>
+<tr>
+<td>Memory checks and limit resolution</td>
+<td>1 ms</td>
+</tr>
+<tr>
+<td>Parallel: <code>limit_reserve.lua</code> ‖ fraud pipeline</td>
+<td>5 ms</td>
+</tr>
+<tr>
+<td>Rule evaluation (≤ 100 ENFORCE + 50 SHADOW rules)</td>
+<td>1 ms</td>
+</tr>
+<tr>
+<td>Non-ALLOW only: compensation + DB insert</td>
+<td>≤ 15 ms</td>
+</tr>
+<tr>
+<td><strong>Typical ALLOW total</strong></td>
+<td><strong>≈ 8 ms</strong> (SLO p95 ≤ 50 ms, p99 ≤ 80 ms)</td>
+</tr>
+</tbody></table></div>
+<p><em>Spec ref: §3.4 F1–F3, §3.7, §5.1.1, §7.2 (BR-05-16, 23, 24, 37), §7.5</em></p>
+<hr>
+<h2 id="4-use-case-2--reservation-lifecycle"><a class="anchor" href="#4-use-case-2--reservation-lifecycle">#</a>4. Use case 2 — Reservation lifecycle</h2>
+<p>The evaluate call only <strong>reserves</strong>. What happens to that reservation afterwards is driven by events from transaction-service.</p>
+<h3 id="41-state-machine"><a class="anchor" href="#41-state-machine">#</a>4.1 State machine</h3>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; RESERVED: evaluate ALLOW or ALLOW_AND_ALERT
+  [*] --&gt; BATCH_HELD: evaluate batch ALLOW (not dryRun)
+  RESERVED --&gt; COMMITTED: TRANSACTION_COMPLETED
+  RESERVED --&gt; RELEASED: TRANSACTION_FAILED, release API, compensation
+  RESERVED --&gt; EXPIRED: sweeper, age 10 min and watermark passed
+  EXPIRED --&gt; COMMITTED: TRANSACTION_COMPLETED re-applies counters
+  RELEASED --&gt; COMMITTED: TRANSACTION_COMPLETED re-applies counters
+  BATCH_HELD --&gt; RELEASED: release API or BATCH_ROW_FAILED
+  BATCH_HELD --&gt; [*]: record TTL at month key expiry, counters kept
+  COMMITTED --&gt; [*]: TTL
+  RELEASED --&gt; [*]: TTL
+  EXPIRED --&gt; [*]: TTL</pre></div>
+<p>Index codes in Redis (<code>lri:&lt;txnId&gt;</code> field <code>s</code>): <code>R</code> reserved, <code>B</code> batch held, <code>C</code> committed (<strong>final</strong>), <code>X</code> released, <code>E</code> expired.</p>
+<h3 id="42-what-actually-sits-in-redis"><a class="anchor" href="#42-what-actually-sits-in-redis">#</a>4.2 What actually sits in Redis</h3>
+<p>For the Rahim → Karim payment on <strong>2026-10-09 (a Friday)</strong>, with weeks starting on Saturday, the keys are:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead><tbody><tr>
+<td><code>lc:{rahimWallet}:D:20261009</code></td>
+<td>Rahim&#39;s day counters</td>
+</tr>
+<tr>
+<td><code>lc:{rahimWallet}:W:20261003</code></td>
+<td>Rahim&#39;s week counters (week began Sat 3 Oct)</td>
+</tr>
+<tr>
+<td><code>lc:{rahimWallet}:M:202610</code></td>
+<td>Rahim&#39;s month counters</td>
+</tr>
+<tr>
+<td>same three for <code>{karimWallet}</code></td>
+<td>Karim&#39;s counters</td>
+</tr>
+<tr>
+<td><code>lr:{rahimWallet}:&lt;txnId&gt;</code>, <code>lr:{karimWallet}:&lt;txnId&gt;</code></td>
+<td>per-party reservation record (what was added, where), used to undo or redo exactly</td>
+</tr>
+<tr>
+<td><code>lri:&lt;txnId&gt;</code></td>
+<td>index: from, to, state, created time, first decision, score</td>
+</tr>
+<tr>
+<td><code>lrpend:&lt;n&gt;</code></td>
+<td>sorted set of reservations waiting for an outcome (used by the sweeper)</td>
+</tr>
+</tbody></table></div>
+<p>Inside each counter hash, fields look like <code>&lt;scope&gt;:&lt;dir&gt;:c</code> (count) and <code>&lt;scope&gt;:&lt;dir&gt;:a</code> (amount). <code>dir</code> is <code>S</code> (send), <code>R</code> (receive) or <code>X</code> (any), and <code>*</code> means &quot;ALL&quot;. For Rahim&#39;s P2P send the service <strong>always</strong> increments <code>P2P:S:c</code>, <code>P2P:S:a</code>, <code>*:S:c</code> and <code>*:S:a</code> in all three period hashes. It also increments scope-group fields (and <code>X</code> &quot;any&quot; fields) when an active rule references them. Counters are maintained even when no rule exists, so a new rule works immediately.</p>
+<h3 id="43-worked-counter-example"><a class="anchor" href="#43-worked-counter-example">#</a>4.3 Worked counter example</h3>
+<p>Rahim&#39;s <strong>day</strong> hash, field <code>P2P:S:a</code> (amount) / <code>P2P:S:c</code> (count):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Step</th>
+<th>Event</th>
+<th><code>P2P:S:a</code></th>
+<th><code>P2P:S:c</code></th>
+<th>State</th>
+</tr>
+</thead><tbody><tr>
+<td>0</td>
+<td>start of example</td>
+<td>350,000</td>
+<td>3</td>
+<td>—</td>
+</tr>
+<tr>
+<td>1</td>
+<td>evaluate 500 Tk → ALLOW</td>
+<td><strong>400,000</strong></td>
+<td><strong>4</strong></td>
+<td><code>R</code></td>
+</tr>
+<tr>
+<td>2a</td>
+<td><code>TRANSACTION_COMPLETED</code> (commit)</td>
+<td>400,000 (kept)</td>
+<td>4</td>
+<td><code>C</code> (record deleted)</td>
+</tr>
+<tr>
+<td>2b</td>
+<td><em>or</em> <code>TRANSACTION_FAILED</code> (release)</td>
+<td><strong>350,000</strong></td>
+<td><strong>3</strong></td>
+<td><code>X</code> (record kept, <code>rel=1</code>)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><em>after 2b</em>, a late <code>TRANSACTION_COMPLETED</code> arrives (re-apply)</td>
+<td><strong>400,000</strong></td>
+<td><strong>4</strong></td>
+<td><code>C</code></td>
+</tr>
+</tbody></table></div>
+<p>Step 3 is not a bug. If money really moved, it <strong>must</strong> count against the limit, even if the reservation had been released in the meantime. Re-apply does <strong>no limit check</strong>; it records the truth.</p>
+<h3 id="44-commit-release-and-re-apply-by-event"><a class="anchor" href="#44-commit-release-and-re-apply-by-event">#</a>4.4 Commit, release and re-apply by event</h3>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant K as txn.events
+  participant W as limits-risk worker
+  participant RC as Redis critical
+  participant RA as Redis aggregate
+  K-&gt;&gt;W: TRANSACTION_FAILED (txnId, fromWalletId, toWalletId)
+  W-&gt;&gt;RC: limit_release(FROM), limit_release(TO), state X
+  K-&gt;&gt;W: TRANSACTION_COMPLETED (txnId, createdAt, completedAt)
+  W-&gt;&gt;RC: idx_state C (returns previous state)
+  alt previous state R (normal)
+    W-&gt;&gt;RC: limit_reapply = plain commit, records deleted
+  else previous state E or X (expired or released earlier)
+    W-&gt;&gt;RC: limit_reapply re-increments, no limit check
+    W-&gt;&gt;W: bitspay_limitsrisk_expired_then_completed_total +1
+  end
+  W-&gt;&gt;RA: update sender profile + receiver last activity
+  W-&gt;&gt;RC: txnwm[partition] = watermark</pre></div>
+<p>Safety rules for releases:</p>
+<ul>
+<li>They are <strong>idempotent</strong>: a second release does nothing.</li>
+<li>A counter never goes below 0. If it would, it is clamped and <code>bitspay_limitsrisk_counter_clamped_total</code> is incremented; that metric must stay 0.</li>
+<li>Duplicate deliveries of these two events need <strong>no inbox table</strong>. Each effect is naturally idempotent (release marks <code>rel=1</code>, commit deletes the record).</li>
+</ul>
+<h3 id="45-orphans-the-guarded-sweeper"><a class="anchor" href="#45-orphans-the-guarded-sweeper">#</a>4.5 Orphans: the guarded sweeper</h3>
+<p>What if transaction-service crashed and no event ever arrives? The <strong>sweeper</strong> (every 30 s, leader pod only) expires reservations older than <strong>10 minutes</strong>, but <strong>only if</strong> the <code>txn.events</code> watermark has moved past <code>created + 10 min</code> on <strong>every</strong> partition.</p>
+<p><strong>Example:</strong> a reservation created at 08:03:22.</p>
+<ul>
+<li>At 08:14 it is a candidate (older than 10 min).</li>
+<li>If the Kafka consumer is lagging and the slowest partition watermark is 08:12:00, then 08:13:22 is <em>not</em> ≤ 08:12:00, so it is <strong>not expired</strong>. A COMPLETED event may still be in the queue.</li>
+<li>Once all partitions pass 08:13:22, the reservation is released and its state becomes <code>E</code>.</li>
+</ul>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant S as Sweeper (leader)
+  participant RC as Redis critical
+  S-&gt;&gt;RC: HGETALL txnwm
+  S-&gt;&gt;S: W = min over all partitions (missing partition means W = 0)
+  loop n in 0..15
+    S-&gt;&gt;RC: ZRANGEBYSCORE lrpend:n -inf (now - 10 min) LIMIT 0 500
+    S-&gt;&gt;S: keep members with createdMs + 10 min &lt;= W
+    S-&gt;&gt;RC: per txn: limit_release(FROM), limit_release(TO), state E
+  end</pre></div>
+<p><strong>Why so careful?</strong> If Kafka is down, wrongly expiring a reservation would &quot;give back&quot; headroom for money that actually moved. Stalling is the conservative choice: counters may stay high for a while, but they can never overshoot.</p>
+<h3 id="46-the-release-api"><a class="anchor" href="#46-the-release-api">#</a>4.6 The release API</h3>
+<p><strong>Endpoint:</strong> <code>POST /v1/limits/reservations/{txnId}:release</code>
+<strong>Callers:</strong> transaction, disbursement and pricing services, SYSTEM, and staff (staff releases are audited).</p>
+<pre class="code"><code class="lang-json">{ "reasonCode": "ROW_FAILED" }</code></pre>
+<p>→</p>
+<pre class="code"><code class="lang-json">{ "txnId": "0192f4d0-0000-7000-8000-000000000001", "released": true, "state": "RELEASED" }</code></pre>
+<p><code>state</code> is one of four final answers:</p>
+<ul>
+<li><code>RELEASED</code>: released now or earlier.</li>
+<li><code>COMMITTED</code>: the transaction completed, so nothing was released.</li>
+<li><code>EXPIRED</code>: the sweeper already released it.</li>
+<li><code>NOT_FOUND</code>: there was no reservation.</li>
+</ul>
+<p>All of these return HTTP 200, so callers can retry safely from a persisted job.</p>
+<h3 id="47-optional-restore-on-reversal"><a class="anchor" href="#47-optional-restore-on-reversal">#</a>4.7 Optional: restore on reversal</h3>
+<p>Restore on reversal is off by default (<code>restore-on-reversal = false</code>). When it is on, <code>TRANSACTION_REVERSED</code> / <code>TRANSACTION_REFUNDED</code> give back the original&#39;s counters: the amount by the reversed or refunded delta, and the count by 1 only for a full reversal. Counters are clamped at 0 and never give back more than the original contributed.</p>
+<p><em>Spec ref: §3.4 F3–F5, §3.5, §4.2, §5.1.3, §6.1, §7.2 (BR-05-17..22), §7.7</em></p>
+<hr>
+<h2 id="5-use-case-3--usage--headroom"><a class="anchor" href="#5-use-case-3--usage--headroom">#</a>5. Use case 3 — Usage / headroom</h2>
+<p><strong>Endpoint:</strong> <code>GET /v1/limits/wallets/{walletId}/usage</code>
+<strong>Callers:</strong> the wallet owner (own wallet only, otherwise 403), any staff, transaction-service (for quotes), support-service, wallet-service (closure payout reads <code>maxBalancePoisha</code>).</p>
+<p><strong>Question it answers:</strong> &quot;What are my limits, how much have I used, and how much is left?&quot;</p>
+<pre class="code"><code>GET /v1/limits/wallets/0192f2aa-0000-7000-8000-00000000a001/usage?txnType=P2P</code></pre>
+<pre class="code"><code class="lang-json">{ "walletId": "0192f2aa-0000-7000-8000-00000000a001", "asOf": "2026-10-09T08:05:00.000Z",
+  "userCategory": "CUSTOMER", "kycTier": 2, "riskGrade": "LOW", "maxBalancePoisha": 50000000,
+  "items": [ { "txnType": "P2P", "direction": "SEND", "allowed": true, "perTxnMinPoisha": 1000, "perTxnMaxPoisha": 2500000,
+      "monthlyCountUsed": 7,
+      "daily":   { "countLimit": 50, "countUsed": 3, "countRemaining": 47, "amountLimitPoisha": 5000000, "amountUsedPoisha": 350000, "amountRemainingPoisha": 4650000, "resetsAt": "2026-10-09T18:00:00.000Z" },
+      "weekly":  null,
+      "monthly": { "countLimit": 300, "countUsed": 7, "countRemaining": 293, "amountLimitPoisha": 30000000, "amountUsedPoisha": 900000, "amountRemainingPoisha": 29100000, "resetsAt": "2026-10-31T18:00:00.000Z" } } ] }</code></pre>
+<p>How to read it, for Rahim (Tier 2):</p>
+<ul>
+<li><strong>Today:</strong> used 3,500 Tk in 3 sends out of 50,000 Tk / 50 sends, so <strong>46,500 Tk</strong> and <strong>47 sends</strong> remain.</li>
+<li><strong>This month:</strong> used 9,000 Tk out of 300,000 Tk, so 291,000 Tk remain.</li>
+<li><code>weekly: null</code> means no weekly limit is configured.</li>
+<li>Each send must be between 10 Tk (<code>1000</code>) and 25,000 Tk (<code>2500000</code>).</li>
+</ul>
+<p>Rules:</p>
+<ul>
+<li>&quot;Used&quot; <strong>includes outstanding reservations</strong>.</li>
+<li>Limits are the <em>effective</em> values after precedence, emergency REDUCE and self-limits.</li>
+<li>Without <code>txnType</code>, the response has one item per (txnType, direction) that has at least one limit. With <code>txnType</code>, it returns both SEND and RECEIVE, even if they are unlimited.</li>
+<li>If the wallet has no stored profile, pass <code>walletType</code>, <code>kycTier</code> and <code>categoryCode</code> as query parameters, or you get 404.</li>
+</ul>
+<p><em>Spec ref: §5.1.4, BR-05-25</em></p>
+<hr>
+<h2 id="6-use-case-4--batch-evaluate-for-bulk-credits"><a class="anchor" href="#6-use-case-4--batch-evaluate-for-bulk-credits">#</a>6. Use case 4 — Batch evaluate for bulk credits</h2>
+<p><strong>Endpoint:</strong> <code>POST /v1/risk/evaluate:batch</code>
+<strong>Callers:</strong> disbursement-service (salary), pricing-service&#39;s campaign module (cashback), and staff.</p>
+<p><strong>What is different from single evaluate:</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th></th>
+<th>Single evaluate</th>
+<th>Batch</th>
+</tr>
+</thead><tbody><tr>
+<td>Items</td>
+<td>1</td>
+<td>up to 1,000 (p95 ≤ 300 ms)</td>
+</tr>
+<tr>
+<td>Fraud rules</td>
+<td>yes</td>
+<td><strong>no</strong>: limits + blacklist only</td>
+</tr>
+<tr>
+<td>Blacklist</td>
+<td>wallet, device, MSISDN, NID, partner</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Reservation expiry</td>
+<td>sweeper after 10 min</td>
+<td><strong>never auto-expires</strong>; lives until the monthly counter key expires</td>
+</tr>
+<tr>
+<td>Released by</td>
+<td><code>txn.events</code>, API, sweeper</td>
+<td>release API or <code>BATCH_ROW_FAILED</code> only</td>
+</tr>
+<tr>
+<td><code>dryRun</code></td>
+<td>—</td>
+<td><code>true</code> = evaluate only, reserve nothing</td>
+</tr>
+<tr>
+<td>Extra txnTypes</td>
+<td>—</td>
+<td><code>DISBURSEMENT</code>, <code>CAMPAIGN_REWARD</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="61-example-salary-to-karim"><a class="anchor" href="#61-example-salary-to-karim">#</a>6.1 Example: salary to Karim</h3>
+<pre class="code"><code class="lang-json">{ "dryRun": false,
+  "items": [ { "txnId": "0192f4d0-0000-7000-8000-000000000001", "txnType": "DISBURSEMENT", "channel": "API", "amountPoisha": 1500000,
+    "from": { "walletId": "0192f2ff-0000-7000-8000-0000000000f1", "walletType": "I", "kycTier": 2, "categoryCode": 401, "flags": 0 },
+    "to":   { "walletId": "0192f2bb-0000-7000-8000-00000000b002", "walletType": "C", "kycTier": 1, "categoryCode": 0, "flags": 0 },
+    "at": "2026-10-09T09:00:00.000Z" } ] }</code></pre>
+<p>Karim is Tier 1, and his DISBURSEMENT RECEIVE daily limit is 100,000 Tk (seed). 15,000 Tk fits, so the result is ALLOW:</p>
+<pre class="code"><code class="lang-json">{ "items": [ { "txnId": "0192f4d0-0000-7000-8000-000000000001", "decision": "ALLOW", "reasonCodes": [], "riskScore": 0,
+    "reservationId": "0192f4d0-0000-7000-8000-000000000001", "receiverMaxBalancePoisha": 10000000,
+    "usage": { "senderMonthlyCountForTxnType": 0 }, "violatedLimit": null } ] }</code></pre>
+<ul>
+<li>Results are <strong>positional</strong>: same order and length as the request.</li>
+<li>Batch decisions can only be <code>ALLOW</code>, <code>BLOCK</code>, <code>LIMIT_EXCEEDED</code> or <code>SERVICE_DISABLED</code>.</li>
+<li><code>txnId</code> <strong>must</strong> be the ledger <code>commandId</code> of the row. It stays stable across re-runs, and a new attempt gets a new id.</li>
+</ul>
+<h3 id="62-example-cashback-campaign_reward"><a class="anchor" href="#62-example-cashback-campaign_reward">#</a>6.2 Example: cashback (<code>CAMPAIGN_REWARD</code>)</h3>
+<p>The sender is the system wallet <code>{ &quot;walletId&quot;: &quot;00000000-0000-0000-0000-000000000240&quot;, &quot;walletType&quot;: &quot;S&quot;, ... }</code>. WalletType <code>S</code> is allowed <strong>only here</strong>. Only the receiver&#39;s limits and blacklist are checked, and <code>usage.senderMonthlyCountForTxnType</code> is <code>null</code>.</p>
+<h3 id="63-re-runs-and-the-whole-batch-409"><a class="anchor" href="#63-re-runs-and-the-whole-batch-409">#</a>6.3 Re-runs and the whole-batch 409</h3>
+<ul>
+<li>Re-sending an item that is still held returns the same decision and counts nothing twice.</li>
+<li>If <strong>any</strong> item&#39;s <code>txnId</code> was already released or expired, the <strong>whole batch</strong> is refused and nothing is reserved:</li>
+</ul>
+<pre class="code"><code>409 STATE_CONFLICT, reason TXN_ID_RELEASED, extension "txnIds": ["…", "…"]</code></pre>
+<p>The caller gives the listed rows new <code>commandId</code>s and resubmits.</p>
+<h3 id="64-when-a-row-fails-later"><a class="anchor" href="#64-when-a-row-fails-later">#</a>6.4 When a row fails later</h3>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant D as disbursement-service
+  participant R as limits-risk api
+  participant RC as Redis critical
+  participant K as disbursement.events
+  participant W as limits-risk worker
+  D-&gt;&gt;R: POST /v1/risk/evaluate:batch (1,000 items)
+  R-&gt;&gt;RC: pipeline idx check for all txnIds
+  alt any txnId released or expired
+    R--&gt;&gt;D: 409 STATE_CONFLICT TXN_ID_RELEASED, txnIds
+  else
+    R-&gt;&gt;RC: pipelined limit_reserve.lua per item (mode B)
+    R--&gt;&gt;D: 200 items (positional)
+  end
+  K-&gt;&gt;W: BATCH_ROW_FAILED (commandId)
+  W-&gt;&gt;RC: limit_release(TO), limit_release(FROM), state X</pre></div>
+<p><code>BATCH_ROW_FAILED</code> with a <code>null</code> <code>commandId</code> is ignored. If the reservation&#39;s receiver differs from the event&#39;s <code>walletId</code>, the service still releases and increments the mismatch metric. <strong>Callers must release every row that will not be paid</strong>, including skipped rows, because batch holds never expire on their own.</p>
+<p><em>Spec ref: §3.4 F6, §5.1.2, §6.6, BR-05-20, BR-05-39</em></p>
+<hr>
+<h2 id="7-use-case-5--configure-limits"><a class="anchor" href="#7-use-case-5--configure-limits">#</a>7. Use case 5 — Configure limits</h2>
+<h3 id="71-building-blocks"><a class="anchor" href="#71-building-blocks">#</a>7.1 Building blocks</h3>
+<div class="diagram"><pre class="mermaid">flowchart LR
+  W["walletType + categoryCode"] --&gt; UC[userCategory]
+  UC --&gt; T["Tier definition&lt;br/&gt;(userCategory × KYC tier × risk grade)"]
+  T --&gt; R["Limit rules&lt;br/&gt;(scope × direction × dimension = value)"]</pre></div>
+<p><strong>1. User category</strong> (first match wins):</p>
+<ol>
+<li>exact <code>(walletType, categoryCode)</code>, e.g. <code>A, 102</code> → <code>SUPER_AGENT</code>;</li>
+<li>hundred group, e.g. merchant <code>3101</code> → group <code>3100</code> → <code>MICRO_MERCHANT</code>;</li>
+<li>wildcard <code>(walletType, -1)</code>;</li>
+<li>default by wallet type (<code>C</code> → CUSTOMER, <code>A</code> → RETAIL_AGENT, …), plus a metric.</li>
+</ol>
+<p><strong>2. Risk grade:</strong> <code>HIGH</code> if the AML_WATCH flag is set; else the grade from <code>customer.events</code> or <code>partner.events</code>; else <code>LOW</code>.</p>
+<p><strong>3. Limit rule:</strong> one row = one number. For example: <code>layer=TIER, userCategory=CUSTOMER, kycTier=2, scope=P2P, direction=SEND, dimension=DAILY_AMOUNT, value=5000000</code>.</p>
+<h3 id="72-precedence-which-number-wins"><a class="anchor" href="#72-precedence-which-number-wins">#</a>7.2 Precedence: which number wins?</h3>
+<p>For each <code>(scope, direction, dimension)</code>:</p>
+<ol>
+<li>Within a layer, the <strong>most specific</strong> row wins (most non-null of kycTier / riskGrade / channel).</li>
+<li>Across layers, for &quot;upper&quot; dimensions (max, counts, amounts):</li>
+</ol>
+<pre class="code"><code>base = min(tier, product/channel)          -- whichever is stricter
+v    = override ?? base                     -- an override may raise OR lower …
+v    = min(v, regulatory cap)               -- … but never beat the regulator
+v    = REDUCE active ? floor(v × bps / 10000) : v
+v    = SEND &amp;&amp; self-limit ? min(v, self) : v
+null = unlimited</code></pre>
+<p>For <code>PER_TXN_MIN</code> the <em>maximum</em> wins instead (the strictest minimum).</p>
+<p><strong>Worked example: Rahim, P2P SEND DAILY_AMOUNT</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>Step</th>
+<th>Value (poisha)</th>
+<th>Tk</th>
+</tr>
+</thead><tbody><tr>
+<td>Tier 2 seed</td>
+<td>5,000,000</td>
+<td>50,000</td>
+</tr>
+<tr>
+<td>Product/channel, override, cap</td>
+<td>none</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Emergency <code>REDUCE 5000 bps</code> (USSD fraud wave)</td>
+<td>floor(5,000,000 × 5000 / 10000) = 2,500,000</td>
+<td>25,000</td>
+</tr>
+<tr>
+<td>Rahim&#39;s own self-limit 🕒 R2</td>
+<td>min(2,500,000, 1,000,000) = 1,000,000</td>
+<td>10,000</td>
+</tr>
+</tbody></table></div>
+<p><strong>Worked example: an override cannot beat the cap</strong></p>
+<p>Tier 2 CASH_OUT SEND daily = 30,000 Tk, and the regulatory cap for CUSTOMER CASH_OUT SEND daily = 50,000 Tk.</p>
+<ul>
+<li>Override to 45,000 Tk for a verified customer: accepted, effective 45,000.</li>
+<li>Override to 70,000 Tk: <strong>rejected</strong> with <code>400 EXCEEDS_REGULATORY_CAP</code>.</li>
+</ul>
+<h3 id="73-seeded-values-provisional-pending-compliance-sign-off"><a class="anchor" href="#73-seeded-values-provisional-pending-compliance-sign-off">#</a>7.3 Seeded values (provisional, pending Compliance sign-off)</h3>
+<p>Customers (Tk; <code>(n)</code> = count):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Dimension</th>
+<th>Tier 0</th>
+<th>Tier 1</th>
+<th>Tier 2</th>
+</tr>
+</thead><tbody><tr>
+<td>MAX_BALANCE</td>
+<td>10,000</td>
+<td>100,000</td>
+<td>500,000</td>
+</tr>
+<tr>
+<td>P2P SEND</td>
+<td><strong>not permitted</strong></td>
+<td>10–25,000 per txn; D 25,000 (50); M 200,000 (200)</td>
+<td>10–25,000 per txn; D 50,000 (50); M 300,000 (300)</td>
+</tr>
+<tr>
+<td>P2P RECEIVE D / M</td>
+<td>10,000 / 30,000</td>
+<td>50,000 / 200,000</td>
+<td>100,000 / 500,000</td>
+</tr>
+<tr>
+<td>CASH_OUT SEND D / M</td>
+<td>2,000 (2) / 10,000 (10)</td>
+<td>25,000 (5) / 150,000 (20)</td>
+<td>30,000 (10) / 200,000 (50)</td>
+</tr>
+<tr>
+<td>CASH_IN RECEIVE D / M</td>
+<td>5,000 (3) / 20,000 (15)</td>
+<td>30,000 (5) / 150,000 (25)</td>
+<td>50,000 (10) / 300,000 (50)</td>
+</tr>
+<tr>
+<td>MERCHANT_PAYMENT SEND D / M</td>
+<td>2,000 / 10,000</td>
+<td>50,000 / 200,000</td>
+<td>100,000 / 500,000</td>
+</tr>
+<tr>
+<td>DISBURSEMENT RECEIVE D</td>
+<td>10,000</td>
+<td>100,000</td>
+<td>500,000</td>
+</tr>
+</tbody></table></div>
+<p>Regulatory caps: CUSTOMER MAX_BALANCE 500,000; CASH_OUT SEND daily 50,000; P2P SEND per-txn max 50,000.
+Scope group: <code>CICO = {CASH_IN, CASH_OUT}</code>. For example, a RETAIL_AGENT has a <code>CICO</code> ANY daily amount of 2,000,000 Tk. See SPEC §7.11 for the partner table.</p>
+<h3 id="74-apis"><a class="anchor" href="#74-apis">#</a>7.4 APIs</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>What</th>
+<th>Endpoint</th>
+<th>Notes</th>
+</tr>
+</thead><tbody><tr>
+<td>Read category map / tiers / rules</td>
+<td><code>GET /v1/limits/categories</code>, <code>GET /v1/limits/tiers</code>, <code>GET /v1/limits/rules</code></td>
+<td>any staff</td>
+</tr>
+<tr>
+<td><strong>Change many rules atomically</strong></td>
+<td><code>POST /v1/limits/change-sets</code> → <code>202</code> + <code>approvalId</code> + <code>diff</code></td>
+<td>maker-checker; <strong>2 levels</strong> if it touches a REGULATORY_CAP or raises any value by more than 50 %</td>
+</tr>
+<tr>
+<td>View a change set</td>
+<td><code>GET /v1/limits/change-sets/{id}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Explain</strong> effective limits</td>
+<td><code>GET /v1/limits/effective?walletId=…&amp;txnType=P2P</code></td>
+<td>shows every candidate per layer and which won</td>
+</tr>
+<tr>
+<td>Per-wallet override</td>
+<td><code>POST /v1/limits/overrides</code> (mandatory <code>effectiveTo</code> and <code>reason</code>)</td>
+<td>maker-checker; auto-expires</td>
+</tr>
+<tr>
+<td>List / deactivate override</td>
+<td><code>GET /v1/limits/overrides</code>, <code>POST /v1/limits/overrides/{id}:deactivate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Self-limits 🕒 R2</td>
+<td><code>PUT</code> / <code>GET /v1/limits/wallets/{walletId}/self-limits</code></td>
+<td>customer, own wallet</td>
+</tr>
+</tbody></table></div>
+<p>Example change set (&quot;raise the Tier 2 P2P daily send limit to 60,000 Tk&quot;):</p>
+<pre class="code"><code class="lang-json">{ "summary": "Raise Tier 2 P2P daily send to 60,000 Tk",
+  "operations": [
+    { "op": "UPSERT_RULE", "rule": { "layer": "TIER", "userCategory": "CUSTOMER", "kycTier": 2, "riskGrade": null, "channel": null,
+        "scope": "P2P", "direction": "SEND", "dimension": "DAILY_AMOUNT", "value": 6000000,
+        "effectiveFrom": "2026-10-10T18:00:00.000Z", "effectiveTo": null, "reason": "BB circular ref 12/2026" } },
+    { "op": "DEACTIVATE_RULE", "ruleId": "0192f3aa-0000-7000-8000-000000000777" } ] }</code></pre>
+<p>→</p>
+<pre class="code"><code class="lang-json">{ "changeSetId": "0192f3ab-0000-7000-8000-000000000101", "approvalId": "0192f5ab-0000-7000-8000-000000000001",
+  "status": "PENDING", "requiredLevels": 1,
+  "diff": [ { "key": "TIER|CUSTOMER|2|*|*|P2P|SEND|DAILY_AMOUNT", "before": 5000000, "after": 6000000 } ] }</code></pre>
+<p>(5,000,000 → 6,000,000 is a +20 % raise, below the 50 % threshold, so one approval level is enough.)</p>
+<p>Validation: amounts must be multiples of 100 poisha (whole Tk), MIN ≤ MAX, and values ≤ 10^13.</p>
+<h3 id="75-self-limits--r2"><a class="anchor" href="#75-self-limits--r2">#</a>7.5 Self-limits 🕒 R2</h3>
+<p>Behind the flag <code>bitspay.features.self-limits.enabled</code> (default false). A customer may set their <strong>own</strong> lower SEND caps for <code>DAILY_AMOUNT</code>, <code>MONTHLY_AMOUNT</code> or <code>PER_TXN_MAX</code>.</p>
+<ul>
+<li><strong>Lowering</strong> takes effect immediately, with no approval.</li>
+<li><strong>Raising or removing</strong> waits a 24 h cooling period, which protects against a thief who has stolen the phone.</li>
+</ul>
+<h3 id="76-how-a-change-reaches-every-pod"><a class="anchor" href="#76-how-a-change-reaches-every-pod">#</a>7.6 How a change reaches every pod</h3>
+<p>Config lives in Postgres and is compiled into in-memory &quot;books&quot;. An approved change bumps <code>config_version</code> and publishes on Redis pub/sub <code>risk:config</code>. Every pod reloads within <strong>≤ 2 s</strong>, with a 1 s polling fallback.</p>
+<p><em>Spec ref: §5.1.8, §7.1 (BR-05-02..07, 13, 40), §7.10, §7.11, ADR-08</em></p>
+<hr>
+<h2 id="8-use-case-6--emergency-controls"><a class="anchor" href="#8-use-case-6--emergency-controls">#</a>8. Use case 6 — Emergency controls</h2>
+<p>When something is on fire (for example, a USSD cash-out fraud wave), ops can apply one of two kinds of control:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Kind</th>
+<th>Effect</th>
+</tr>
+</thead><tbody><tr>
+<td><code>FREEZE</code></td>
+<td>Matching payments get <code>SERVICE_DISABLED</code>, with no Redis and no alert</td>
+</tr>
+<tr>
+<td><code>REDUCE</code></td>
+<td>Matching limits are multiplied by <code>reduceBps / 10000</code> (5000 = halve). Does not apply to MAX_BALANCE or TXN_ALLOWED</td>
+</tr>
+</tbody></table></div>
+<p>A control <strong>matches</strong> when every non-null filter matches: <code>txnType</code>, <code>channel</code>, <code>walletType</code>, <code>userCategory</code>, <code>kycTier</code>, <code>direction</code>. Null means &quot;any&quot;.</p>
+<h3 id="two-approval-modes"><a class="anchor" href="#two-approval-modes">#</a>Two approval modes</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Mode</th>
+<th>Who</th>
+<th>What happens</th>
+</tr>
+</thead><tbody><tr>
+<td><code>MAKER_CHECKER</code></td>
+<td><code>RISK_ANALYST</code>, <code>OPS_MAKER</code></td>
+<td><code>PENDING_APPROVAL</code> until a checker approves</td>
+</tr>
+<tr>
+<td><code>EMERGENCY_SINGLE</code></td>
+<td><code>RISK_CHECKER</code>, <code>CAMLCO</code>, <code>ADMIN</code> only</td>
+<td><strong>ACTIVE immediately</strong>. A <strong>post-facto review</strong> approval is created, due in 24 h, and must be approved by <em>another</em> person. Rejecting it deactivates the control. If the review is overdue, the control stays effective as <code>PENDING_REVIEW</code> and a <code>siem=true</code> log line is written</td>
+</tr>
+</tbody></table></div>
+<p><strong>Example:</strong></p>
+<pre class="code"><code class="lang-json">{ "kind": "FREEZE", "txnType": "CASH_OUT", "channel": "USSD", "walletType": "C", "userCategory": null, "kycTier": 0,
+  "direction": "SEND", "reduceBps": null, "approvalMode": "EMERGENCY_SINGLE",
+  "effectiveFrom": "2026-10-09T08:10:00.000Z", "effectiveTo": "2026-10-09T20:00:00.000Z", "reason": "USSD cash-out fraud wave, incident INC-221" }</code></pre>
+<p>→ <code>201</code> with <code>&quot;code&quot;: &quot;EC-000017&quot;, &quot;status&quot;: &quot;ACTIVE&quot;, &quot;reviewDueAt&quot;: &quot;2026-10-10T08:10:00.000Z&quot;</code>.</p>
+<p>Within 2 s, every Tier 0 customer cash-out over USSD returns <code>SERVICE_DISABLED</code> with <code>EMERGENCY:EC-000017</code>. A Tier 1 customer, or the same customer on the APP, is unaffected.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; PENDING_APPROVAL: MAKER_CHECKER
+  [*] --&gt; ACTIVE: EMERGENCY_SINGLE, review approval created
+  PENDING_APPROVAL --&gt; ACTIVE: approved
+  PENDING_APPROVAL --&gt; REJECTED: rejected or expired
+  ACTIVE --&gt; PENDING_REVIEW: post-facto review overdue
+  ACTIVE --&gt; DEACTIVATED: deactivate or review rejected
+  PENDING_REVIEW --&gt; ACTIVE: review approved
+  PENDING_REVIEW --&gt; DEACTIVATED: review rejected or deactivate
+  ACTIVE --&gt; EXPIRED: effective_to passed
+  PENDING_REVIEW --&gt; EXPIRED: effective_to passed</pre></div>
+<p><strong>Endpoints:</strong></p>
+<ul>
+<li><code>POST /v1/limits/emergency-controls</code></li>
+<li><code>GET /v1/limits/emergency-controls</code></li>
+<li><code>POST /v1/limits/emergency-controls/{id}:deactivate</code>: an immediate lift by <code>RISK_CHECKER</code> / <code>CAMLCO</code> / <code>ADMIN</code>, audited.</li>
+</ul>
+<p><em>Spec ref: §3.5, §5.1.8, BR-05-07, BR-05-12</em></p>
+<hr>
+<h2 id="9-use-case-7--blacklist-and-whitelist"><a class="anchor" href="#9-use-case-7--blacklist-and-whitelist">#</a>9. Use case 7 — Blacklist and whitelist</h2>
+<h3 id="91-what-can-be-listed"><a class="anchor" href="#91-what-can-be-listed">#</a>9.1 What can be listed</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>List</th>
+<th>Types</th>
+<th>Effect</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>Blacklist</strong></td>
+<td><code>NID</code>, <code>MSISDN</code>, <code>DEVICE</code>, <code>WALLET</code>, <code>BANK_ACCOUNT</code>, <code>IP</code>, <code>PARTNER</code></td>
+<td>Evaluate / batch → <code>BLOCK</code> (<code>riskScore</code> 100). Published on <code>blacklist.events</code></td>
+</tr>
+<tr>
+<td><strong>Whitelist</strong></td>
+<td><code>WALLET</code>, <code>DEVICE</code>, <code>MSISDN</code> (expiry mandatory)</td>
+<td>Skips fraud rules marked <code>suppressibleByWhitelist</code>. <strong>Never</strong> overrides the blacklist or limits. Not published</td>
+</tr>
+</tbody></table></div>
+<h3 id="92-hashing-why-you-cannot-send-a-clear-nid"><a class="anchor" href="#92-hashing-why-you-cannot-send-a-clear-nid">#</a>9.2 Hashing: why you cannot send a clear NID</h3>
+<p>Values are stored as <code>HMAC-SHA256(BITSPAY_PLATFORM_HMAC_KEY, normalize(type, value))</code> in lower-case hex (kernel K2), plus a masked display form.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Type</th>
+<th>Normalisation</th>
+<th>Mask</th>
+</tr>
+</thead><tbody><tr>
+<td>MSISDN</td>
+<td>digits only; <code>01711000000</code> → <code>8801711000000</code> (13 digits)</td>
+<td><code>8801711****00</code></td>
+</tr>
+<tr>
+<td>NID</td>
+<td>digits only (10/13/17)</td>
+<td><code>******1234</code></td>
+</tr>
+<tr>
+<td>WALLET / PARTNER</td>
+<td>lower-case UUID</td>
+<td>first 4 + <code>****</code></td>
+</tr>
+<tr>
+<td>BANK_ACCOUNT</td>
+<td><code>&lt;bankCode&gt;:&lt;digits&gt;</code></td>
+<td>first 4 + <code>****</code></td>
+</tr>
+</tbody></table></div>
+<p>Because MSISDN is normalised before hashing, <code>01711000000</code> and <code>8801711000000</code> produce <strong>the same hash</strong>, so both are caught.</p>
+<p>For <code>NID</code> and <code>BANK_ACCOUNT</code> you <strong>must</strong> send <code>valueHash</code>. Sending a clear <code>value</code> gives <code>400 CLEAR_VALUE_NOT_ALLOWED</code>, so a clear NID never appears in a URL or a log.</p>
+<h3 id="93-check-api-used-by-wallet-service-during-onboarding"><a class="anchor" href="#93-check-api-used-by-wallet-service-during-onboarding">#</a>9.3 Check API (used by wallet-service during onboarding)</h3>
+<pre class="code"><code>GET /v1/blacklist/check?type=NID&amp;valueHash=9f2c0e7a…
+GET /v1/blacklist/check?type=MSISDN&amp;value=01711000000</code></pre>
+<pre class="code"><code class="lang-json">{ "listed": true,
+  "entries": [ { "entryId": "0192f5aa-0000-7000-8000-0000000000e1", "type": "NID", "reasonCode": "FRAUD_CONFIRMED",
+                 "valueMasked": "******1234", "expiresAt": null, "createdAt": "2026-09-01T10:00:00.000Z" } ] }</code></pre>
+<p>Send exactly one of <code>value</code> / <code>valueHash</code>. The query string is masked in access logs.</p>
+<h3 id="94-proposing-an-entry-compliance-case"><a class="anchor" href="#94-proposing-an-entry-compliance-case">#</a>9.4 Proposing an entry (compliance case)</h3>
+<div class="diagram"><pre class="mermaid">sequenceDiagram
+  participant C as compliance-service
+  participant R as limits-risk api
+  participant PG as Postgres
+  participant CH as Checker (RISK_CHECKER)
+  C-&gt;&gt;R: POST /v1/blacklist/entries (NID, valueHash, COMPLIANCE_CASE)
+  R-&gt;&gt;PG: one txn: entry PENDING_APPROVAL, approval_request, APPROVAL_REQUESTED, AUDIT_RECORDED
+  R--&gt;&gt;C: 202 entryId, approvalId
+  CH-&gt;&gt;R: POST /v1/approvals/{id}:approve
+  R-&gt;&gt;PG: one txn: entry ACTIVE, config_version + 1, APPROVAL_DECIDED, BLACKLIST_ENTRY_UPSERTED active true, AUDIT_RECORDED
+  R--&gt;&gt;CH: 200 APPROVED
+  R-&gt;&gt;R: every pod reloads ListBook within 2 s</pre></div>
+<pre class="code"><code class="lang-json">{ "type": "NID", "valueHash": "9f2c0e7a1b3d5f7091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708", "valueMasked": null,
+  "reasonCode": "FRAUD_CONFIRMED", "expiresAt": null, "comment": "Confirmed identity fraud",
+  "source": "COMPLIANCE_CASE", "reference": "CASE-2026-000123" }</code></pre>
+<p>→ <code>202 { &quot;entryId&quot;: &quot;…e2&quot;, &quot;status&quot;: &quot;PENDING_APPROVAL&quot;, &quot;approvalId&quot;: &quot;…01&quot;, &quot;valueMasked&quot;: null }</code></p>
+<ul>
+<li>Reason codes: <code>FRAUD_CONFIRMED</code>, <code>MULE_ACCOUNT</code>, <code>IDENTITY_FRAUD</code>, <code>AML_SUSPICION</code>, <code>REGULATORY_INSTRUCTION</code>, <code>SANCTIONS</code>, <code>OTHER</code>.</li>
+<li><strong>Duplicate</strong> (an ACTIVE or PENDING entry for the same type + hash) → <code>409 DUPLICATE_ENTRY</code> with the existing <code>entryId</code>.</li>
+<li>Service requests are <strong>never auto-approved</strong>.</li>
+</ul>
+<h3 id="95-lifecycle"><a class="anchor" href="#95-lifecycle">#</a>9.5 Lifecycle</h3>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; PENDING_APPROVAL: add (maker)
+  PENDING_APPROVAL --&gt; ACTIVE: approved, BLACK publishes active true
+  PENDING_APPROVAL --&gt; REJECTED: rejected or approval expired
+  ACTIVE --&gt; INACTIVE: deactivation approved, BLACK publishes active false
+  ACTIVE --&gt; EXPIRED: expires_at passed, BLACK publishes active false</pre></div>
+<h3 id="96-other-list-endpoints"><a class="anchor" href="#96-other-list-endpoints">#</a>9.6 Other list endpoints</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead><tbody><tr>
+<td><code>POST /v1/blacklist/entries:bulk</code></td>
+<td>CSV of ≤ 10,000 rows. Bad rows come back in <code>rejectedRows</code>; one approval covers the rest</td>
+</tr>
+<tr>
+<td><code>GET /v1/blacklist/entries</code></td>
+<td>list (masked values only)</td>
+</tr>
+<tr>
+<td><code>POST /v1/blacklist/entries/{id}:deactivate</code></td>
+<td>→ approval</td>
+</tr>
+<tr>
+<td><code>POST /v1/whitelist/entries</code></td>
+<td>e.g. <code>{ &quot;type&quot;: &quot;WALLET&quot;, &quot;value&quot;: &quot;0192f2aa-…a001&quot;, &quot;reasonCode&quot;: &quot;VERIFIED_HIGH_VALUE&quot;, &quot;expiresAt&quot;: &quot;2027-01-01T00:00:00.000Z&quot;, &quot;comment&quot;: &quot;Verified business owner&quot; }</code></td>
+</tr>
+<tr>
+<td><code>GET /v1/whitelist/entries</code>, <code>POST /v1/whitelist/entries/{id}:deactivate</code></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<h3 id="97-where-the-blacklist-is-checked-during-evaluate"><a class="anchor" href="#97-where-the-blacklist-is-checked-during-evaluate">#</a>9.7 Where the blacklist is checked during evaluate</h3>
+<ul>
+<li><strong>Memory, before Redis:</strong> WALLET (both parties) and DEVICE (<code>deviceId</code>).</li>
+<li><strong>After the profile fetch:</strong> MSISDN, NID and PARTNER hashes of both parties. These come from the local wallet profile that is built from <code>wallet.events</code>, <code>customer.events</code> and <code>partner.events</code>. If no profile exists, the check is skipped and counted in a metric.</li>
+</ul>
+<p>Each hit adds <code>BLACKLIST:&lt;TYPE&gt;:&lt;FROM|TO&gt;</code> to <code>reasonCodes</code>.</p>
+<p><em>Spec ref: §3.4 F7, §5.1.5–5.1.7, §5.2.2, §7.4 (BR-05-26..29)</em></p>
+<hr>
+<h2 id="10-use-case-8--fraud-rules-engine"><a class="anchor" href="#10-use-case-8--fraud-rules-engine">#</a>10. Use case 8 — Fraud rules engine</h2>
+<h3 id="101-a-rule-is-data"><a class="anchor" href="#101-a-rule-is-data">#</a>10.1 A rule is data</h3>
+<pre class="code"><code class="lang-json">{
+  "ruleId": "FR-NEWDEV-001", "name": "New device + high value", "category": "DEVICE",
+  "description": "Device first seen on this wallet &lt; 24h and amount &gt;= 10,000 Tk",
+  "appliesTo": { "txnTypes": ["P2P","CASH_OUT","MERCHANT_PAYMENT"], "channels": null, "fromWalletTypes": ["C"], "toWalletTypes": null },
+  "condition": { "all": [
+      { "op": "lt",  "left": "device.firstSeenMinutesAgo", "right": 1440 },
+      { "op": "gte", "left": "txn.amountPoisha",           "right": 1000000 } ] },
+  "weight": 45, "action": null, "mode": "ENFORCE", "suppressibleByWhitelist": true
+}</code></pre>
+<p>Read it as: <em>&quot;For customer senders doing P2P, cash-out or merchant payment: if the device was first seen less than 1,440 minutes (24 h) ago <strong>and</strong> the amount is at least 10,000 Tk, add 45 to the score.&quot;</em></p>
+<h3 id="102-the-dsl-in-a-nutshell"><a class="anchor" href="#102-the-dsl-in-a-nutshell">#</a>10.2 The DSL in a nutshell</h3>
+<ul>
+<li><strong>Combinators:</strong> <code>all</code>, <code>any</code>, <code>not</code> (each takes 1..20 children).</li>
+<li><strong>Operators:</strong><ul>
+<li>comparisons: <code>eq</code>, <code>ne</code>, <code>gt</code>, <code>gte</code>, <code>lt</code>, <code>lte</code>;</li>
+<li>sets: <code>in</code>, <code>notIn</code>;</li>
+<li>range: <code>between</code> (lo ≤ x &lt; hi);</li>
+<li>presence: <code>exists</code>, <code>missing</code>;</li>
+<li>booleans: <code>isTrue</code>, <code>isFalse</code>;</li>
+<li>bitmask: <code>hasFlag</code>;</li>
+<li>divisibility: <code>divisibleBy</code>.</li>
+</ul>
+</li>
+<li><strong>Arithmetic</strong> (integers only): <code>add</code>, <code>sub</code>, and <code>mulBps</code> (<code>floor(x × bps / 10000)</code>). For example, <code>{&quot;mulBps&quot;: [&quot;from.profile.ewmaSendAmountPoisha&quot;, 50000]}</code> means &quot;5 × the usual amount&quot;.</li>
+<li><strong>Limits:</strong> depth ≤ 6, ≤ 50 nodes, ≤ 100 ENFORCE + 50 SHADOW live rules.</li>
+</ul>
+<p><strong>Attributes you can use</strong> (validated at compile time):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Family</th>
+<th>Examples</th>
+</tr>
+</thead><tbody><tr>
+<td><code>txn.*</code></td>
+<td><code>txn.amountPoisha</code>, <code>txn.type</code>, <code>txn.channel</code>, <code>txn.hasDevice</code></td>
+</tr>
+<tr>
+<td><code>time.*</code></td>
+<td><code>time.hourDhaka</code>, <code>time.isNight</code> (22:00–06:00)</td>
+</tr>
+<tr>
+<td><code>from.*</code> / <code>to.*</code></td>
+<td><code>walletType</code>, <code>kycTier</code>, <code>flags</code>, <code>riskGrade</code>, <code>profile.ageDays</code>, <code>profile.ewmaSendAmountPoisha</code>, <code>profile.msisdnHash</code></td>
+</tr>
+<tr>
+<td><code>agg.&lt;from|to&gt;.&lt;metric&gt;.&lt;window&gt;[.&lt;TXN_TYPE&gt;]</code></td>
+<td><code>agg.from.sendCount.10m</code>, <code>agg.to.recvCount.24h</code>, <code>agg.from.sendCount.1h.CASH_OUT</code>. Windows: <code>10m</code>, <code>1h</code>, <code>24h</code>, <code>7d</code>, <code>30d</code>. Values are <strong>before</strong> this txn</td>
+</tr>
+<tr>
+<td><code>device.*</code></td>
+<td><code>isNewForWallet</code>, <code>firstSeenMinutesAgo</code>, <code>changedMinutesAgo</code>, <code>walletCount</code></td>
+</tr>
+<tr>
+<td><code>beneficiary.isFirstTime</code></td>
+<td>sender never completed a payment to this receiver</td>
+</tr>
+<tr>
+<td><code>pair.*</code></td>
+<td><code>pair.to.CASH_IN.S.minutesAgo</code>, <code>pair.from.countToday</code></td>
+</tr>
+<tr>
+<td><code>ctx.*</code></td>
+<td><code>ctx.authFailedCount15m</code>, <code>ctx.simChangedHoursAgo</code>, <code>ctx.geo.kmhSinceLast</code>. <strong>All UNKNOWN in R1</strong> (<code>context</code> is null)</td>
+</tr>
+</tbody></table></div>
+<h3 id="103-three-valued-logic-missing-data-never-fires-a-rule"><a class="anchor" href="#103-three-valued-logic-missing-data-never-fires-a-rule">#</a>10.3 Three-valued logic: missing data never fires a rule</h3>
+<p>A predicate over a missing attribute is <strong>UNKNOWN</strong>, not false.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Expression</th>
+<th>Result</th>
+</tr>
+</thead><tbody><tr>
+<td><code>all</code> with any FALSE</td>
+<td>FALSE</td>
+</tr>
+<tr>
+<td><code>all</code> with no FALSE but an UNKNOWN</td>
+<td>UNKNOWN</td>
+</tr>
+<tr>
+<td><code>any</code> with any TRUE</td>
+<td>TRUE</td>
+</tr>
+<tr>
+<td><code>not UNKNOWN</code></td>
+<td>UNKNOWN</td>
+</tr>
+</tbody></table></div>
+<p>A rule <strong>fires only on TRUE</strong>.</p>
+<p><strong>Example:</strong> FR-GEO-001 (<code>ctx.geo.kmhSinceLast ≥ 500</code>). In R1 <code>context</code> is null, so the attribute is missing, the predicate is UNKNOWN, and the rule never fires. That is why the GEO, AUTH and SIM-001 rules are seeded in SHADOW mode.</p>
+<p>Validate before saving: <code>POST /v1/risk/rules:validate</code>.</p>
+<pre class="code"><code class="lang-json">{ "valid": false, "errors": [ { "pointer": "/condition/all/1/left", "message": "unknown attribute agg.from.sendCount.2h (windows: 10m,1h,24h,7d,30d)" } ], "requiredAggregates": ["m5:S:c"] }</code></pre>
+<h3 id="104-rolling-aggregates"><a class="anchor" href="#104-rolling-aggregates">#</a>10.4 Rolling aggregates</h3>
+<p><code>agg_touch.lua</code> keeps per-wallet velocity buckets (1 min, 5 min, 1 h, 1 day resolution) in the <strong>aggregate</strong> Redis. It returns the &quot;before&quot; values, then increments them.</p>
+<p>These count <strong>attempts</strong>, including later-declined ones, so a burst of tries is visible. Facts that should reflect <em>completed</em> activity (beneficiary set, average send amount, last activity) are updated from <code>TRANSACTION_COMPLETED</code>.</p>
+<p>If the aggregate store is down, the setting <code>fraud.on-aggregate-unavailable</code> decides what happens:</p>
+<ul>
+<li><code>REFUSE</code> (seed): 503.</li>
+<li><code>DEGRADE</code>: evaluate with those attributes UNKNOWN.</li>
+</ul>
+<h3 id="105-score--decision"><a class="anchor" href="#105-score--decision">#</a>10.5 Score → decision</h3>
+<pre class="code"><code>riskScore = min(maxScore, Σ weight of matched ENFORCE rules)
+fraud outcome = most severe of (each matched rule's action, threshold(score))</code></pre>
+<p>Seed settings:</p>
+<pre class="code"><code class="lang-json">{"thresholds":{"ALLOW_AND_ALERT":30,"STEP_UP":50,"HOLD":70,"BLOCK":90},"maxScore":100,
+ "stepUpUnsupportedChannels":["SYSTEM","API"],"stepUpFallback":"HOLD","bypassTxnTypes":["REVERSAL"],"alertOnLimitExceeded":false}</code></pre>
+<div class="table-wrap"><table><thead><tr>
+<th>Score</th>
+<th>Outcome</th>
+</tr>
+</thead><tbody><tr>
+<td>0–29</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>30–49</td>
+<td>ALLOW_AND_ALERT</td>
+</tr>
+<tr>
+<td>50–69</td>
+<td>STEP_UP</td>
+</tr>
+<tr>
+<td>70–89</td>
+<td>HOLD</td>
+</tr>
+<tr>
+<td>90–100</td>
+<td>BLOCK</td>
+</tr>
+</tbody></table></div>
+<p><strong>Worked example (agent round-trip, CICO):</strong> Salma Telecom (agent) cashes in 2,000 Tk to a customer. 20 minutes later the same customer cashes out at Salma. FR-CICO-002 (<code>pair.to.CASH_IN.S.minutesAgo ≤ 30</code>, weight 50) fires, and 50 ≥ 50 gives <strong>STEP_UP</strong>. The channel <code>PARTNER_APP</code> supports step-up, so it stays STEP_UP, which is a terminal decline in R1.</p>
+<p>Settings are changed through <code>GET</code> / <code>POST /v1/risk/settings</code>, which is maker-checked. Thresholds must be ascending and ≤ <code>maxScore</code>.</p>
+<h3 id="106-seeded-rule-library-20-templates-values-provisional"><a class="anchor" href="#106-seeded-rule-library-20-templates-values-provisional">#</a>10.6 Seeded rule library (20 templates, values provisional)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Rule</th>
+<th>What it catches</th>
+<th>Weight / action</th>
+<th>Mode</th>
+</tr>
+</thead><tbody><tr>
+<td>FR-VEL-001</td>
+<td>≥ 5 sends in 10 min</td>
+<td>30</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-VEL-002</td>
+<td>24 h send amount + this ≥ 100,000 Tk</td>
+<td>25</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-PRF-001</td>
+<td>amount ≥ 5× usual (and ≥ 5,000 Tk)</td>
+<td>35</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-NEWDEV-001</td>
+<td>new device + ≥ 10,000 Tk</td>
+<td>45</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-DEV-001</td>
+<td>device changed ≤ 60 min ago</td>
+<td>15</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-DEV-002</td>
+<td>device used by ≥ 4 wallets</td>
+<td>40</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-GEO-001</td>
+<td>impossible travel ≥ 500 km/h</td>
+<td>50</td>
+<td>SHADOW</td>
+</tr>
+<tr>
+<td>FR-AUTH-001</td>
+<td>≥ 3 failed auths in 15 min</td>
+<td>STEP_UP</td>
+<td>SHADOW</td>
+</tr>
+<tr>
+<td>FR-SIM-001</td>
+<td>SIM changed ≤ 72 h + ≥ 5,000 Tk</td>
+<td>HOLD</td>
+<td>SHADOW</td>
+</tr>
+<tr>
+<td>FR-SIM-002</td>
+<td>PIN-reset cooling + ≥ 5,000 Tk</td>
+<td>STEP_UP</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-BEN-001</td>
+<td>first-time beneficiary + ≥ 10,000 Tk</td>
+<td>30</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-STR-001</td>
+<td>round amounts (÷1,000 Tk), ≥ 5,000 Tk, ≥ 3 sends/h</td>
+<td>25</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-PT-001</td>
+<td>received ≥ 10,000 Tk in 1 h and sends ≥ 80 % of it out</td>
+<td>40</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-DOR-001</td>
+<td>dormant ≥ 180 d or reactivated ≤ 7 d + ≥ 5,000 Tk</td>
+<td>35</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-MER-001</td>
+<td>≥ 10 merchant refunds in 24 h</td>
+<td>40</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-CICO-001</td>
+<td>agent and customer share the same MSISDN</td>
+<td>BLOCK</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-CICO-002</td>
+<td>cash-out ≤ 30 min after a cash-in at the same agent</td>
+<td>50</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-CICO-003</td>
+<td>≥ 3 cash-outs in 1 h (split)</td>
+<td>35</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-CICO-004</td>
+<td>≥ 5 agent–customer txns today</td>
+<td>30</td>
+<td>ENFORCE</td>
+</tr>
+<tr>
+<td>FR-MUL-001</td>
+<td>mule fan-in: ≥ 30 receives in 24 h</td>
+<td>30</td>
+<td>ENFORCE</td>
+</tr>
+</tbody></table></div>
+<p>The exact DSL for each rule is in SPEC §7.8.</p>
+<h3 id="107-rule-versions-and-shadow-mode"><a class="anchor" href="#107-rule-versions-and-shadow-mode">#</a>10.7 Rule versions and SHADOW mode</h3>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; DRAFT
+  DRAFT --&gt; DRAFT: edit
+  DRAFT --&gt; PENDING_APPROVAL: submit with mode and effectiveFrom
+  PENDING_APPROVAL --&gt; REJECTED: rejected or expired
+  PENDING_APPROVAL --&gt; SCHEDULED: approved, effectiveFrom in future
+  PENDING_APPROVAL --&gt; ACTIVE: approved, mode ENFORCE
+  PENDING_APPROVAL --&gt; SHADOW: approved, mode SHADOW
+  SCHEDULED --&gt; ACTIVE: effectiveFrom reached
+  SHADOW --&gt; ACTIVE: promote (new approval)
+  ACTIVE --&gt; RETIRED: retire approved or superseded
+  SHADOW --&gt; RETIRED: retire approved or superseded</pre></div>
+<p><strong>SHADOW</strong> means the rule is evaluated and its hits are counted (<code>bitspay_limitsrisk_rule_hits_total{mode=&quot;SHADOW&quot;}</code>), but it <strong>never affects the decision or raises an alert</strong>. It is a safe way to measure a new rule on live traffic before enforcing it.</p>
+<p>A typical workflow:</p>
+<ol>
+<li><code>POST /v1/risk/rules</code> (with a <code>definition</code> or <code>fromTemplate</code>) creates DRAFT v1.</li>
+<li><code>POST /v1/risk/rules:validate</code> compiles it and reports errors.</li>
+<li><code>PUT /v1/risk/rules/{ruleId}/versions/{v}</code> edits the draft (with <code>If-Match</code>).</li>
+<li><code>POST /v1/risk/rules/{ruleId}/versions/{v}:submit</code> with <code>mode: SHADOW</code> sends it to a <code>RISK_CHECKER</code> for approval.</li>
+<li>Watch the hit metrics for a week.</li>
+<li><code>POST /v1/risk/rules/{ruleId}/versions</code> makes a new draft; submit it with <code>mode: ENFORCE</code> and get it approved.</li>
+<li><code>POST /v1/risk/rules/{ruleId}:retire</code> retires the rule when it is no longer needed.</li>
+</ol>
+<p>Reading:</p>
+<ul>
+<li><code>GET /v1/risk/rules</code></li>
+<li><code>GET /v1/risk/rules/{ruleId}/versions</code></li>
+<li><code>GET /v1/risk/rules/{ruleId}/versions/{v}</code></li>
+</ul>
+<h3 id="108-decision-log"><a class="anchor" href="#108-decision-log">#</a>10.8 Decision log</h3>
+<p><code>GET /v1/risk/decisions?walletId=&amp;decision=&amp;fromTs=&amp;toTs=</code> and <code>GET /v1/risk/decisions/{txnId}</code> list <strong>non-ALLOW decisions only</strong>. ALLOW is visible in <code>txn.events.riskDecision</code>. Each entry shows the matched rules (including SHADOW hits), the score, <code>violatedLimit</code> and <code>configVersion</code>. Retention is 24 months.</p>
+<p><em>Spec ref: §5.1.9, §7.5, §7.6, §7.8, ADR-04, ADR-06</em></p>
+<hr>
+<h2 id="11-use-case-9--simulation-and-history--r2"><a class="anchor" href="#11-use-case-9--simulation-and-history--r2">#</a>11. Use case 9 — Simulation and history 🕒 R2</h2>
+<p><strong>Question it answers:</strong> &quot;Before I enforce this rule, how often would it have fired over the last 90 days?&quot;</p>
+<ul>
+<li>A history writer (consumer group <code>.history</code>, flag <code>bitspay.risk.history.enabled</code>, default <strong>off</strong>) copies every <code>txn.events</code> record into <code>txn_history</code> (daily partitions, 90 days).</li>
+<li><code>POST /v1/risk/simulations</code> with 1..20 candidate rules and a window of ≤ 90 days → <code>202 { simulationId, status: QUEUED }</code>.</li>
+<li>The worker replays history through an <strong>in-memory</strong> aggregate store. It <strong>never touches Redis</strong>. <code>ctx.*</code> attributes and the blacklist are UNKNOWN during a replay.</li>
+<li><code>GET /v1/risk/simulations/{id}</code> returns, per rule:<ul>
+<li>hits and hit rate per 10k transactions;</li>
+<li>the would-be decision distribution;</li>
+<li>the amount affected;</li>
+<li>overlap with live decisions;</li>
+<li>the top 20 wallets and 100 sample <code>txnId</code>s.</li>
+</ul>
+</li>
+<li>Only one run per user at a time (<code>409 SIMULATION_RUNNING</code>).</li>
+<li>A rule submission may reference its <code>simulationId</code>, so the checker can see the evidence.</li>
+</ul>
+<p><em>Spec ref: §5.1.9, §6.2, §7.9, WP-9</em></p>
+<hr>
+<h2 id="12-use-case-10--maker-checker-approvals"><a class="anchor" href="#12-use-case-10--maker-checker-approvals">#</a>12. Use case 10 — Maker-checker approvals</h2>
+<p>Every config, rule, list and emergency change goes through a local approval request (kernel K5).</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; PENDING: maker submits (level 1)
+  PENDING --&gt; PENDING: level approved, level + 1
+  PENDING --&gt; APPROVED: last level approved, change applied
+  PENDING --&gt; REJECTED: rejected
+  PENDING --&gt; EXPIRED: 72 h passed
+  PENDING --&gt; CANCELLED: maker withdraws</pre></div>
+<h3 id="who-may-approve-what"><a class="anchor" href="#who-may-approve-what">#</a>Who may approve what</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>What</th>
+<th>Makers</th>
+<th>Checkers</th>
+<th>Levels</th>
+</tr>
+</thead><tbody><tr>
+<td>Limit change set</td>
+<td><code>RISK_ANALYST</code>, <code>COMPLIANCE_OFFICER</code></td>
+<td>L1 <code>RISK_CHECKER</code>/<code>CAMLCO</code>; L2 <code>CAMLCO</code></td>
+<td>1, or <strong>2</strong> if it touches a cap or raises any value by &gt; 50 %</td>
+</tr>
+<tr>
+<td>Override (+ deactivation)</td>
+<td><code>RISK_ANALYST</code>, <code>COMPLIANCE_OFFICER</code>, <code>OPS_MAKER</code></td>
+<td><code>RISK_CHECKER</code>, <code>CAMLCO</code>, <code>OPS_CHECKER</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Emergency control</td>
+<td>see §8</td>
+<td><code>RISK_CHECKER</code>, <code>CAMLCO</code>, <code>ADMIN</code></td>
+<td>1 (reviewer ≠ creator)</td>
+</tr>
+<tr>
+<td>Fraud rule version (activate / retire)</td>
+<td><code>RISK_ANALYST</code></td>
+<td><code>RISK_CHECKER</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Risk settings</td>
+<td><code>RISK_ANALYST</code></td>
+<td><code>RISK_CHECKER</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Blacklist entry (add, bulk, deactivate)</td>
+<td><code>RISK_ANALYST</code>, <code>COMPLIANCE_OFFICER</code>, <code>PARTNER_OPS_MAKER</code>, <code>compliance-service</code></td>
+<td><code>RISK_CHECKER</code>, <code>CAMLCO</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Whitelist entry</td>
+<td><code>RISK_ANALYST</code></td>
+<td><code>RISK_CHECKER</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>Self-limit</td>
+<td>—</td>
+<td>—</td>
+<td>none</td>
+</tr>
+</tbody></table></div>
+<h3 id="endpoints"><a class="anchor" href="#endpoints">#</a>Endpoints</h3>
+<ul>
+<li><code>GET /v1/approvals?status=PENDING&amp;entityType=…</code> (the inbox)</li>
+<li><code>POST /v1/approvals/{id}:approve</code> with <code>{ &quot;comment&quot;: &quot;OK per circular&quot; }</code> → <code>200 { &quot;id&quot;: &quot;…&quot;, &quot;status&quot;: &quot;APPROVED&quot;, &quot;level&quot;: 1, &quot;requiredLevels&quot;: 1 }</code></li>
+<li><code>POST /v1/approvals/{id}:reject</code> with <code>{ &quot;comment&quot;: &quot;…&quot;, &quot;reasonCode&quot;: &quot;…&quot; }</code></li>
+</ul>
+<h3 id="errors-you-will-meet"><a class="anchor" href="#errors-you-will-meet">#</a>Errors you will meet</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Situation</th>
+<th>Response</th>
+</tr>
+</thead><tbody><tr>
+<td>Checker = maker (or the same person approves two levels)</td>
+<td><code>422 MAKER_CHECKER_VIOLATION</code></td>
+</tr>
+<tr>
+<td>Role not allowed at this level</td>
+<td><code>403</code></td>
+</tr>
+<tr>
+<td>Not pending any more</td>
+<td><code>409 APPROVAL_NOT_PENDING</code></td>
+</tr>
+<tr>
+<td>Past 72 h</td>
+<td><code>409 APPROVAL_EXPIRED</code></td>
+</tr>
+<tr>
+<td>Change no longer valid at approval time (e.g. a cap changed)</td>
+<td><code>409 REVALIDATION_FAILED</code> (stays pending)</td>
+</tr>
+</tbody></table></div>
+<h3 id="what-apply-means"><a class="anchor" href="#what-apply-means">#</a>What &quot;apply&quot; means</h3>
+<p>The final approval does all of the following in <strong>one DB transaction</strong>:</p>
+<ul>
+<li>applies the change;</li>
+<li>bumps <code>config_version</code>;</li>
+<li>writes history;</li>
+<li>writes the outbox rows <code>APPROVAL_DECIDED</code> and <code>AUDIT_RECORDED</code>, plus <code>BLACKLIST_ENTRY_UPSERTED</code> for blacklist changes.</li>
+</ul>
+<p>Pods then reload within 2 s. Audit payloads carry <strong>hashes and masks only</strong>.</p>
+<p><em>Spec ref: §3.5, §5.1.10, §6.8, §7.10, §7.12</em></p>
+<hr>
+<h2 id="13-events-in-and-out"><a class="anchor" href="#13-events-in-and-out">#</a>13. Events in and out</h2>
+<h3 id="131-produced-through-the-outbox-svc_limits_riskoutbox"><a class="anchor" href="#131-produced-through-the-outbox-svc_limits_riskoutbox">#</a>13.1 Produced (through the outbox <code>svc_limits_risk.outbox</code>)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Topic</th>
+<th>Event</th>
+<th>Key</th>
+<th>When</th>
+</tr>
+</thead><tbody><tr>
+<td><code>risk.alerts</code></td>
+<td><code>RISK_ALERT_RAISED</code></td>
+<td>sender walletId</td>
+<td>ALLOW_AND_ALERT / STEP_UP / HOLD / BLOCK caused by ENFORCE rules or the blacklist; LIMIT_EXCEEDED only if <code>alertOnLimitExceeded</code>. <strong>Not</strong> for SHADOW hits, ALLOW or SERVICE_DISABLED</td>
+</tr>
+<tr>
+<td><code>blacklist.events</code> (compacted)</td>
+<td><code>BLACKLIST_ENTRY_UPSERTED</code></td>
+<td>entryId</td>
+<td>a BLACK entry becomes ACTIVE (<code>active: true</code>), INACTIVE or EXPIRED (<code>active: false</code>)</td>
+</tr>
+<tr>
+<td><code>approval.events</code> (admin-owned)</td>
+<td><code>APPROVAL_REQUESTED</code> / <code>APPROVAL_DECIDED</code> / <code>APPROVAL_EXPIRED</code></td>
+<td></td>
+<td>every maker-checker transition</td>
+</tr>
+<tr>
+<td><code>audit.events</code> (admin-owned)</td>
+<td><code>AUDIT_RECORDED</code></td>
+<td>entityId</td>
+<td>every state-changing API and job</td>
+</tr>
+</tbody></table></div>
+<p><code>RISK_ALERT_RAISED</code> example (the HOLD from §3.5C):</p>
+<pre class="code"><code class="lang-json">{ "eventId": "0192f3c2-0000-7000-8000-0000000000aa", "eventType": "RISK_ALERT_RAISED", "eventVersion": 1,
+  "occurredAt": "2026-10-09T08:03:22.130Z", "producer": "limits-risk-service", "aggregateType": "RiskAlert",
+  "aggregateId": "0192f2aa-0000-7000-8000-00000000a001", "correlationId": "c-0f3e9a",
+  "data": { "alertId": "0192f3c2-0000-7000-8000-0000000000ab", "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11", "txnRef": null,
+    "walletId": "0192f2aa-0000-7000-8000-00000000a001", "decision": "HOLD", "ruleIds": ["FR-NEWDEV-001", "FR-BEN-001"], "riskScore": 75,
+    "details": { "txnType": "P2P", "channel": "APP", "amountPoisha": 2500000, "deviceId": "d-999",
+      "counterpartyWalletId": "0192f2bb-0000-7000-8000-00000000b002",
+      "matchedRules": [ { "ruleId": "FR-NEWDEV-001", "ruleVersion": 2, "weight": 45, "action": null, "category": "DEVICE" },
+                        { "ruleId": "FR-BEN-001", "ruleVersion": 1, "weight": 30, "action": null, "category": "BENEFICIARY" } ],
+      "blacklistHits": [], "reasonCodes": ["FR-NEWDEV-001", "FR-BEN-001"], "violatedLimit": null,
+      "configVersion": 412, "evaluatedAt": "2026-10-09T08:03:22.000Z" } } }</code></pre>
+<p><code>txnRef</code> is always null because it is not known at evaluate time; correlate by <code>txnId</code>.</p>
+<p><code>BLACKLIST_ENTRY_UPSERTED</code> example:</p>
+<pre class="code"><code class="lang-json">{ "eventType": "BLACKLIST_ENTRY_UPSERTED", "aggregateId": "0192f5aa-0000-7000-8000-0000000000e1",
+  "data": { "entryId": "0192f5aa-0000-7000-8000-0000000000e1", "type": "NID",
+    "valueHash": "9f2c0e7a1b3d5f7091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708",
+    "active": true, "expiresAt": null, "reasonCode": "FRAUD_CONFIRMED" } }</code></pre>
+<h3 id="132-consumed"><a class="anchor" href="#132-consumed">#</a>13.2 Consumed</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Topic / event</th>
+<th>From</th>
+<th>What limits-risk does</th>
+<th>Idempotency</th>
+</tr>
+</thead><tbody><tr>
+<td><code>txn.events</code> <code>TRANSACTION_FAILED</code></td>
+<td>transaction</td>
+<td>release both parties</td>
+<td>intrinsic (no inbox row)</td>
+</tr>
+<tr>
+<td><code>txn.events</code> <code>TRANSACTION_COMPLETED</code></td>
+<td>transaction</td>
+<td>commit, or re-apply if expired/released; update sender profile (EWMA amount, count, beneficiary set) and receiver last activity</td>
+<td>intrinsic</td>
+</tr>
+<tr>
+<td><code>txn.events</code> <code>REVERSED</code> / <code>REFUNDED</code></td>
+<td>transaction</td>
+<td>restore counters, <strong>only</strong> if <code>restore-on-reversal</code></td>
+<td><code>processed_event</code></td>
+</tr>
+<tr>
+<td><em>every</em> <code>txn.events</code> record</td>
+<td>transaction</td>
+<td>advance the partition <strong>watermark</strong> (guards the sweeper)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>wallet.events</code> <code>WALLET_UPSERTED</code></td>
+<td>wallet</td>
+<td>upsert wallet profile <code>fp:{walletId}</code> (type, tier, MSISDN <strong>hash</strong>, reactivation time)</td>
+<td>version compare-and-set</td>
+</tr>
+<tr>
+<td><code>customer.events</code> (4 types)</td>
+<td>wallet</td>
+<td>risk grade, NID hash</td>
+<td><code>processed_event</code></td>
+</tr>
+<tr>
+<td><code>partner.events</code> <code>PARTNER_UPSERTED</code></td>
+<td>wallet</td>
+<td>partner risk grade, PARTNER hash</td>
+<td>version + <code>processed_event</code></td>
+</tr>
+<tr>
+<td><code>disbursement.events</code> <code>BATCH_ROW_FAILED</code></td>
+<td>disbursement</td>
+<td>release <code>commandId</code></td>
+<td>intrinsic</td>
+</tr>
+</tbody></table></div>
+<p>A trimmed <code>TRANSACTION_COMPLETED</code> example (fields this service uses):</p>
+<pre class="code"><code class="lang-json">{ "eventType": "TRANSACTION_COMPLETED", "occurredAt": "2026-10-09T08:03:22.161Z",
+  "data": { "txnId": "0192f3c1-7a2b-7c00-9a51-3f2c8e1d0a11", "txnType": "P2P",
+    "fromWalletId": "0192f2aa-0001-7000-8000-00000000a001", "toWalletId": "0192f2bb-0002-7000-8000-00000000b002",
+    "amountPoisha": 50000, "createdAt": "2026-10-09T08:03:22.101Z", "completedAt": "2026-10-09T08:03:22.161Z" } }</code></pre>
+<p>Consumer rules:</p>
+<ul>
+<li>At-least-once delivery, so <strong>every event must be safe to receive twice</strong> (tests deliver each one twice).</li>
+<li>Unknown event types are ignored and counted.</li>
+<li>Failures are retried 5× with backoff, then sent to <code>&lt;topic&gt;.dlq</code>.</li>
+</ul>
+<p>Sample payloads for every topic are in <a href="contracts/consumed/"><code>contracts/consumed/</code></a> and <a href="fixtures/events/"><code>fixtures/events/</code></a>.</p>
+<p><em>Spec ref: §5.2, §6, ADR-07</em></p>
+<hr>
+<h2 id="14-internal-endpoints-jobs-and-failure-behaviour"><a class="anchor" href="#14-internal-endpoints-jobs-and-failure-behaviour">#</a>14. Internal endpoints, jobs and failure behaviour</h2>
+<h3 id="internal-endpoints"><a class="anchor" href="#internal-endpoints">#</a>Internal endpoints</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Endpoint</th>
+<th>Who</th>
+<th>Purpose</th>
+</tr>
+</thead><tbody><tr>
+<td><code>POST /v1/internal/config:reload</code></td>
+<td>SYSTEM, <code>ADMIN</code></td>
+<td>force every book to reload → <code>{configVersion, reloadedAt}</code></td>
+</tr>
+<tr>
+<td><code>GET /v1/internal/reservations/{txnId}</code></td>
+<td><code>RISK_ANALYST</code>, <code>OPS_MAKER</code>, <code>OPS_CHECKER</code></td>
+<td>debug view: state, from/to, amounts, period keys, fields, mode</td>
+</tr>
+</tbody></table></div>
+<h3 id="background-jobs-worker-role-leader-only"><a class="anchor" href="#background-jobs-worker-role-leader-only">#</a>Background jobs (worker role, leader-only)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Job</th>
+<th>Every</th>
+<th>Effect</th>
+</tr>
+</thead><tbody><tr>
+<td>Reservation sweeper</td>
+<td>30 s</td>
+<td>guarded expiry (§4.5)</td>
+</tr>
+<tr>
+<td>List expiry</td>
+<td>1 min</td>
+<td>expire list entries; BLACK publishes <code>active: false</code></td>
+</tr>
+<tr>
+<td>Override / rule expiry</td>
+<td>1 min</td>
+<td><code>limit_rule</code> past <code>effective_to</code> → EXPIRED</td>
+</tr>
+<tr>
+<td>Emergency controls</td>
+<td>1 min</td>
+<td>expire controls; flag overdue reviews</td>
+</tr>
+<tr>
+<td>Rule activation</td>
+<td>1 min</td>
+<td>SCHEDULED → ACTIVE</td>
+</tr>
+<tr>
+<td>Approval expiry</td>
+<td>5 min</td>
+<td>72 h old → EXPIRED</td>
+</tr>
+<tr>
+<td>Partition maintenance</td>
+<td>daily</td>
+<td><code>risk_decision</code> monthly, <code>txn_history</code> daily (R2)</td>
+</tr>
+<tr>
+<td>Outbox / inbox cleanup</td>
+<td>hourly</td>
+<td>3 d / 14 d</td>
+</tr>
+<tr>
+<td>Config poll</td>
+<td>1 s, every pod</td>
+<td>reload if <code>config_version</code> changed</td>
+</tr>
+</tbody></table></div>
+<h3 id="what-happens-when-something-breaks"><a class="anchor" href="#what-happens-when-something-breaks">#</a>What happens when something breaks</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Failure</th>
+<th>Behaviour</th>
+</tr>
+</thead><tbody><tr>
+<td>Redis critical down</td>
+<td><code>503</code> for evaluate, batch, release, usage. <strong>Never ALLOW without a reservation</strong></td>
+</tr>
+<tr>
+<td>Aggregate Redis down</td>
+<td><code>REFUSE</code> → 503 (seed), or <code>DEGRADE</code> → fraud attributes UNKNOWN</td>
+</tr>
+<tr>
+<td>Postgres down</td>
+<td>ALLOW path unaffected (books in memory). Non-ALLOW decisions still returned and their writes retried. Config, list and approval APIs → 503</td>
+</tr>
+<tr>
+<td>Kafka down / lag</td>
+<td>releases and commits are delayed; the watermark stalls, so <strong>nothing expires</strong> (conservative)</td>
+</tr>
+<tr>
+<td>Config never loaded</td>
+<td>readiness DOWN, evaluate → 503</td>
+</tr>
+</tbody></table></div>
+<h3 id="two-redis-modes-adr-01"><a class="anchor" href="#two-redis-modes-adr-01">#</a>Two Redis modes (ADR-01)</h3>
+<ul>
+<li><code>SINGLE_SLOT</code> (default): one Lua call reserves both parties atomically.</li>
+<li><code>PER_PARTY</code> (Redis Cluster): one call per party. If one party rejects, the other is released immediately.</li>
+</ul>
+<p>Overshoot is impossible in both modes. The test suite proves this: 200 threads × 500 Tk against a 50,000 Tk daily limit gives <strong>exactly 100 ALLOW and 100 LIMIT_EXCEEDED</strong>.</p>
+<p><em>Spec ref: §3.3, §3.6, §5.1.11, §9</em></p>
+<hr>
+<h2 id="15-where-it-will-live-in-code"><a class="anchor" href="#15-where-it-will-live-in-code">#</a>15. Where it will live in code</h2>
+<p>Package root <code>com.bracits.bitspay.limitsrisk</code>, layered (no ports or adapters; <code>ArchitectureTest</code> enforces the layers):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Package</th>
+<th>Holds</th>
+</tr>
+</thead><tbody><tr>
+<td><code>controller</code></td>
+<td><code>EvaluateController</code>, <code>UsageController</code>, <code>LimitsConfigController</code>, <code>RuleController</code>, <code>ListController</code>, <code>ApprovalController</code>, <code>InternalController</code></td>
+</tr>
+<tr>
+<td><code>service</code></td>
+<td><code>EvaluateService</code>, <code>BatchEvaluateService</code>, <code>ReservationService</code>, <code>LimitConfigService</code>, <code>EmergencyService</code>, <code>RuleLifecycleService</code>, <code>SimulationService</code>, <code>ListService</code>, <code>ApprovalService</code>, <code>ConfigReloader</code></td>
+</tr>
+<tr>
+<td><code>service.limits</code></td>
+<td><code>LimitBook</code>, <code>LimitResolver</code>, <code>PeriodCalculator</code>, <code>LimitCode</code> (no <code>double</code>/<code>float</code>, enforced by ArchUnit)</td>
+</tr>
+<tr>
+<td><code>service.fraud</code></td>
+<td>DSL parser/compiler, attributes, <code>Scorer</code>, <code>DecisionCombiner</code></td>
+</tr>
+<tr>
+<td><code>service.lists</code></td>
+<td><code>ListBook</code>, <code>Normalizer</code>, <code>HashedValue</code></td>
+</tr>
+<tr>
+<td><code>client</code></td>
+<td><code>RedisCounterStore</code>, <code>RedisAggregateStore</code>, <code>RedisProfileStore</code>; Lua in <code>src/main/resources/redis/</code></td>
+</tr>
+<tr>
+<td><code>repository</code> / <code>entity</code></td>
+<td>Spring Data JPA (<code>ConfigRepository</code>, <code>HistoryRepository</code>, …), schema <code>svc_limits_risk</code></td>
+</tr>
+<tr>
+<td><code>messaging</code></td>
+<td>Kafka consumers, <code>OutboxWriter</code>, inbox</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>Spring config incl. the <code>Clock</code> bean</td>
+</tr>
+</tbody></table></div>
+<h3 id="feature--work-package-build-order-spec-10"><a class="anchor" href="#feature--work-package-build-order-spec-10">#</a>Feature → work package (build order, SPEC §10)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>WP</th>
+<th>Delivers</th>
+<th>Guide section</th>
+</tr>
+</thead><tbody><tr>
+<td>WP-1</td>
+<td>skeleton, stubs returning OpenAPI examples, outbox, ArchUnit</td>
+<td>—</td>
+</tr>
+<tr>
+<td>WP-2</td>
+<td>limit config, resolver, change sets, overrides, approvals</td>
+<td>§7, §12</td>
+</tr>
+<tr>
+<td>WP-3</td>
+<td>Redis counters, Lua, limits-only evaluate</td>
+<td>§3, §4.2</td>
+</tr>
+<tr>
+<td>WP-4</td>
+<td>reservation lifecycle, sweeper, usage, wallet profiles</td>
+<td>§4, §5</td>
+</tr>
+<tr>
+<td>WP-5</td>
+<td>emergency controls, self-limits, batch</td>
+<td>§6, §7.5, §8</td>
+</tr>
+<tr>
+<td>WP-6</td>
+<td>black/whitelist, customer/partner events</td>
+<td>§9</td>
+</tr>
+<tr>
+<td>WP-7</td>
+<td>fraud DSL and rule lifecycle</td>
+<td>§10.1–10.3, §10.7</td>
+</tr>
+<tr>
+<td>WP-8</td>
+<td>aggregates, scoring, decisions, alerts</td>
+<td>§10.4–10.6, §10.8, §13</td>
+</tr>
+<tr>
+<td>WP-9 🕒</td>
+<td>simulation and history</td>
+<td>§11</td>
+</tr>
+<tr>
+<td>WP-10 / 11</td>
+<td>Compose integration, hardening</td>
+<td>§14</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="16-open-decisions-and-not-yet-built-items"><a class="anchor" href="#16-open-decisions-and-not-yet-built-items">#</a>16. Open decisions and not-yet-built items</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Tag</th>
+<th>Topic</th>
+<th>Current provisional behaviour</th>
+</tr>
+</thead><tbody><tr>
+<td>OPEN D-04</td>
+<td>HOLD / STEP_UP</td>
+<td>terminal decline + alert; an analyst cannot &quot;resume&quot; a held payment</td>
+</tr>
+<tr>
+<td>OPEN D-14</td>
+<td>Batch reservation lifetime</td>
+<td>kept until the monthly key expires; never auto-expired</td>
+</tr>
+<tr>
+<td>OPEN D-15</td>
+<td>Late completion after expiry</td>
+<td>re-apply counters, no limit check</td>
+</tr>
+<tr>
+<td>OPEN D-17</td>
+<td>Quote reads <code>monthlyCountUsed</code></td>
+<td>always present in usage</td>
+</tr>
+<tr>
+<td>OPEN D-29</td>
+<td>Partner events / PARTNER fingerprint</td>
+<td>consumed; batch checks MSISDN/NID/PARTNER</td>
+</tr>
+<tr>
+<td>OPEN D-32</td>
+<td>Blacklist reason codes</td>
+<td>the 7 codes listed in §9.4</td>
+</tr>
+<tr>
+<td>OPEN D-01</td>
+<td><code>Idempotency-Key</code> retention</td>
+<td>7 days</td>
+</tr>
+</tbody></table></div>
+<p><strong>Not built in R1:</strong></p>
+<ul>
+<li>ML scoring (R3).</li>
+<li>Edge signals: <code>context</code> is null and the <code>ctx.*</code> rules run in SHADOW.</li>
+<li>Wallet <code>FRAUD_FREEZE</code> call.</li>
+<li>Max-balance enforcement (the ledger does it).</li>
+<li>Case management / AML.</li>
+<li>Dashboards, alert rules, SIEM forwarding, k6 performance runs.</li>
+</ul>
+<p><strong>Remember:</strong> every limit value, weight and threshold in this guide is a <strong>provisional seed</strong>. Seeds are data and can be changed through change sets and settings without a code change.</p>
+
+    </article>
+  </main>
+</div>
+<a class="top" href="#">↑ Top</a>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'strict', flowchart: { htmlLabels: true } });
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        const a = byId.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '0px 0px -75% 0px' });
+  document.querySelectorAll('h2[id]').forEach(h => obs.observe(h));
+</script>
+</body>
+</html>
