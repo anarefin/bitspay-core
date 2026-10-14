@@ -1,0 +1,22 @@
+---
+description: Bits Pay — rules for implementing any service under services/
+globs: services/**
+alwaysApply: true
+---
+# Bits Pay service work
+
+This repo (`bitspay-core`) holds 12 standalone Spring Boot services under `services/<svc>/`. Code is 100 % agent-written from the spec pack.
+
+Before any work on a service:
+1. Read `services/<svc>/CLAUDE.md` completely and treat it as binding — it was written for Claude Code but applies to you unchanged. Its paths are relative to `services/<svc>/`.
+2. Follow its "Read first" order (SPEC.md, contract.yaml, provided/, consumed/, then `docs/global/GLOBAL-CONVENTIONS.md`).
+
+Always:
+- One work package (SPEC §10) per chat. Plan first, implement only after the developer approves.
+- Edit only `services/<svc>/`. Never read or import another service's code.
+- Never edit `docs/contracts/**`, `contract.yaml`, `codes.yaml` or golden vectors — use `/raise-cr`.
+- Run Gradle from `services/<svc>/` (`./gradlew check`); repo checks from the root (`make verify`).
+- Never weaken, delete or disable tests to get green; never lower coverage thresholds.
+- Never merge. Commit only in `/finish-wp`.
+
+Workflow commands: `/start-wp`, `/implement-wp`, `/review-wp`, `/fix-gate`, `/finish-wp`, `/raise-cr` — see `docs/AI-IMPLEMENTATION-GUIDE.md`.
