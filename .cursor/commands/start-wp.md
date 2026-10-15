@@ -5,6 +5,7 @@ Input: the text typed after this command = `<service> <WP-n>`, e.g. `wallet-serv
 
 Do NOT create, edit or delete any file in this step. If an argument is missing, ask for it and stop.
 
+0. Run `scripts/scope.sh status` (from `bitspay-core/`; `../../scripts/scope.sh status` inside `services/SVC/`). It must print `Scope locked to SVC`. If not, stop and ask the developer to run `make lock svc=SVC` — never run it yourself.
 1. Read `services/SVC/CLAUDE.md` and follow its "Read first" order. Read whole sections, not snippets:
    - `docs/SPEC.md` §10 entry for WP (scope, acceptance, depends-on) and every section it points to (§3, §4, §5, §7 …).
    - `docs/SPEC.md` §11 rows with test names that belong to WP, §12, and §13 rows that touch WP.

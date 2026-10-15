@@ -106,7 +106,7 @@ Approvers sign in the CR's **Approval** table. Nothing is edited before the CR i
 
 ## 5. Apply the CR to the producer pack
 
-Branch `cr/CR-<SVC>-<n>-<service>`. Use one Claude Code session scoped to the producer folder (`scripts/agent <service>`), with this prompt:
+Use one branch (any name) and one Claude Code session scoped to the producer folder (`scripts/agent <service>`), with this prompt:
 
 > Read CLAUDE.md, SPEC.md, contracts/contract.yaml and changes/CR-<SVC>-<n>.md. Apply CR-<SVC>-<n> to this pack exactly as its Adoption Plan (producer row) says:
 > 1. edit contracts/provided/* first;
@@ -122,7 +122,7 @@ Then tick the producer row in the CR. The state changes to **Producer-Applied**.
 
 ## 6. Re-pin each impacted consumer (kinds C and D only)
 
-Use one branch and one session **per consumer listed in the Adoption Plan**: `cr/CR-<SVC>-<n>-<consumer>`. Prompt:
+Use one branch and one session **per consumer listed in the Adoption Plan** (any branch name). Prompt:
 
 > Read CLAUDE.md, SPEC.md, contracts/contract.yaml and ../<producer-folder>/changes/CR-<SVC>-<n>.md (read-only). Re-pin this service to <producer> contract <x.y.z> per the CR's Adoption Plan (row for this service):
 > 1. update the pin(s) in contracts/contract.yaml (major / version / pinnedContractVersion) and the fieldsUsed entries;

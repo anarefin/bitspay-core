@@ -6082,7 +6082,7 @@ ORDER BY m.business_date, m.txn_type, m.channel, m.division_code
 
 ## 10. Work packages
 
-Every WP builds and tests with the service's own infra only (Postgres, Kafka, ClickHouse, object storage, WireMock on 8099 from `stubs/`, fixtures from `fixtures/events/`). Branches `finance-ops-service/<module>/wp-<n>-<slug>`.
+Every WP builds and tests with the service's own infra only (Postgres, Kafka, ClickHouse, object storage, WireMock on 8099 from `stubs/`, fixtures from `fixtures/events/`).
 
 Scope tag: every WP is **[R1+]** (whole service out of MVP, SRS v1.2). CR-FINANCEOPS-1 is scope tagging only, so there is no WP-CR-1.
 

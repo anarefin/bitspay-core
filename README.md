@@ -18,6 +18,8 @@ make down       # stop (keep data)  ·  make reset = stop + delete volumes
 Use `make up svcs="ledger-service wallet-service"` or `make core` on machines with less memory.
 Use `make infra` for infrastructure only, when you run a service from the IDE.
 
+AI agents: lock them to the service you work on with `make lock svc=<service>`. See [docs/SERVICE-IMPLEMENTATION-STEPS.md](docs/SERVICE-IMPLEMENTATION-STEPS.md).
+
 New to Docker? Follow the step-by-step guide: [docs/DOCKER-TUTORIAL.md](docs/DOCKER-TUTORIAL.md).
 
 ## Services

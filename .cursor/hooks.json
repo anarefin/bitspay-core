@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [{ "command": "python3 scripts/scope_check.py cursor-pre-tool" }],
+    "beforeShellExecution": [{ "command": "python3 scripts/scope_check.py cursor-shell" }],
+    "afterFileEdit": [{ "command": "python3 scripts/scope_check.py cursor-after-edit" }]
+  }
+}

@@ -2,6 +2,8 @@
 
 How to take a service from its generated skeleton (WP-0) to done, with **100 % agent-written code**. The same workflow works in Claude Code and in Cursor. The prompts ship in the repo as slash commands, so nobody pastes prompts by hand.
 
+> **Step-by-step checklist for one service:** [SERVICE-IMPLEMENTATION-STEPS.md](SERVICE-IMPLEMENTATION-STEPS.md).
+
 ## 1. Ground rules
 
 1. **Humans don't hand-write production or test code.** Developers write prompts, approve plans, review diffs and own the merge. When output is wrong, fix the *input* — the prompt, a clarification, or a change request — and re-run. Don't patch the code by hand.
@@ -17,7 +19,8 @@ How to take a service from its generated skeleton (WP-0) to done, with **100 % a
    - `scripts/contracts.sh check <svc>` must be green.
    - `make verify` must be green.
 6. **Kernel K9 git rules:**
-   - Branch `<svc>/wp-<n>-<slug>`, one scope per branch.
+   - Any branch name; one scope per branch.
+   - **Scope lock:** `make lock svc=<svc>` before the agent starts. Hooks then block every change to another `services/<other>/` folder ([details](SERVICE-IMPLEMENTATION-STEPS.md#5-when-the-scope-guard-blocks-something)).
    - Conventional Commits with the service as scope.
    - The code owner reviews.
    - **Agents never merge.**
@@ -66,7 +69,7 @@ The example uses `wallet-service WP-3`. Commands are identical in both tools; on
 
 | # | Step | Who | Claude Code | Cursor |
 |---|---|---|---|---|
-| 1 | Branch | Dev | `git switch -c wallet-service/wp-3-<slug>` | same |
+| 1 | Branch + lock | Dev | `git switch -c <any-name>` then `make lock svc=wallet-service` | same |
 | 2 | Plan | Agent | Plan mode → `/start-wp wallet-service WP-3` | Plan mode → `/start-wp wallet-service WP-3` |
 | 3 | Review the plan | **Dev** | Check against §4.1, then reply `approve` or give corrections | same |
 | 4 | Implement (TDD) | Agent | Shift+Tab out of plan mode → `/implement-wp wallet-service WP-3` | Agent mode → `/implement-wp wallet-service WP-3` |
@@ -74,7 +77,7 @@ The example uses `wallet-service WP-3`. Commands are identical in both tools; on
 | 6 | Independent review | Agent | `/clear` → `/review-wp wallet-service WP-3` | New chat → `/review-wp wallet-service WP-3` |
 | 7 | Fix findings | Agent | Paste the BLOCKER/MAJOR rows: "Fix these findings, test-first, then re-run `./gradlew check`." | same |
 | 8 | Finish | Agent | `/finish-wp wallet-service WP-3` (gates, PROGRESS.md, commit, PR text) | same |
-| 9 | Push and open the PR | Dev | `git push -u origin HEAD`, then open the PR with the generated description | same |
+| 9 | Push, open the PR, unlock | Dev | `git push -u origin HEAD`, open the PR with the generated description, then `make unlock` | same |
 | 10 | Code review and merge | **Dev / code owner** | Checklist in §6. Request changes go back through step 7 | same |
 
 ### 4.1 What to check in a plan (step 3)
@@ -114,7 +117,6 @@ Correct the plan in the same session (e.g. "Add `walletCache_404_writesNegativeC
 ## 6. PR review checklist (code owner)
 
 **Scope**
-- [ ] The branch is `<svc>/wp-<n>-<slug>`.
 - [ ] Only `services/<svc>/**` changed.
 - [ ] Nothing under `docs/contracts/` changed.
 - [ ] Golden vectors are byte-identical.

@@ -2738,7 +2738,7 @@ Kernel metrics also exposed: `bitspay_outbox_unpublished_rows` (alert > 1 000 fo
 
 ## 10. Work packages (build order)
 
-Branches: `pricing-service/pricing/wp-<n>-<slug>` (Dev-6), `pricing-service/campaign/wp-<n>-<slug>` (Dev-4), `pricing-service/wp-<n>-<slug>` for shared work. Each WP depends only on earlier WPs of this pack and on the stubs / fixtures.
+Owners: `pricing` module Dev-6, `campaign` module Dev-4. Each WP depends only on earlier WPs of this pack and on the stubs / fixtures.
 
 Scope tags: `[MVP]` = delivered in the MVP release (SRS v1.2); `[R1+]` = later release. In the MVP the campaign module is disabled (`bitspay.modules.campaign.enabled=false`), so the WP-1 start-up test with the flag off is the MVP deployment shape.
 

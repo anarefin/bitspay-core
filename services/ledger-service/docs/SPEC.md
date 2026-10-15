@@ -1891,7 +1891,7 @@ Plus the kernel K8.4 HTTP and outbox metrics. **Alert conditions** (rules are no
 
 Scope tags: `[MVP]` = needed by the MVP release (SRS v1.2); `[R1+]` = no MVP caller. WP-CR-1 is applied after WP-3 and before WP-9.
 
-Every WP ends with `./gradlew check` green, OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated and `make verify` green. No other Bits Pay service is ever needed: TB, Postgres, RabbitMQ and Kafka come from Testcontainers or the Compose stack. Branch `ledger-service/wp-<n>-<slug>`.
+Every WP ends with `./gradlew check` green, OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated and `make verify` green. No other Bits Pay service is ever needed: TB, Postgres, RabbitMQ and Kafka come from Testcontainers or the Compose stack.
 
 ### WP-1 [MVP] Skeleton & contracts
 - Goal: the project builds, runs in Compose and serves every provided operation.

@@ -20,7 +20,7 @@ You are implementing **general-ledger-service** (SVC-16) of Bits Pay: the Operat
 - One work package per session, plan mode first: "We are doing WP-n from SPEC.md §10. Propose a plan, then implement it with tests."
 - Contract-first: implement `docs/contracts/provided/*` exactly; consume others only via `docs/contracts/consumed/*`, `docs/stubs/`, `docs/fixtures/` and `reference/test-inputs/` — never read or import another service's code. Never wait for another service.
 - Finish each WP with `./gradlew check` green, OpenAPI drift check green, `docs/PROGRESS.md` updated, `make verify` green.
-- Use the test names in SPEC §10/§11. Branch `general-ledger-service/wp-<n>-<slug>`.
+- Use the test names in SPEC §10/§11.
 
 ## Non-negotiable rules
 - Edit only this folder. DB schema `svc_general_ledger` only. One outbox `svc_general_ledger.outbox`.

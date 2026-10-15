@@ -16,7 +16,7 @@ You are implementing **wallet-service** of Bits Pay: one Spring Boot service wit
 - Contracts: `../../scripts/contracts.sh check wallet-service`
 
 ## How to work
-- One work package per session, plan mode first: "We are doing WP-n from SPEC.md §10. Propose a plan, then implement it with tests." State the module in every branch / MR: `wallet-service/<module>/wp-<n>-<slug>`.
+- One work package per session, plan mode first: "We are doing WP-n from SPEC.md §10. Propose a plan, then implement it with tests."
 - Contract-first: implement `docs/contracts/provided/*` exactly; consume others only via `docs/contracts/consumed/*`, `docs/stubs/` and `docs/fixtures/` — never read or import another service's code.
 - Finish each WP with `./gradlew check` green, OpenAPI drift check green, `docs/PROGRESS.md` (one section per module) and `docs/MODULES.md` updated, `make verify` green.
 

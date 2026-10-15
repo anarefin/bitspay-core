@@ -13,7 +13,7 @@ Before any work on a service:
 
 Always:
 - One work package (SPEC §10) per chat. Plan first, implement only after the developer approves.
-- Edit only `services/<svc>/`. Never read or import another service's code.
+- Edit only `services/<svc>/`. Never read or import another service's code. The developer runs `make lock svc=<svc>` before the chat; hooks then block edits to other services. Never change or remove `.agent-scope` yourself.
 - Never edit `docs/contracts/**`, `contract.yaml`, `codes.yaml` or golden vectors — use `/raise-cr`.
 - Run Gradle from `services/<svc>/` (`./gradlew check`); repo checks from the root (`make verify`).
 - Never weaken, delete or disable tests to get green; never lower coverage thresholds.

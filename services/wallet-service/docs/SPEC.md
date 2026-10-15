@@ -8695,7 +8695,7 @@ Alert conditions (rules are built later; metrics exposed now): cache mismatch > 
 
 ## 10. Work packages (build order for Claude Code)
 
-Every WP ends with `./gradlew check` green, the OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated (one section per module) and `make verify` green. No WP needs another service running (WireMock stubs from `stubs/`, fixtures from `fixtures/events/`). Branches `wallet-service/<module>/wp-<n>-<slug>`; owners: W-WPs Dev-3, P-WPs Dev-4, shared WPs Dev-3 with Dev-4 reviewing.
+Every WP ends with `./gradlew check` green, the OpenAPI drift check green against `contracts/provided/openapi.yaml`, `docs/PROGRESS.md` updated (one section per module) and `make verify` green. No WP needs another service running (WireMock stubs from `stubs/`, fixtures from `fixtures/events/`). Owners: W-WPs Dev-3, P-WPs Dev-4, shared WPs Dev-3 with Dev-4 reviewing.
 
 Scope tags: `[MVP]` = needed by the MVP release (SRS v1.2); `[R1+]` = no MVP need (R1 / R2 features: R2 lifecycle jobs and pre-registration, effective-dated hierarchy changes, outlets / partner users / agreements). Inside an `[MVP]` WP, items marked R2 (e.g. W-WP-7 risk regrade) may be built later without blocking the MVP. WP-CR-1 is applied after P-WP-7 (and W-WP-3 for the cache writer pattern) and before X-WP-1.
 

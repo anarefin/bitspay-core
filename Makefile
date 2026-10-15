@@ -13,7 +13,7 @@ args ?=
 schema = svc_$(subst -,_,$(patsubst %-service,%,$(svc)))
 
 .DEFAULT_GOAL := help
-.PHONY: help build up core infra down reset ps logs status welcome rebuild psql check check-all gradle tools contracts-check verify urls
+.PHONY: help build up core infra down reset ps logs status welcome rebuild psql check check-all gradle tools contracts-check verify urls lock unlock scope hooks
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -86,6 +86,18 @@ contracts-check: ## Validate every pack's contracts (needs PyYAML)
 	scripts/contracts.sh check
 
 verify: contracts-check ## Repo-level checks (contracts)
+
+lock: ## Lock AI agents to one service (no edits to other services): make lock svc=wallet-service
+	@scripts/scope.sh lock $(svc)
+
+unlock: ## Remove the service-scope lock
+	@scripts/scope.sh unlock
+
+scope: ## Show the current service-scope lock
+	@scripts/scope.sh status
+
+hooks: ## Install the repo git hooks (scope-lock pre-commit)
+	@scripts/scope.sh hooks
 
 urls:
 	@echo "Edge proxy  http://localhost:8000/<svc-short>/welcome   ·   Kafka UI http://localhost:8089 (make tools)"

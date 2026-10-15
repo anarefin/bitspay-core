@@ -20,7 +20,6 @@ You are implementing **admin-service** (SVC-15) of Bits Pay: module `governance`
 
 ## How to work
 - One work package per session, plan mode first: "We are doing WP-n from SPEC.md §10. Propose a plan, then implement it with tests."
-- Branch `admin-service/<module>/wp-<n>-<slug>` (`common` for shared WPs).
 - Contract-first: implement `docs/contracts/provided/*` exactly; consume others only via `docs/contracts/consumed/*`, `docs/stubs/` and `docs/fixtures/` — never read or import another service's code.
 - Finish each WP with `./gradlew check` green, OpenAPI drift check green, `docs/PROGRESS.md` and `docs/MODULES.md` updated, `make verify` green.
 

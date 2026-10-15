@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Refuse a commit that touches another service while the scope is locked (scripts/scope.sh).
+ROOT="$(git rev-parse --show-toplevel)"
+[ -s "$ROOT/.agent-scope" ] || exit 0
+exec python3 "$ROOT/scripts/scope_check.py" staged

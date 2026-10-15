@@ -3192,7 +3192,7 @@ Seed providers: `LOG_SMS_A` (SMS, LOG, sender IDs `{"TRANSACTIONAL":"BitsPay","S
 
 ## 10. Work packages (build order for Claude Code)
 
-Each WP: goal · scope · acceptance tests · depends on. Branches `admin-service/<module>/wp-<n>-<slug>` (`common` for shared WPs).
+Each WP: goal · scope · acceptance tests · depends on.
 
 Scope tags (CR-ADMIN-1, SRS v1.2): `[MVP]` WPs are delivered in the MVP release; `[R1+]` WPs follow. In the MVP, staff roles come only from `X-Actor-Roles` (kernel K7) and the seeded role / permission tables (WP-5 administration APIs are R1+); WP-17 runs the wallet, KYC and `notification.requests` rules (commission-settlement, disbursement and campaign rules stay seeded but their products are disabled).
 
